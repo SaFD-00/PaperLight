@@ -64,8 +64,10 @@ T5 (BE) ── 병렬 진행, T7에서 합류
 
 ### 2.4 Phase 0 종료 조건 (Acceptance Criteria)
 
-1. 빈 라이브러리 탭 + arXiv URL/파일로 논문 PDF 1개 새 탭에서 열기
-2. 탭 2개 이상 띄우고 ⌘1·⌘2로 전환 (전환 < 80ms, [PRD §8.1](./PRD.md) SLO)
+> 시연·E2E 검증은 [fixtures/pilot-papers/](../fixtures/pilot-papers/)에 등록된 파일럿 논문 2편을 고정 입력으로 사용한다. PDF/메타데이터 등록 절차는 해당 디렉토리 README 참조.
+
+1. 빈 라이브러리 탭 + 파일럿 논문 PDF 1편을 새 탭에서 열기 (arXiv URL/파일 업로드 양쪽 경로 모두 동작)
+2. 파일럿 논문 2편을 동시에 띄우고 ⌘1·⌘2로 전환 (전환 < 80ms, [PRD §8.1](./PRD.md) SLO)
 3. PDF에서 텍스트 선택 → Floating Menu → "💡 Explain" → 우측 패널에 Qwen 응답 스트리밍
 4. Translation 토글 → 현재 페이지 한국어 번역 병행 표시
 5. Density Compact/Cozy/Spacious 전환 — 행 높이·폰트 즉시 반영

@@ -43,6 +43,8 @@ PaperLight/
 │
 ├── config/                          # YAML — 모델 매핑, 프롬프트 템플릿, 분야별 용어집
 ├── docs/                            # PRD / DESIGN / ROADMAP / ARCHITECTURE
+├── fixtures/
+│   └── pilot-papers/                # Phase 0 데모 + 회귀 테스트용 파일럿 PDF 2편 + .meta.json
 └── docker-compose.yml               # 로컬 — postgres, qdrant, redis, minio (R2 호환)
 ```
 
