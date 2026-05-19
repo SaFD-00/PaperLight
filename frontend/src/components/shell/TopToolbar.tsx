@@ -9,7 +9,6 @@ import {
   ListTree,
   Menu,
   Minus,
-  MoreHorizontal,
   Play,
   Plus,
   Search,
@@ -18,6 +17,7 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
+import { SettingsMenu } from "@/components/shell/SettingsMenu";
 import { type Density, type Theme, useSettings } from "@/stores/settings";
 import { useReader } from "@/stores/reader";
 
@@ -134,9 +134,7 @@ export function TopToolbar() {
         <IconButton label="명령 팔레트 (⌘K)">
           <Search size={14} />
         </IconButton>
-        <IconButton label="더보기">
-          <MoreHorizontal size={14} />
-        </IconButton>
+        <SettingsMenu />
         <IconButton label="계정">
           <UserRound size={14} />
         </IconButton>
