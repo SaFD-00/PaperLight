@@ -1,69 +1,96 @@
-# PaperLight model routing config — PRD §7.5.4
+# PaperLight model routing config — PRD §7.5.4 (v3.0)
 # Maps tasks to (provider, model) with fallbacks.
 # Hot-reloadable; edit and the running app picks it up via file watcher.
 
-version: "2026.05.19"
+version: "2026.05.19-v3"
 
+# 실험·실행 기본 모델 (PRD §7.5 v3.0) ⭐
 default:
   provider: openrouter
-  model: anthropic/claude-opus-4.7
+  model: qwen/qwen3.6-35b-a3b
 
 tasks:
   summary:
-    provider: openai
-    model: gpt-5
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
-      - { provider: openrouter, model: anthropic/claude-opus-4.7 }
+      - { provider: openai, model: gpt-5 }
       - { provider: gemini, model: gemini-2.5-pro }
 
   chat:
-    provider: gemini
-    model: gemini-2.5-pro
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
+      - { provider: gemini, model: gemini-2.5-pro }
       - { provider: openrouter, model: anthropic/claude-sonnet-4.6 }
 
   explanation:
-    provider: openai
-    model: gpt-5
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
-      - { provider: openrouter, model: anthropic/claude-opus-4.7 }
+      - { provider: openai, model: gpt-5 }
 
   translation:
-    provider: gemini
-    model: gemini-2.5-flash
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
+      - { provider: gemini, model: gemini-2.5-flash }
       - { provider: openai, model: gpt-5-mini }
 
-  figure_description:        # F-14 — Vision LLM required
+  figure_description:        # F-14 — Vision required, Qwen은 text-only fallback
     provider: openai
     model: gpt-5
     fallback:
       - { provider: gemini, model: gemini-2.5-pro }
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
   table_description:         # F-14
     provider: gemini
     model: gemini-2.5-pro
     fallback:
       - { provider: openai, model: gpt-5 }
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
-  paragraph_description:     # F-15 — cheap+fast (batch)
-    provider: gemini
-    model: gemini-2.5-flash
+  paragraph_description:     # F-15 — cheap + fast (batch)
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
-      - { provider: openai, model: gpt-5-mini }
+      - { provider: gemini, model: gemini-2.5-flash }
 
   paragraph_importance:      # F-15 — classifier
-    provider: gemini
-    model: gemini-2.5-flash
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
     fallback:
-      - { provider: openai, model: gpt-5-mini }
+      - { provider: gemini, model: gemini-2.5-flash-lite }
 
   podcast_outline:
     provider: openai
     model: gpt-5
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
   podcast_script:
     provider: openai
     model: gpt-5
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
   podcast_critique:
     provider: gemini
     model: gemini-2.5-pro
+
+  critique:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  classifier:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  highlight:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  domain_classifier:         # 논문 도메인 분류 (글로서리 선택용)
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
