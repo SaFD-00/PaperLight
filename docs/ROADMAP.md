@@ -12,7 +12,7 @@
 | Phase | 기간 | 범위 | 핵심 산출물 | 상태 |
 |-------|------|------|------------|------|
 | **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | ✅ S6 완료 (T0~T10) — 사용자 브라우저 AC 검증 대기 |
-| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | ⬜ 대기 |
+| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a (Schema Foundation) ✅ — 다음 S7b Auth |
 | **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
 
@@ -118,19 +118,21 @@ S1 ──┬──► S2 ──► S4 ──► S6
 
 ### 3.1 주요 작업 묶음
 
-| 묶음 | 범위 | 관련 F-넘버 / PRD 섹션 |
-|------|------|------------------------|
-| **Auth** | Google OAuth 2.0 + Refresh Token rotation + httpOnly Cookie | [PRD §7.3](./PRD.md) |
-| **Schema** | Supabase Postgres 10개 엔티티 마이그레이션 (Alembic 도입) | [PRD §8.4](./PRD.md) |
-| **Library 4-pane** | F-08 — Zotero 패턴 (Tree/List/Detail/TagCloud), 무한 트리, 멀티 태그, 3-상태, Bulk 작업 | F-08, [PRD §5.6](./PRD.md) |
-| **arXiv import** | URL/ID/파일 업로드 → Paper 생성 → R2 업로드 | F-01 보강 |
-| **Ingestion pipeline** | marker-pdf 파서 → chunker → embedder(bge-m3) → Qdrant 색인 | [PRD §7.2](./PRD.md) |
-| **Auto pre-gen** | Summary (다층) + F-10 Auto-Highlight + F-14 Figure/Table + F-15 Paragraph 모두 자동 | F-06, F-10, F-14, F-15 |
-| **Chat + Citation** | F-03 + F-05 — SSE 스트리밍, 인용 점프, 후속 질문 칩 | F-03, F-05 |
-| **LLM Abstraction** | LLMProvider 추상화 (Qwen default + GPT-5 vision + Gemini table fallback) | [PRD §7.5](./PRD.md) |
-| **Markup** | F-11 — 사용자 하이라이트 + Markdown 노트 + S3 백업 | F-11 |
-| **Observability** | Sentry + PostHog + Langfuse 통합 (Phase 1은 트레이스 가시화까지) | [PRD §7.6](./PRD.md) |
-| **CI** | GitHub Actions — frontend lint/test/build + backend pytest + docker-compose smoke | — |
+> **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank → Phase 1 스킵 (Phase 2 이관) / QDRANT Cloud → docker-compose 로컬 Qdrant / ELEVENLABS → Phase 2 OpenAI tts-1-hd 단독.
+
+| 세션 | 묶음 | 범위 | 관련 F-넘버 / PRD 섹션 | 상태 |
+|------|------|------|------------------------|------|
+| **S7a** | **Schema** | Postgres 지원 + Alembic + 10 엔티티 ORM + Tab user-scoped | [PRD §8.5](./PRD.md) | ✅ |
+| **S7b** | **Auth** | Google OAuth 2.0 + Refresh Token rotation + httpOnly Cookie | [PRD §7.3](./PRD.md) | ⬜ |
+| **S8** | **arXiv import + Paper API** | URL/ID/파일 업로드 → Paper 생성 → R2(MinIO local) | F-01 보강 | ⬜ |
+| **S9** | **Ingestion pipeline** | marker-pdf 파서 → chunker → embedder(bge-m3) → 로컬 Qdrant 색인 (rerank는 Phase 2) | [PRD §7.2](./PRD.md) | ⬜ |
+| **S10** | **LLM Abstraction** | LLMProvider 추상화 (Qwen default + OpenAI vision + Gemini table fallback) + models.yaml 라우팅 | [PRD §7.5](./PRD.md) | ⬜ |
+| **S11** | **Auto pre-gen** | Summary (다층) + F-10 Auto-Highlight + F-14 Figure/Table + F-15 Paragraph 자동 + Right Panel 4개 | F-06, F-10, F-14, F-15 | ⬜ |
+| **S12** | **Chat + Citation** | F-03 + F-05 — SSE 스트리밍, 인용 점프, 후속 질문 칩 | F-03, F-05 | ⬜ |
+| **S13** | **Library 4-pane** | F-08 — Zotero 패턴 (Tree/List/Detail/TagCloud), 무한 트리, 멀티 태그, 3-상태, Bulk | F-08, [PRD §5.6](./PRD.md) | ⬜ |
+| **S14** | **Markup** | F-11 — 사용자 하이라이트 + Markdown 노트 + S3 백업 + pdf.js 채널 3개 추가 | F-11 | ⬜ |
+| **S15** | **Observability** | Sentry + PostHog + Langfuse 통합 (Phase 1은 트레이스 가시화까지) | [PRD §7.6](./PRD.md) | ⬜ |
+| **S16** | **CI + 종료 회귀** | GitHub Actions — frontend lint/test/build + backend pytest + docker-compose smoke + Playwright Phase 1 신규 suite | — | ⬜ |
 
 ### 3.2 Phase 1 종료 조건
 

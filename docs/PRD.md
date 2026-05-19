@@ -1172,16 +1172,16 @@ Cache
 
 ## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
 
-> **마지막 갱신**: 2026-05-20 (Phase 0 종료 sync)
+> **마지막 갱신**: 2026-05-20 (Phase 1 S7a 진입)
 > **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
-> **현재 마일스톤**: → **Phase 0 ✅ 완료**, Phase 1 디테일 PLAN 대기
+> **현재 마일스톤**: → **Phase 1 🚧 S7a (Schema Foundation)** 진행 중
 
 ### 18.1 Phase 진척도
 
 | Phase | 상태 | 메모 |
 |-------|------|------|
 | Phase 0 (4주) | ✅ 완료 | S1~S6 (T0~T10) 완료, Playwright E2E 8/8 PASS (chromium) — [ROADMAP §2](./ROADMAP.md) |
-| Phase 1 (8주) | ⬜ 대기 | Outline만 — [ROADMAP §3](./ROADMAP.md) |
+| Phase 1 (8주) | 🚧 진행 | S7a (Schema Foundation) ✅ — Postgres+Alembic+10 엔티티 ORM. 다음 S7b Auth. [ROADMAP §3](./ROADMAP.md) |
 | Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
 | Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
 
@@ -1218,7 +1218,7 @@ Cache
 | 디자인 토큰 CSS | ✅ | S1 T0 — `frontend/src/styles/tokens.css` + Tailwind v4 `@theme inline` 매핑 |
 | Pretendard·Inter 폰트 셋업 | ✅ | S1 T0 — `next/font/local` (Pretendard variable) + `next/font/google` (Inter, JBMono) |
 | pdf.js 정적 자산 (`public/pdfjs/`) | ✅ | S2 T4 — `scripts/copy-pdfjs.mjs` postinstall로 viewer/worker 복사 |
-| Alembic DB 마이그레이션 | ⬜ | Phase 1 도입 |
+| Alembic DB 마이그레이션 | ✅ | S7a — 10 엔티티 + Tab 초기 migration (`backend/alembic/versions/0001_phase1_init.py`), `DATABASE_URL` async/sync 양쪽 지원 |
 | i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
 | i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
 | CI workflow (GitHub Actions) | 🚧 | `.github/workflows/ci.yml` 파일만 존재, 내용 빈 상태 |
@@ -1233,10 +1233,10 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. **다음 진입점**: Phase 1 디테일 PLAN — [ROADMAP §3](./ROADMAP.md#3-phase-1--mvp-8주--outline) outline을 task로 분해
-2. Phase 1 첫 묶음 후보: Auth (Google OAuth) / Library 4-pane (F-08) / arXiv import / Ingestion 파이프라인 (marker-pdf → chunker → bge-m3 → Qdrant)
-3. arXiv URL·파일 업로드 경로는 Phase 1 첫 세션에서 합류 ([ROADMAP §2.4](./ROADMAP.md#24-phase-0-종료-조건-acceptance-criteria) AC#1 노트 참조)
-4. F-01/F-02/F-04는 Phase 0 범위 내 ✅ — Phase 1에서 Citation(F-05)·Auto-Highlight(F-10)·Figure/Table(F-14)·Paragraph(F-15) 등 자동 생성 기능 합류 시 보강
+1. **다음 진입점**: **S7b Auth** — Google OAuth 2.0/OIDC + JWT/httpOnly Cookie + Refresh rotation + 로그인 UI ([§7.3](#73-인증)). User 엔티티(S7a ORM)와 Tab API `X-User-Id` placeholder를 실제 JWT subject로 교체.
+2. Phase 1 세션 분할 (S7a 완료): S7b Auth → S8 arXiv Import+Paper API+R2 → S9 Ingestion → S10 LLM 추상화 확장 → S11 Auto Pre-gen → S12 Chat+Citation → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI+Phase 1 종료 회귀
+3. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant 사용 / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 ([§14](#14-결정사항--구-open-questions--v30에서-모두-해소) TTS 결정 수정 반영 필요)
+4. S7a 검증: BE pytest 13/13 PASS + Playwright Phase 0 8/8 PASS (chromium, 9.8s) + `alembic upgrade head` clean
 
 ---
 
