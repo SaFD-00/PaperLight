@@ -1170,6 +1170,75 @@ Cache
 
 ---
 
+## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
+
+> **마지막 갱신**: 2026-05-20
+> **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
+> **현재 마일스톤**: → **Phase 0 진행 준비 완료**, T0부터 착수 예정
+
+### 18.1 Phase 진척도
+
+| Phase | 상태 | 메모 |
+|-------|------|------|
+| Phase 0 (4주) | 🚧 진행 준비 완료 | Task 분해 완료, T0 착수 대기 — [ROADMAP §2](./ROADMAP.md) |
+| Phase 1 (8주) | ⬜ 대기 | Outline만 — [ROADMAP §3](./ROADMAP.md) |
+| Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
+| Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
+
+### 18.2 기능별 상태 (F-01 ~ F-15)
+
+> 범례: ⬜ Not started · 🚧 In progress · ✅ Done
+
+| F# | 이름 | Phase | 상태 | 비고 |
+|----|------|-------|------|------|
+| F-01 | PDF 뷰어 (pdf.js + Shadow DOM) | 0 | ⬜ | Phase 0 T4 |
+| F-02 | Translation (병행) | 0 | ⬜ | Phase 0 T8 |
+| F-03 | AI Chat | 1 | ⬜ | Phase 1 |
+| F-04 | Explanation | 0 | ⬜ | Phase 0 T6+T7 |
+| F-05 | Citation | 1 | ⬜ | Phase 1 |
+| F-06 | Summary (다층) | 1 | ⬜ | Ingestion 자동 |
+| F-07 | Preview | 2 | ⬜ | Phase 2 |
+| F-08 | Library (4-pane) | 1 | ⬜ | Phase 1 — Phase 0은 placeholder만 |
+| F-09 | Scholar Deep Search | 2 | ⬜ | Phase 2 |
+| F-10 | Auto Highlight | 1 | ⬜ | Ingestion 자동 |
+| F-11 | Markup (노트+하이라이트) | 1 | ⬜ | Phase 1 |
+| F-12 | Team / 협업 | 3 | ⬜ | Phase 3 |
+| F-13 | AI Podcast ⭐ | 2 | ⬜ | Phase 2 — 차별 포인트 |
+| F-14 | Figure/Table Description | 1 | ⬜ | Ingestion 자동 |
+| F-15 | Paragraph-level Description | 1 | ⬜ | Ingestion 자동 |
+
+### 18.3 인프라·플랫폼 상태
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 모노레포 디렉토리 트리 | ✅ | backend/ + frontend/ + config/ + docs/ |
+| 백엔드 FastAPI 스캐폴드 | ✅ | api/ 5개 라우터 stub |
+| 프론트엔드 Next.js 15 스캐폴드 | ✅ | components/ 비어있음 |
+| Docker Compose (PG·Qdrant·Redis·MinIO) | ✅ | 로컬 실행 가능 |
+| 디자인 토큰 CSS | ⬜ | Phase 0 T0 |
+| Pretendard·Inter 폰트 셋업 | ⬜ | Phase 0 T0 |
+| pdf.js 정적 자산 (`public/pdfjs/`) | ⬜ | Phase 0 T4 |
+| Alembic DB 마이그레이션 | ⬜ | Phase 1 도입 |
+| i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
+| i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
+| CI workflow (GitHub Actions) | 🚧 | `.github/workflows/ci.yml` 파일만 존재, 내용 빈 상태 |
+| Sentry / PostHog / Langfuse | ⬜ | Phase 1 트레이스, Phase 2 안정화 |
+| Vercel·Render 프로덕션 배포 | ⬜ | Phase 1 베타 단계에서 활성 |
+
+### 18.4 결정 완료 사항 (변경 없음)
+- 기본 LLM: `openrouter/qwen/qwen3.6-35b-a3b` ([§7.5](#75-llm-라우팅))
+- TTS 기본: `openai/tts-1-hd`, fallback `elevenlabs` ([§14](#14-결정사항--구-open-questions--v30에서-모두-해소))
+- 인증: Google OAuth 단일 (v1)
+- 리전: Vercel Seoul edge / Render Tokyo / Supabase Seoul / Qdrant ap-northeast-1
+- Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
+
+### 18.5 다음 액션
+1. ROADMAP §2.1 T0부터 순차 진행
+2. 각 task PR 머지 시 [ROADMAP §2.1](./ROADMAP.md) 체크박스와 본 §18.2 표 동기 갱신
+3. Phase 0 종료 후 새 PLAN으로 Phase 1 디테일화
+
+---
+
 ## 부록 A. 용어집
 - **Chunk**: 임베딩 단위 텍스트 조각 (보통 512 토큰)
 - **BBox**: PDF 페이지 위 영역 좌표
