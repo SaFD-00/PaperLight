@@ -1,0 +1,9 @@
+# Core glossary — PRD §5.8 (technical term preservation)
+# Terms listed here are kept in their original form during translation/summary.
+
+terms:
+  - { term: "Transformer", preserve: true }
+  - { term: "Attention", preserve: true }
+  - { term: "Embedding", preserve: true }
+  - { term: "Token", preserve: true }
+  - { term: "LLM", preserve: true }

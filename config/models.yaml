@@ -1,0 +1,69 @@
+# PaperLight model routing config — PRD §7.5.4
+# Maps tasks to (provider, model) with fallbacks.
+# Hot-reloadable; edit and the running app picks it up via file watcher.
+
+version: "2026.05.19"
+
+default:
+  provider: openrouter
+  model: anthropic/claude-opus-4.7
+
+tasks:
+  summary:
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: openrouter, model: anthropic/claude-opus-4.7 }
+      - { provider: gemini, model: gemini-2.5-pro }
+
+  chat:
+    provider: gemini
+    model: gemini-2.5-pro
+    fallback:
+      - { provider: openrouter, model: anthropic/claude-sonnet-4.6 }
+
+  explanation:
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: openrouter, model: anthropic/claude-opus-4.7 }
+
+  translation:
+    provider: gemini
+    model: gemini-2.5-flash
+    fallback:
+      - { provider: openai, model: gpt-5-mini }
+
+  figure_description:        # F-14 — Vision LLM required
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: gemini, model: gemini-2.5-pro }
+
+  table_description:         # F-14
+    provider: gemini
+    model: gemini-2.5-pro
+    fallback:
+      - { provider: openai, model: gpt-5 }
+
+  paragraph_description:     # F-15 — cheap+fast (batch)
+    provider: gemini
+    model: gemini-2.5-flash
+    fallback:
+      - { provider: openai, model: gpt-5-mini }
+
+  paragraph_importance:      # F-15 — classifier
+    provider: gemini
+    model: gemini-2.5-flash
+    fallback:
+      - { provider: openai, model: gpt-5-mini }
+
+  podcast_outline:
+    provider: openai
+    model: gpt-5
+  podcast_script:
+    provider: openai
+    model: gpt-5
+  podcast_critique:
+    provider: gemini
+    model: gemini-2.5-pro

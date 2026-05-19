@@ -1,0 +1,9 @@
+# Prompt template for task: chat
+# PRD §7.5 — owned by Researcher/PM. Hot-reloadable.
+# TODO: author actual prompts.
+
+version: "0.0.1"
+system: |
+  TODO: write system prompt for chat.
+user: |
+  TODO: write user prompt template for chat.

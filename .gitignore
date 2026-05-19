@@ -1,0 +1,59 @@
+# --- Secrets / env ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.pnpm-store/
+.npm/
+.yarn/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- macOS / iCloud ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.icloud
+*.icloud
+.Trashes
+
+# --- IDE ---
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+*.swp
+*.swo
+
+# --- Claude Code local artifacts ---
+.claude/state/
+.claude/plans/
+.claude/researchs/
+.claude/analysis/
+.claude/reflexions/
+.claude/knowledge/

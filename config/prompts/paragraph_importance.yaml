@@ -1,0 +1,9 @@
+# Prompt template for task: paragraph_importance
+# PRD §7.5 — owned by Researcher/PM. Hot-reloadable.
+# TODO: author actual prompts.
+
+version: "0.0.1"
+system: |
+  TODO: write system prompt for paragraph_importance.
+user: |
+  TODO: write user prompt template for paragraph_importance.

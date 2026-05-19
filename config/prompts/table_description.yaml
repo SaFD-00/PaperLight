@@ -1,0 +1,9 @@
+# Prompt template for task: table_description
+# PRD §7.5 — owned by Researcher/PM. Hot-reloadable.
+# TODO: author actual prompts.
+
+version: "0.0.1"
+system: |
+  TODO: write system prompt for table_description.
+user: |
+  TODO: write user prompt template for table_description.

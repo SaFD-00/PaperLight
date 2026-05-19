@@ -1,0 +1,22 @@
+# LLM / TTS provider metadata — PRD §7.5
+# Keys come from .env (e.g., OPENAI_API_KEY). This file only holds non-secret config.
+
+providers:
+  openai:
+    base_url: https://api.openai.com/v1
+    timeout_sec: 60
+    max_retries: 3
+  gemini:
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    timeout_sec: 60
+    max_retries: 3
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    timeout_sec: 60
+    max_retries: 3
+  tts_openai:
+    base_url: https://api.openai.com/v1
+    default_voice: alloy
+  tts_elevenlabs:
+    base_url: https://api.elevenlabs.io/v1
+    default_voice: rachel
