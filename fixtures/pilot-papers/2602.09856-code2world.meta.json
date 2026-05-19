@@ -1,0 +1,29 @@
+{
+  "slug": "2602.09856-code2world",
+  "title": "Code2World: A GUI World Model via Renderable Code Generation",
+  "authors": [
+    "Zheng, Yuhao",
+    "Zhong, Lian",
+    "Wang, Yi",
+    "Dai, Rui",
+    "Liu, Kaikui",
+    "Chu, Xiangxiang",
+    "Lü, Linyuan",
+    "Torr, Philip",
+    "Lin, Kevin Qinghong"
+  ],
+  "year": 2026,
+  "venue": "arXiv preprint (cs.CV)",
+  "arxiv_id": "2602.09856",
+  "arxiv_version": "v1",
+  "doi": null,
+  "source_url": "https://arxiv.org/abs/2602.09856",
+  "pdf_url": "https://arxiv.org/pdf/2602.09856v1.pdf",
+  "sha256": "28f0f800c2441022026e84384a6e432b6d318cfbe183eba6533493d5ec3cd596",
+  "pages": 30,
+  "size_bytes": 8922492,
+  "preprint_date": "2026-02-11",
+  "added_at": "2026-05-20",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "notes": "Phase 0 파일럿 #1 — GUI World Model. Code2World는 vision-language coder로 renderable HTML 코드를 생성해 next visual state를 예측. AndroidCode 80K corpus + Render-Aware RL. Code2World-8B가 GPT-5/Gemini-3-Pro-Image와 경쟁. 동반 파일럿 [2605.10347]의 비교 baseline으로도 등장."
+}

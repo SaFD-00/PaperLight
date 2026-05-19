@@ -1,0 +1,33 @@
+{
+  "slug": "2605.10347-mobile-world-model-gui-agents",
+  "title": "How Mobile World Model Guides GUI Agents?",
+  "authors": [
+    "Xu, Weikai",
+    "Huang, Kun",
+    "Feng, Yunren",
+    "Li, Jiaxing",
+    "Chen, Yuhan",
+    "Liu, Yuxuan",
+    "Jiang, Zhizheng",
+    "Qu, Heng",
+    "Gao, Pengzhi",
+    "Liu, Wei",
+    "Luan, Jian",
+    "Hu, Xiaolin",
+    "An, Bo"
+  ],
+  "year": 2026,
+  "venue": "arXiv preprint (cs.AI)",
+  "arxiv_id": "2605.10347",
+  "arxiv_version": "v1",
+  "doi": null,
+  "source_url": "https://arxiv.org/abs/2605.10347",
+  "pdf_url": "https://arxiv.org/pdf/2605.10347v1.pdf",
+  "sha256": "04c3c76031fcbfde746fa948a2ee68167328d928bbc693fe59e16b8f7c3caa66",
+  "pages": null,
+  "size_bytes": 21098450,
+  "preprint_date": "2026-05-11",
+  "added_at": "2026-05-20",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "notes": "Phase 0 파일럿 #2 — Mobile World Model. 4가지 prediction format (delta text / full text / diffusion image / renderable code) 비교, MobileWorldBench + Code2WorldBench, RQ1~RQ3 분석. DESIGN.md 와이어프레임 예시(\"How Mobile World...\")의 원전."
+}

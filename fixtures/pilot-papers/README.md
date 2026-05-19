@@ -26,18 +26,12 @@
 
 ## 3. 등록된 파일럿 논문
 
-> 사용자가 선정한 두 논문을 아래 표에 기록. PDF 추가 시 `.meta.json`도 함께 작성.
+| # | Slug | Title | Lead Authors | Year | arXiv | 추가 일자 |
+|---|------|-------|--------------|------|-------|-----------|
+| 1 | `2602.09856-code2world` | Code2World: A GUI World Model via Renderable Code Generation | Zheng, Zhong, Wang et al. | 2026 | [2602.09856](https://arxiv.org/abs/2602.09856) | 2026-05-20 |
+| 2 | `2605.10347-mobile-world-model-gui-agents` | How Mobile World Model Guides GUI Agents? | Xu, Huang, Feng et al. | 2026 | [2605.10347](https://arxiv.org/abs/2605.10347) | 2026-05-20 |
 
-| # | Slug | Title | Authors | Year | arXiv / DOI | Source URL | 추가 일자 |
-|---|------|-------|---------|------|-------------|-----------|-----------|
-| 1 | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| 2 | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-
-> **다음 단계**: 두 논문이 확정되면
-> 1. PDF 파일 (`<slug>.pdf`) 본 디렉토리에 저장
-> 2. 같은 이름의 `.meta.json` 작성 (아래 §4 스키마)
-> 3. 위 표에 한 줄씩 추가
-> 4. `git add fixtures/pilot-papers/...` 로 별도 커밋 — 메시지: `chore(fixtures): add pilot test papers (N=2)`
+> 상세 메타는 동일 이름의 `.meta.json` 참조. 두 논문은 GUI World Model 도메인(모바일/Android Agent)으로 묶여 있어 F-09 Deep Search·F-13 Podcast 비교 실험에도 유용.
 
 ## 4. `.meta.json` 스키마
 
