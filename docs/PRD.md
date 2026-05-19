@@ -1172,15 +1172,15 @@ Cache
 
 ## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
 
-> **마지막 갱신**: 2026-05-20
+> **마지막 갱신**: 2026-05-20 (Phase 0 종료 sync)
 > **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
-> **현재 마일스톤**: → **Phase 0 진행 준비 완료**, T0부터 착수 예정
+> **현재 마일스톤**: → **Phase 0 ✅ 완료**, Phase 1 디테일 PLAN 대기
 
 ### 18.1 Phase 진척도
 
 | Phase | 상태 | 메모 |
 |-------|------|------|
-| Phase 0 (4주) | 🚧 진행 준비 완료 | Task 분해 완료, T0 착수 대기 — [ROADMAP §2](./ROADMAP.md) |
+| Phase 0 (4주) | ✅ 완료 | S1~S6 (T0~T10) 완료, Playwright E2E 8/8 PASS (chromium) — [ROADMAP §2](./ROADMAP.md) |
 | Phase 1 (8주) | ⬜ 대기 | Outline만 — [ROADMAP §3](./ROADMAP.md) |
 | Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
 | Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
@@ -1191,10 +1191,10 @@ Cache
 
 | F# | 이름 | Phase | 상태 | 비고 |
 |----|------|-------|------|------|
-| F-01 | PDF 뷰어 (pdf.js + Shadow DOM) | 0 | 🚧 | Phase 0 T4 — pdf.js 4.10 + iframe wrapper + 5-채널 postMessage (S2 완료); JUMP_TO/SET_ZOOM/SELECTION/PAGE_VISIBLE 동작 |
-| F-02 | Translation (병행) | 0 | 🚧 | Phase 0 T8 — `/api/translate` SSE + TranslationPane (S5), TopToolbar [T] 토글로 현재 페이지 한국어 병행 |
+| F-01 | PDF 뷰어 (pdf.js + Shadow DOM) | 0 | ✅ (Phase 0 범위) | S2 — pdf.js 4.10 + Shadow DOM iframe + 7-채널 postMessage (LOAD/JUMP/ZOOM/HIGHLIGHT/TOGGLE_TRANSLATION/REQUEST_PAGE_TEXT/PAGE_TEXT). Phase 1에서 arXiv import 합류 시 보강. |
+| F-02 | Translation (병행) | 0 | ✅ (Phase 0 범위) | S5 — `/api/translate` SSE + TranslationPane + TopToolbar [T] 토글. 현재 페이지 한국어 병행. |
 | F-03 | AI Chat | 1 | ⬜ | Phase 1 |
-| F-04 | Explanation | 0 | 🚧 | Phase 0 T6+T7 — Floating Menu + OpenRouter SSE relay 완료 (S4); Qwen 응답 우측 패널 스트리밍 |
+| F-04 | Explanation | 0 | ✅ (Phase 0 범위) | S4 — Floating Menu + `/api/explain` OpenRouter SSE relay + ExplanationPanel 스트리밍. |
 | F-05 | Citation | 1 | ⬜ | Phase 1 |
 | F-06 | Summary (다층) | 1 | ⬜ | Ingestion 자동 |
 | F-07 | Preview | 2 | ⬜ | Phase 2 |
@@ -1215,9 +1215,9 @@ Cache
 | 백엔드 FastAPI 스캐폴드 | ✅ | api/ 5개 라우터 stub |
 | 프론트엔드 Next.js 15 스캐폴드 | ✅ | components/ 비어있음 |
 | Docker Compose (PG·Qdrant·Redis·MinIO) | ✅ | 로컬 실행 가능 |
-| 디자인 토큰 CSS | ⬜ | Phase 0 T0 |
-| Pretendard·Inter 폰트 셋업 | ⬜ | Phase 0 T0 |
-| pdf.js 정적 자산 (`public/pdfjs/`) | ⬜ | Phase 0 T4 |
+| 디자인 토큰 CSS | ✅ | S1 T0 — `frontend/src/styles/tokens.css` + Tailwind v4 `@theme inline` 매핑 |
+| Pretendard·Inter 폰트 셋업 | ✅ | S1 T0 — `next/font/local` (Pretendard variable) + `next/font/google` (Inter, JBMono) |
+| pdf.js 정적 자산 (`public/pdfjs/`) | ✅ | S2 T4 — `scripts/copy-pdfjs.mjs` postinstall로 viewer/worker 복사 |
 | Alembic DB 마이그레이션 | ⬜ | Phase 1 도입 |
 | i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
 | i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
@@ -1233,10 +1233,10 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. **다음 진입점**: [ROADMAP §2.5](./ROADMAP.md#25-세션-분할-기능-의미-단위) **S1 (FE 셸 골격)** — T0+T1+T2+T3 묶음
-2. 각 세션 종료 시 [ROADMAP §2.1](./ROADMAP.md#21-task-체크리스트) 체크박스와 본 §18.2 표 동기 갱신
-3. 세션이 30 커밋·1만 line을 초과하면 sub-session으로 재분할 (ROADMAP §2.5 진행 규칙 §3)
-4. Phase 0 종료 후 새 PLAN으로 Phase 1 디테일화
+1. **다음 진입점**: Phase 1 디테일 PLAN — [ROADMAP §3](./ROADMAP.md#3-phase-1--mvp-8주--outline) outline을 task로 분해
+2. Phase 1 첫 묶음 후보: Auth (Google OAuth) / Library 4-pane (F-08) / arXiv import / Ingestion 파이프라인 (marker-pdf → chunker → bge-m3 → Qdrant)
+3. arXiv URL·파일 업로드 경로는 Phase 1 첫 세션에서 합류 ([ROADMAP §2.4](./ROADMAP.md#24-phase-0-종료-조건-acceptance-criteria) AC#1 노트 참조)
+4. F-01/F-02/F-04는 Phase 0 범위 내 ✅ — Phase 1에서 Citation(F-05)·Auto-Highlight(F-10)·Figure/Table(F-14)·Paragraph(F-15) 등 자동 생성 기능 합류 시 보강
 
 ---
 
