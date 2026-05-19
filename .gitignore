@@ -63,3 +63,6 @@ Icon?
 .claude/analysis/
 .claude/reflexions/
 .claude/knowledge/
+# --- Playwright ---
+test-results/
+playwright-report/
