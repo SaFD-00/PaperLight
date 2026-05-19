@@ -80,6 +80,36 @@ T5 (BE) ── 병렬 진행, T7에서 합류
 5. Density Compact/Cozy/Spacious 전환 — 행 높이·폰트 즉시 반영
 6. Light/Dark 테마 전환 + `prefers-reduced-motion` 시 모션 50%로 단축
 
+### 2.5 세션 분할 (기능 의미 단위)
+
+> Phase 0 T0~T10을 한 세션에 다 다루기 어려우므로, **"한 세션 = 한 기능 의미 묶음"**으로 분할.
+> 각 세션 시작 시 `/workflow:development "Phase 0 S{n} 시작"` 형태로 진입.
+
+| S# | 묶음 | 포함 Task | 핵심 산출 | 세션 종료 조건 |
+|----|------|-----------|-----------|----------------|
+| **S1** | FE 셸 골격 | T0 + T1 + T2 + T3 | 디자인 토큰·테마·폰트, Tab Bar(Zustand), 3-Column Reader Shell, Top Toolbar | mock 데이터로 빈 셸 + 탭 추가/전환/닫기 동작 |
+| **S2** | pdf.js Viewer | T4 | Shadow DOM iframe wrapper, host↔iframe postMessage 채널 5종 | 파일럿 PDF 1편 렌더 + `JUMP_TO` 동작 |
+| **S3** | BE Tab API | T5 | `api/tabs.py`, 로컬 SQLite 어댑터, `models/tab.py` | T1 Zustand ↔ BE 양방향 동기 (last-write-wins) |
+| **S4** | Explanation Flow | T6 + T7 | Floating Selection Menu, `api/explain.py`, OpenRouter provider, `ExplanationPanel` SSE | 본문 선택 → 우측 패널에 Qwen 응답 스트리밍 |
+| **S5** | Translation | T8 | `api/translate.py`, `TranslationPane` 병행 표시 | 현재 페이지 한국어 병행 ON/OFF |
+| **S6** | Polish | T9 + T10 | Density·Theme 토글, Library 빈 셸 일러스트 | [§2.4](#24-phase-0-종료-조건-acceptance-criteria) AC 6개 전부 통과 |
+
+#### 의존성 그래프
+
+```
+S1 ──┬──► S2 ──► S4 ──► S6
+     │
+     ├──► S5
+     │
+     └──► S3 (S4 합류 지점에서 사용)
+```
+
+#### 진행 규칙
+
+1. 각 세션 시작 시 [§2.1](#21-task-체크리스트) 표의 해당 task 행을 ⬜ → 🚧 갱신.
+2. 세션 종료(PR 머지) 시 [§2.1](#21-task-체크리스트) ⬜/🚧 → ✅, 그리고 [PRD §18.2](./PRD.md#182-기능별-상태-f-01--f-15) 표 동기 갱신.
+3. 한 세션이 30 커밋·1만 line을 초과하면 sub-session(`S2a`/`S2b`)으로 재분할.
+
 ---
 
 ## 3. Phase 1 — MVP (8주) — outline

@@ -1233,9 +1233,10 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. ROADMAP §2.1 T0부터 순차 진행
-2. 각 task PR 머지 시 [ROADMAP §2.1](./ROADMAP.md) 체크박스와 본 §18.2 표 동기 갱신
-3. Phase 0 종료 후 새 PLAN으로 Phase 1 디테일화
+1. **다음 진입점**: [ROADMAP §2.5](./ROADMAP.md#25-세션-분할-기능-의미-단위) **S1 (FE 셸 골격)** — T0+T1+T2+T3 묶음
+2. 각 세션 종료 시 [ROADMAP §2.1](./ROADMAP.md#21-task-체크리스트) 체크박스와 본 §18.2 표 동기 갱신
+3. 세션이 30 커밋·1만 line을 초과하면 sub-session으로 재분할 (ROADMAP §2.5 진행 규칙 §3)
+4. Phase 0 종료 후 새 PLAN으로 Phase 1 디테일화
 
 ---
 
