@@ -45,6 +45,8 @@ PaperLight/
 ├── docs/                            # PRD / DESIGN / ROADMAP / ARCHITECTURE
 ├── fixtures/
 │   └── pilot-papers/                # Phase 0 데모 + 회귀 테스트용 파일럿 PDF 2편 + .meta.json
+│       ├── 2602.09856-code2world.{pdf,meta.json}                     # Code2World (Zheng et al., 2026)
+│       └── 2605.10347-mobile-world-model-gui-agents.{pdf,meta.json}  # Mobile World Model (Xu et al., 2026)
 └── docker-compose.yml               # 로컬 — postgres, qdrant, redis, minio (R2 호환)
 ```
 
