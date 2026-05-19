@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from paperlight.api import auth, chat, library, papers, podcast, tabs
+from paperlight.api import auth, chat, explain, library, papers, podcast, tabs
 from paperlight.storage.db import init_db
 
 
@@ -40,6 +40,7 @@ app.include_router(podcast.router)
 app.include_router(library.router)
 app.include_router(auth.router)
 app.include_router(tabs.router)
+app.include_router(explain.router)
 
 
 @app.get("/health")

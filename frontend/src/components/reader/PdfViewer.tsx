@@ -8,14 +8,15 @@ import {
   type IframeToHostMessage,
 } from "@/lib/pdf/messages";
 import { createShadowIframe, type ShadowIframeHandle } from "@/lib/pdf/shadow-iframe";
+import { useReader } from "@/stores/reader";
 
 export interface PdfViewerProps {
   pdfUrl: string | null;
-  onSelectionChange?: (msg: Extract<IframeToHostMessage, { type: "SELECTION_CHANGE" }>) => void;
 }
 
-export function PdfViewer({ pdfUrl, onSelectionChange }: PdfViewerProps) {
+export function PdfViewer({ pdfUrl }: PdfViewerProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const setSelection = useReader((s) => s.setSelection);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -71,14 +72,32 @@ export function PdfViewer({ pdfUrl, onSelectionChange }: PdfViewerProps) {
         case "PAGE_VISIBLE":
           setPages((prev) => (prev ? { ...prev, visible: data.page } : prev));
           break;
-        case "SELECTION_CHANGE":
-          onSelectionChange?.(data);
+        case "SELECTION_CHANGE": {
+          if (!data.text || !data.rect) {
+            setSelection(null);
+            return;
+          }
+          const iframeRect = handle.iframe.getBoundingClientRect();
+          const r = data.rect;
+          setSelection({
+            text: data.text,
+            page: data.page,
+            hostRect: {
+              left: iframeRect.left + r.left,
+              top: iframeRect.top + r.top,
+              right: iframeRect.left + r.right,
+              bottom: iframeRect.top + r.bottom,
+              width: r.width,
+              height: r.height,
+            },
+          });
           break;
+        }
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onSelectionChange]);
+  }, [setSelection]);
 
   // Send LOAD_PDF when pdfUrl changes (after iframe shell is ready).
   useEffect(() => {

@@ -11,7 +11,7 @@
 
 | Phase | 기간 | 범위 | 핵심 산출물 | 상태 |
 |-------|------|------|------------|------|
-| **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | 🚧 S3 완료 (T0~T5) |
+| **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | 🚧 S4 완료 (T0~T7) |
 | **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | ⬜ 대기 |
 | **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
@@ -36,8 +36,8 @@
 | T3 | Top Toolbar (5-토글 placeholder + 페이지 컨트롤) | T0 | `frontend/src/components/shell/TopToolbar.tsx` | **P0** | ✅ |
 | T4 | pdf.js Shadow DOM iframe wrapper (F-01) | T2 | `frontend/src/components/reader/PdfViewer.tsx`, `frontend/public/pdfjs/`, `frontend/src/lib/pdf/shadow-iframe.ts` | **P0** | ✅ |
 | T5 | Tab API 최소 구현 (단일 사용자, 로컬 SQLite) | — | `backend/paperlight/api/tabs.py`, `backend/paperlight/storage/db.py`, `backend/paperlight/models/tab.py` | **P0** | ✅ |
-| T6 | Floating Selection Menu (F-04 트리거) | T4 | `frontend/src/components/reader/FloatingSelectionMenu.tsx`, `frontend/src/lib/selection.ts` | P0 | ⬜ |
-| T7 | Explanation API + 우측 패널 표시 (F-04) | T6, T5 | `backend/paperlight/api/explain.py`, `backend/paperlight/providers/openrouter.py`, `frontend/src/components/panels/ExplanationPanel.tsx` | P0 | ⬜ |
+| T6 | Floating Selection Menu (F-04 트리거) | T4 | `frontend/src/components/reader/FloatingSelectionMenu.tsx`, `frontend/src/stores/reader.ts` | P0 | ✅ |
+| T7 | Explanation API + 우측 패널 표시 (F-04) | T6, T5 | `backend/paperlight/api/explain.py`, `backend/paperlight/providers/openrouter_provider.py`, `frontend/src/components/panels/ExplanationPanel.tsx`, `frontend/src/lib/sse.ts` | P0 | ✅ |
 | T8 | Translation 병행 패널 (F-02) | T4 | `backend/paperlight/api/translate.py`, `frontend/src/components/reader/TranslationPane.tsx` | P0 | ⬜ |
 | T9 | Density·Theme 토글 (Settings 시드) | T0 | `frontend/src/stores/settings.ts`, `frontend/src/components/shell/SettingsMenu.tsx` | P1 | ⬜ |
 | T10 | Library 탭 (빈 셸 + 일러스트 only) | T1 | `frontend/src/components/library/LibraryShell.tsx` | P1 | ⬜ |
