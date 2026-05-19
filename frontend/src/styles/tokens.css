@@ -1,0 +1,152 @@
+/* PaperLight Design Tokens
+ * Source: docs/DESIGN.md §3 (v1.0, 2026-05-19)
+ * Single source of truth. Tailwind v4 @theme inline maps these to utility classes.
+ */
+
+:root,
+:root[data-theme="light"] {
+  /* Brand */
+  --brand-primary: #7c5cfc;
+  --brand-primary-hover: #6a4ae8;
+  --brand-primary-soft: #efe9ff;
+  --brand-primary-text: #ffffff;
+
+  /* Surface */
+  --bg-base: #fafafb;
+  --bg-surface: #ffffff;
+  --bg-muted: #f4f4f6;
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Border */
+  --border-subtle: #e8e8ec;
+  --border-default: #d4d4da;
+  --border-strong: #b0b0b8;
+
+  /* Text */
+  --text-primary: #1a1a1f;
+  --text-secondary: #5b5b66;
+  --text-muted: #8b8b96;
+  --text-inverse: #ffffff;
+
+  /* Highlight (F-10) */
+  --hl-contribution: #fff4c2;
+  --hl-method: #deebff;
+  --hl-result: #d6f3e0;
+  --hl-limitation: #ffe0e0;
+
+  /* F-15 Importance */
+  --importance-critical-bg: #fff4c2;
+  --importance-skippable-bg: #f4f4f6;
+  --importance-skippable-text: #8b8b96;
+
+  /* Feedback */
+  --success: #2ea66b;
+  --warning: #e0a11d;
+  --danger: #d8443d;
+  --info: #2d6fe0;
+
+  /* Spacing (4의 배수) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-focus: 0 0 0 3px var(--brand-primary-soft);
+
+  /* Motion */
+  --motion-fast: 100ms;
+  --motion-default: 200ms;
+  --motion-panel: 250ms;
+  --motion-page: 400ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-out: ease-out;
+
+  /* Font family — assigned by next/font in layout.tsx */
+  --font-sans:
+    var(--font-pretendard), var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono: var(--font-jbmono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Density — Cozy (default) */
+  --row-h: 40px;
+  --font-body: 14px;
+  --pad-card: 12px;
+  --gap-list: 2px;
+  --sidebar-item-h: 32px;
+}
+
+:root[data-theme="dark"] {
+  --bg-base: #15151a;
+  --bg-surface: #1e1e24;
+  --bg-muted: #25252d;
+
+  --border-subtle: #2e2e36;
+  --border-default: #3a3a44;
+  --border-strong: #4d4d58;
+
+  --text-primary: #f5f5f8;
+  --text-secondary: #b0b0bc;
+  --text-muted: #7a7a85;
+
+  --brand-primary: #9b82ff;
+  --brand-primary-soft: #2a2440;
+
+  --hl-contribution: #4d421e;
+  --hl-method: #1e3a55;
+  --hl-result: #1f4a2e;
+  --hl-limitation: #4d2424;
+
+  --importance-critical-bg: #4d421e;
+  --importance-skippable-bg: #25252d;
+  --importance-skippable-text: #6a6a75;
+}
+
+:root[data-density="compact"] {
+  --row-h: 28px;
+  --font-body: 13px;
+  --pad-card: 8px;
+  --gap-list: 0px;
+  --sidebar-item-h: 24px;
+}
+
+:root[data-density="cozy"] {
+  --row-h: 40px;
+  --font-body: 14px;
+  --pad-card: 12px;
+  --gap-list: 2px;
+  --sidebar-item-h: 32px;
+}
+
+:root[data-density="spacious"] {
+  --row-h: 56px;
+  --font-body: 15px;
+  --pad-card: 16px;
+  --gap-list: 4px;
+  --sidebar-item-h: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 50ms;
+    --motion-default: 100ms;
+    --motion-panel: 125ms;
+    --motion-page: 200ms;
+  }
+}
