@@ -1,16 +1,17 @@
+"use client";
+
+import { PdfViewer } from "./PdfViewer";
+
+const PDF_URL_MAP: Record<string, string> = {
+  "sample-1": "/api/sample-pdfs/sample-1",
+  "sample-2": "/api/sample-pdfs/sample-2",
+};
+
 export function Center({ paperId }: { paperId: string }) {
+  const pdfUrl = PDF_URL_MAP[paperId] ?? null;
   return (
-    <section
-      aria-label="PDF 본문 영역"
-      className="grid h-full place-items-center overflow-auto bg-bg-muted"
-    >
-      <div className="flex flex-col items-center gap-2 text-text-muted">
-        <div className="grid h-32 w-24 place-items-center rounded-md border border-dashed border-border-default bg-bg-surface text-xs">
-          PDF
-        </div>
-        <p className="text-sm">paperId: <span className="font-mono">{paperId}</span></p>
-        <p className="text-xs">pdf.js Shadow DOM iframe — S2에서 통합</p>
-      </div>
+    <section aria-label="PDF 본문 영역" className="h-full overflow-hidden bg-bg-muted">
+      <PdfViewer pdfUrl={pdfUrl} />
     </section>
   );
 }
