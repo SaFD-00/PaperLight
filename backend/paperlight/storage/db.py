@@ -1,4 +1,8 @@
-"""Async SQLAlchemy setup for Phase 0 local SQLite — Postgres migration in Phase 1."""
+"""Async SQLAlchemy setup.
+
+Phase 1 S7a: `DATABASE_URL` (Postgres) 우선, `PAPERLIGHT_DB_URL`은 backward-compat.
+default는 SQLite로 유지 — Phase 0 회귀 호환.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +31,10 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def get_database_url() -> str:
-    return os.environ.get("PAPERLIGHT_DB_URL", _DEFAULT_URL)
+    return os.environ.get(
+        "DATABASE_URL",
+        os.environ.get("PAPERLIGHT_DB_URL", _DEFAULT_URL),
+    )
 
 
 def _build_engine(url: str) -> AsyncEngine:
@@ -51,10 +58,34 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+DEFAULT_USER_ID = "anonymous"
+
+
 async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Phase 1 S7a: ensure default user row exists for unauthenticated tab/library flows.
+    # 실제 OAuth(S7b) 합류 시 anonymous는 게스트 모드로 격하.
+    await _ensure_default_user()
+
+
+async def _ensure_default_user() -> None:
+    # Avoid import cycle: User imports Base from this module.
+    from paperlight.models.user import User
+
+    factory = get_session_factory()
+    async with factory() as session:
+        existing = await session.get(User, DEFAULT_USER_ID)
+        if existing is None:
+            session.add(
+                User(
+                    id=DEFAULT_USER_ID,
+                    email="anonymous@local",
+                    google_sub=None,
+                )
+            )
+            await session.commit()
 
 
 async def reset_engine(url: str | None = None) -> None:
@@ -65,7 +96,11 @@ async def reset_engine(url: str | None = None) -> None:
     _engine = None
     _session_factory = None
     if url is not None:
+        os.environ["DATABASE_URL"] = url
         os.environ["PAPERLIGHT_DB_URL"] = url
+    else:
+        os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("PAPERLIGHT_DB_URL", None)
 
 
 @asynccontextmanager
