@@ -73,7 +73,7 @@ T5 (BE) ── 병렬 진행, T7에서 합류
 >
 > 두 논문 모두 GUI World Model 도메인 — F-09 Deep Search·F-13 Podcast 비교 실험에도 재사용. 추가/변경 절차는 [fixtures README](../fixtures/pilot-papers/README.md) 참조.
 
-1. 빈 라이브러리 탭 + 파일럿 논문 PDF 1편을 새 탭에서 열기 (arXiv URL/파일 업로드 양쪽 경로 모두 동작)
+1. 빈 라이브러리 탭 + 파일럿 논문 PDF 1편을 새 탭에서 열기 — Phase 0은 [fixtures/pilot-papers/](../fixtures/pilot-papers/)의 고정 fixture 2편만 사용. arXiv URL paste·파일 업로드 경로는 [Phase 1](#3-phase-1--mvp-8주--outline) arXiv import 묶음에서 합류.
 2. 파일럿 논문 2편을 동시에 띄우고 ⌘1·⌘2로 전환 (전환 < 80ms, [PRD §8.1](./PRD.md) SLO)
 3. PDF에서 텍스트 선택 → Floating Menu → "💡 Explain" → 우측 패널에 Qwen 응답 스트리밍
 4. Translation 토글 → 현재 페이지 한국어 번역 병행 표시
