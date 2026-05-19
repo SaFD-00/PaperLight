@@ -50,6 +50,12 @@ Icon?
 *.swp
 *.swo
 
+# --- Local SQLite (Phase 0 single-user) ---
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
 # --- Claude Code local artifacts ---
 .claude/state/
 .claude/plans/

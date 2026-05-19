@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { pushTabDelete, pushTabPatch, pushTabUpsert } from "@/lib/tab-sync";
 
 export const LIBRARY_TAB_ID = "library";
 export const MAX_TABS = 10;
@@ -21,6 +22,7 @@ interface TabsState {
   closeTab: (id: string) => void;
   activateTab: (id: string) => void;
   reorderTab: (id: string, newPosition: number) => void;
+  hydrate: (serverTabs: Tab[]) => void;
   __resetForTests: () => void;
 }
 
@@ -89,6 +91,7 @@ export const useTabs = create<TabsState>((set, get) => ({
       lastActiveAt: now,
     };
     set({ tabs: [...workingTabs, next], activeId: id });
+    void pushTabUpsert(next);
     return id;
   },
 
@@ -105,6 +108,7 @@ export const useTabs = create<TabsState>((set, get) => ({
       activeId = next?.id ?? LIBRARY_TAB_ID;
     }
     set({ tabs: reflowPositions(remaining), activeId });
+    void pushTabDelete(id);
   },
 
   activateTab: (id) => {
@@ -115,6 +119,7 @@ export const useTabs = create<TabsState>((set, get) => ({
       activeId: id,
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, lastActiveAt: now } : t)),
     });
+    void pushTabPatch(id, { lastActiveAt: now });
   },
 
   reorderTab: (id, newPosition) => {
@@ -132,6 +137,17 @@ export const useTabs = create<TabsState>((set, get) => ({
     if (library) reflowed.push({ ...library, position: 0 });
     others.forEach((t, i) => reflowed.push({ ...t, position: i + 1 }));
     set({ tabs: reflowed });
+    for (const t of reflowed) {
+      if (!t.isLibrary) void pushTabPatch(t.id, { position: t.position });
+    }
+  },
+
+  hydrate: (serverTabs) => {
+    if (serverTabs.length === 0) return;
+    const hasLibrary = serverTabs.some((t) => t.isLibrary);
+    const tabs = hasLibrary ? serverTabs : [...seed().tabs, ...serverTabs];
+    const active = tabs.find((t) => t.isLibrary)?.id ?? LIBRARY_TAB_ID;
+    set({ tabs: reflowPositions(tabs), activeId: active });
   },
 
   __resetForTests: () => set(seed()),
