@@ -184,8 +184,15 @@ window.addEventListener("message", async (event) => {
       // Phase 0 stub — implemented in F-10 / F-04 highlight (Phase 1+).
       break;
     case "TOGGLE_TRANSLATION":
-      // Handled by S5 TranslationPane separately; iframe stub for now.
+      // Translation overlay is rendered host-side; iframe stub.
       break;
+    case "REQUEST_PAGE_TEXT": {
+      const wrapper = pageWrappers[(msg.page || 1) - 1];
+      const layer = wrapper?.querySelector(".text-layer");
+      const text = layer ? layer.textContent || "" : "";
+      send("PAGE_TEXT", { page: msg.page, text });
+      break;
+    }
   }
 });
 

@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { type Density, type Theme, useSettings } from "@/stores/settings";
+import { useReader } from "@/stores/reader";
 
 type ToggleId = "auto-hl" | "image-desc" | "paragraph" | "skim" | "translate";
 
@@ -51,6 +52,9 @@ export function TopToolbar() {
   const density = useSettings((s) => s.density);
   const setTheme = useSettings((s) => s.setTheme);
   const setDensity = useSettings((s) => s.setDensity);
+
+  const translationEnabled = useReader((s) => s.translationEnabled);
+  const toggleTranslation = useReader((s) => s.toggleTranslation);
 
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-3">
@@ -91,14 +95,17 @@ export function TopToolbar() {
         <div className="flex items-center gap-0.5 rounded-md bg-bg-base p-0.5">
           {TOGGLES.map((t) => {
             const Icon = t.icon;
-            const on = active[t.id];
+            const on = t.id === "translate" ? translationEnabled : active[t.id];
             return (
               <button
                 key={t.id}
                 type="button"
                 aria-label={t.label}
                 aria-pressed={on}
-                onClick={() => setActive((s) => ({ ...s, [t.id]: !s[t.id] }))}
+                onClick={() => {
+                  if (t.id === "translate") toggleTranslation();
+                  else setActive((s) => ({ ...s, [t.id]: !s[t.id] }));
+                }}
                 className={clsx(
                   "grid h-7 w-7 place-items-center rounded-sm text-[11px] font-semibold transition-colors",
                   on

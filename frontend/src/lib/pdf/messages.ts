@@ -20,7 +20,8 @@ export type HostToIframeMessage =
       page: number;
       rect: { x: number; y: number; w: number; h: number };
     }
-  | { source: typeof HOST_SOURCE; type: "TOGGLE_TRANSLATION"; enabled: boolean };
+  | { source: typeof HOST_SOURCE; type: "TOGGLE_TRANSLATION"; enabled: boolean }
+  | { source: typeof HOST_SOURCE; type: "REQUEST_PAGE_TEXT"; page: number };
 
 export type IframeToHostMessage =
   | {
@@ -37,4 +38,5 @@ export type IframeToHostMessage =
       text: string;
       rect: SelectionRect | null;
       page: number | null;
-    };
+    }
+  | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string };

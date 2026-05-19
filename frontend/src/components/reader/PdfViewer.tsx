@@ -17,6 +17,10 @@ export interface PdfViewerProps {
 export function PdfViewer({ pdfUrl }: PdfViewerProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const setSelection = useReader((s) => s.setSelection);
+  const setCurrentPage = useReader((s) => s.setCurrentPage);
+  const setPageText = useReader((s) => s.setPageText);
+  const translationEnabled = useReader((s) => s.translationEnabled);
+  const currentPage = useReader((s) => s.currentPage);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -71,6 +75,10 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
           break;
         case "PAGE_VISIBLE":
           setPages((prev) => (prev ? { ...prev, visible: data.page } : prev));
+          setCurrentPage(data.page);
+          break;
+        case "PAGE_TEXT":
+          setPageText(data.page, data.text);
           break;
         case "SELECTION_CHANGE": {
           if (!data.text || !data.rect) {
@@ -97,7 +105,14 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setSelection]);
+  }, [setSelection, setCurrentPage, setPageText]);
+
+  // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
+  useEffect(() => {
+    if (!translationEnabled) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "REQUEST_PAGE_TEXT", page: currentPage });
+  }, [translationEnabled, currentPage]);
 
   // Send LOAD_PDF when pdfUrl changes (after iframe shell is ready).
   useEffect(() => {

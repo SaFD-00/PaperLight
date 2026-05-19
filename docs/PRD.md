@@ -1192,7 +1192,7 @@ Cache
 | F# | 이름 | Phase | 상태 | 비고 |
 |----|------|-------|------|------|
 | F-01 | PDF 뷰어 (pdf.js + Shadow DOM) | 0 | 🚧 | Phase 0 T4 — pdf.js 4.10 + iframe wrapper + 5-채널 postMessage (S2 완료); JUMP_TO/SET_ZOOM/SELECTION/PAGE_VISIBLE 동작 |
-| F-02 | Translation (병행) | 0 | ⬜ | Phase 0 T8 |
+| F-02 | Translation (병행) | 0 | 🚧 | Phase 0 T8 — `/api/translate` SSE + TranslationPane (S5), TopToolbar [T] 토글로 현재 페이지 한국어 병행 |
 | F-03 | AI Chat | 1 | ⬜ | Phase 1 |
 | F-04 | Explanation | 0 | 🚧 | Phase 0 T6+T7 — Floating Menu + OpenRouter SSE relay 완료 (S4); Qwen 응답 우측 패널 스트리밍 |
 | F-05 | Citation | 1 | ⬜ | Phase 1 |

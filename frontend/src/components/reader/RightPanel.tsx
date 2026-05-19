@@ -1,14 +1,33 @@
 "use client";
 
-import { Bookmark, BookOpen, FileText, Headphones, Lightbulb, MessageSquare, Star } from "lucide-react";
-import { useState } from "react";
+import {
+  Bookmark,
+  BookOpen,
+  FileText,
+  Headphones,
+  Languages,
+  Lightbulb,
+  MessageSquare,
+  Star,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { ExplanationPanel } from "@/components/panels/ExplanationPanel";
+import { TranslationPane } from "@/components/panels/TranslationPane";
 import { useReader } from "@/stores/reader";
 
-type PanelId = "explain" | "summary" | "notes" | "podcast" | "chat" | "bookmarks" | "starred";
+type PanelId =
+  | "explain"
+  | "translate"
+  | "summary"
+  | "notes"
+  | "podcast"
+  | "chat"
+  | "bookmarks"
+  | "starred";
 
 const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
   { id: "explain", label: "Explanation", icon: Lightbulb },
+  { id: "translate", label: "Translation", icon: Languages },
   { id: "summary", label: "Summary", icon: BookOpen },
   { id: "notes", label: "Notes", icon: FileText },
   { id: "podcast", label: "Podcast", icon: Headphones },
@@ -20,9 +39,15 @@ const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
 export function RightPanel() {
   const [active, setActive] = useState<PanelId>("explain");
   const explainText = useReader((s) => s.explainText);
+  const translationEnabled = useReader((s) => s.translationEnabled);
 
-  // explain 요청이 들어오면 자동으로 패널 전환
-  if (explainText && active !== "explain") setActive("explain");
+  useEffect(() => {
+    if (explainText) setActive("explain");
+  }, [explainText]);
+
+  useEffect(() => {
+    if (translationEnabled) setActive("translate");
+  }, [translationEnabled]);
 
   return (
     <aside
@@ -52,7 +77,8 @@ export function RightPanel() {
       </div>
       <div className="flex-1 overflow-hidden">
         {active === "explain" && <ExplanationPanel />}
-        {active !== "explain" && (
+        {active === "translate" && <TranslationPane />}
+        {active !== "explain" && active !== "translate" && (
           <div className="space-y-4 p-4 text-sm text-text-muted">
             <p className="text-xs">
               {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
