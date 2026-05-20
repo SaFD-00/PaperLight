@@ -11,7 +11,7 @@ async function gotoLibrary(page: Page) {
 async function openSamplePaper(page: Page, index: 0 | 1) {
   await gotoLibrary(page);
   const cards = page.getByRole("button", { name: /arXiv/i });
-  await cards.nth(index).click();
+  await cards.nth(index).dblclick();
   await expect(page).toHaveURL(/\/r\/sample-/);
 }
 
@@ -36,7 +36,7 @@ test.describe("Phase 0 — FE shell + tabs", () => {
     await page.keyboard.press(`${META}+1`);
     await expect(page).toHaveURL(/\/library$/);
     const cards = page.getByRole("button", { name: /arXiv/i });
-    await cards.nth(1).click();
+    await cards.nth(1).dblclick();
     await expect(page).toHaveURL(/\/r\/sample-/);
     tabs = page.getByRole("tab");
     await expect(tabs).toHaveCount(3);
