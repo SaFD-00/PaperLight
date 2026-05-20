@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -12,11 +11,11 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from paperlight.providers.openrouter_provider import OpenRouterProvider
+from paperlight.providers.cache import stream_with_cache
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
-DEFAULT_MODEL = os.environ.get("PAPERLIGHT_TRANSLATE_MODEL", "qwen/qwen3.6-35b-a3b")
+TRANSLATE_PROMPT_VERSION = "translate-v1"
 
 SYSTEM_PROMPT = (
     "당신은 학술 논문 번역가입니다. "
@@ -38,13 +37,7 @@ def _format_sse(event: dict[str, Any]) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-async def _stream(text: str, target_lang: str) -> AsyncIterator[str]:
-    try:
-        provider = OpenRouterProvider()
-    except RuntimeError as err:
-        yield _format_sse({"error": str(err)})
-        yield "data: [DONE]\n\n"
-        return
+async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIterator[str]:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
@@ -53,7 +46,13 @@ async def _stream(text: str, target_lang: str) -> AsyncIterator[str]:
         },
     ]
     try:
-        async for token in provider.stream_chat(messages, DEFAULT_MODEL):
+        async for token in stream_with_cache(
+            "translation",
+            messages,
+            text=text,
+            paper_id=paper_id,
+            prompt_version=TRANSLATE_PROMPT_VERSION,
+        ):
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         yield _format_sse({"error": str(err)})
@@ -63,7 +62,7 @@ async def _stream(text: str, target_lang: str) -> AsyncIterator[str]:
 @router.post("")
 async def translate(req: TranslateRequest) -> StreamingResponse:
     return StreamingResponse(
-        _stream(req.text, req.targetLang),
+        _stream(req.text, req.targetLang, req.paperId),
         media_type="text/event-stream",
         headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
     )

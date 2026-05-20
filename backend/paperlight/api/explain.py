@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -12,11 +11,11 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from paperlight.providers.openrouter_provider import OpenRouterProvider
+from paperlight.providers.cache import stream_with_cache
 
 router = APIRouter(prefix="/api/explain", tags=["explain"])
 
-DEFAULT_MODEL = os.environ.get("PAPERLIGHT_EXPLAIN_MODEL", "qwen/qwen3.6-35b-a3b")
+EXPLAIN_PROMPT_VERSION = "explain-v1"
 
 SYSTEM_PROMPT = (
     "당신은 학술 논문 설명 도우미입니다. "
@@ -36,19 +35,19 @@ def _format_sse(event: dict[str, Any]) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-async def _stream(text: str) -> AsyncIterator[str]:
-    try:
-        provider = OpenRouterProvider()
-    except RuntimeError as err:
-        yield _format_sse({"error": str(err)})
-        yield "data: [DONE]\n\n"
-        return
+async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"다음 단락을 설명해주세요:\n\n```\n{text}\n```"},
     ]
     try:
-        async for token in provider.stream_chat(messages, DEFAULT_MODEL):
+        async for token in stream_with_cache(
+            "explanation",
+            messages,
+            text=text,
+            paper_id=paper_id,
+            prompt_version=EXPLAIN_PROMPT_VERSION,
+        ):
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         yield _format_sse({"error": str(err)})
@@ -58,7 +57,7 @@ async def _stream(text: str) -> AsyncIterator[str]:
 @router.post("")
 async def explain(req: ExplainRequest) -> StreamingResponse:
     return StreamingResponse(
-        _stream(req.text),
+        _stream(req.text, req.paperId),
         media_type="text/event-stream",
         headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
     )

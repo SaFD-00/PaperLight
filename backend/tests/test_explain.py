@@ -65,6 +65,9 @@ async def test_explain_missing_key_emits_error_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
     async with client.stream("POST", "/api/explain", json={"text": "sample"}) as resp:
         assert resp.status_code == 200
