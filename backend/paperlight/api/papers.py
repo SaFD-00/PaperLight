@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import uuid4
@@ -20,10 +21,22 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from paperlight.agents.pregen import (
+    FIGURE_PROMPT_VERSION,
+    HIGHLIGHT_PROMPT_VERSION,
+    PARAGRAPH_DESC_PROMPT_VERSION,
+    PARAGRAPH_IMPORTANCE_PROMPT_VERSION,
+    SUMMARY_PROMPT_VERSION,
+    TABLE_PROMPT_VERSION,
+)
 from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
 from paperlight.ingestion.pipeline import ingest_paper
+from paperlight.models.cache import Cache
+from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
+from paperlight.providers.cache import cache_key, read_cached
+from paperlight.providers.router import primary_model
 from paperlight.storage.db import get_session, get_session_factory
 from paperlight.storage.object_store import (
     DEFAULT_TTL_SECONDS,
@@ -204,3 +217,76 @@ async def ingestion_progress(
         media_type="text/event-stream",
         headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
     )
+
+
+def _pgkey(task: str, paper_id: str, chunk_id: str, version: str) -> str:
+    return cache_key(task, paper_id, chunk_id, primary_model(task), version)
+
+
+@router.get("/{paper_id}/summary")
+async def get_summary(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
+    await _get_owned(session, paper_id, user_id)
+    text = await read_cached(
+        "summary",
+        paper_id=paper_id,
+        chunk_id=f"summary:{paper_id}",
+        prompt_version=SUMMARY_PROMPT_VERSION,
+    )
+    return {"text": text}
+
+
+@router.get("/{paper_id}/insights")
+async def get_insights(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
+    """Read-only assembly of pre-gen artifacts (F-15 + F-14 + auto-highlight) from cache."""
+    await _get_owned(session, paper_id, user_id)
+    chunks = list(
+        (await session.execute(select(Chunk).where(Chunk.paper_id == paper_id).order_by(Chunk.idx)))
+        .scalars()
+        .all()
+    )
+
+    spec: dict[str, tuple[str, Chunk]] = {}
+    for ch in chunks:
+        spec[_pgkey("paragraph_description", paper_id, ch.id, PARAGRAPH_DESC_PROMPT_VERSION)] = (
+            "desc",
+            ch,
+        )
+        spec[
+            _pgkey("paragraph_importance", paper_id, ch.id, PARAGRAPH_IMPORTANCE_PROMPT_VERSION)
+        ] = ("imp", ch)
+        spec[_pgkey("figure_description", paper_id, ch.id, FIGURE_PROMPT_VERSION)] = ("figure", ch)
+        spec[_pgkey("table_description", paper_id, ch.id, TABLE_PROMPT_VERSION)] = ("table", ch)
+    hl_key = _pgkey("highlight", paper_id, f"highlight:{paper_id}", HIGHLIGHT_PROMPT_VERSION)
+
+    keys = [*spec.keys(), hl_key]
+    now = int(time.time())
+    texts: dict[str, str] = {}
+    if keys:
+        rows = (await session.execute(select(Cache).where(Cache.key.in_(keys)))).scalars().all()
+        for row in rows:
+            if row.expires_at is not None and row.expires_at < now:
+                continue
+            value = row.response.get("text")
+            if isinstance(value, str):
+                texts[row.key] = value
+
+    para: dict[str, dict[str, Any]] = {}
+    figures: list[dict[str, Any]] = []
+    for key, (kind, ch) in spec.items():
+        value = texts.get(key)
+        if value is None:
+            continue
+        if kind in ("desc", "imp"):
+            entry = para.setdefault(
+                ch.id,
+                {"chunkId": ch.id, "page": ch.page_num, "description": None, "importance": None},
+            )
+            entry["description" if kind == "desc" else "importance"] = value.strip()
+        else:
+            figures.append(
+                {"chunkId": ch.id, "page": ch.page_num, "kind": kind, "description": value}
+            )
+
+    paragraphs = [para[ch.id] for ch in chunks if ch.id in para]
+    figures.sort(key=lambda f: f["page"])
+    return {"paragraphs": paragraphs, "figures": figures, "highlights": texts.get(hl_key)}
