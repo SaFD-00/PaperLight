@@ -17,9 +17,16 @@ export interface SelectionInfo {
   rects: NormRect[];
 }
 
+export interface TranslateSelection {
+  text: string;
+  hostRect: SelectionInfo["hostRect"];
+}
+
 interface ReaderState {
   selection: SelectionInfo | null;
   explainText: string | null;
+  askText: string | null;
+  translateSelection: TranslateSelection | null;
   translationEnabled: boolean;
   currentPage: number;
   pageText: Record<number, string>;
@@ -30,6 +37,10 @@ interface ReaderState {
   setSelection: (s: SelectionInfo | null) => void;
   triggerExplain: (text: string) => void;
   clearExplain: () => void;
+  triggerAsk: (text: string) => void;
+  clearAsk: () => void;
+  triggerTranslateSelection: (sel: TranslateSelection) => void;
+  clearTranslateSelection: () => void;
   toggleTranslation: () => void;
   setTranslation: (enabled: boolean) => void;
   setCurrentPage: (page: number) => void;
@@ -41,6 +52,8 @@ interface ReaderState {
 export const useReader = create<ReaderState>((set) => ({
   selection: null,
   explainText: null,
+  askText: null,
+  translateSelection: null,
   translationEnabled: false,
   currentPage: 1,
   pageText: {},
@@ -49,6 +62,10 @@ export const useReader = create<ReaderState>((set) => ({
   setSelection: (s) => set({ selection: s }),
   triggerExplain: (text) => set({ explainText: text, selection: null }),
   clearExplain: () => set({ explainText: null }),
+  triggerAsk: (text) => set({ askText: text, selection: null }),
+  clearAsk: () => set({ askText: null }),
+  triggerTranslateSelection: (sel) => set({ translateSelection: sel, selection: null }),
+  clearTranslateSelection: () => set({ translateSelection: null }),
   toggleTranslation: () => set((state) => ({ translationEnabled: !state.translationEnabled })),
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
   setCurrentPage: (page) => set({ currentPage: page }),

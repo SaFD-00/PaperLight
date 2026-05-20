@@ -49,11 +49,21 @@ const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
 export function RightPanel({ paperId }: { paperId: string }) {
   const [active, setActive] = useState<PanelId>("explain");
   const explainText = useReader((s) => s.explainText);
+  const askText = useReader((s) => s.askText);
+  const panelRequest = useReader((s) => s.panelRequest);
   const translationEnabled = useReader((s) => s.translationEnabled);
 
   useEffect(() => {
     if (explainText) setActive("explain");
   }, [explainText]);
+
+  useEffect(() => {
+    if (askText) setActive("chat");
+  }, [askText]);
+
+  useEffect(() => {
+    if (panelRequest) setActive(panelRequest.panel as PanelId);
+  }, [panelRequest]);
 
   useEffect(() => {
     if (translationEnabled) setActive("translate");
