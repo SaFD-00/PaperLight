@@ -1,0 +1,118 @@
+# LLM task routing — PRD §7.5.4 v3.0. Loaded by paperlight.providers.router.
+version: "2026.05.19"
+
+# 실험·실행 기본 모델 (PRD §7.5 v3.0)
+default:
+  provider: openrouter
+  model: qwen/qwen3.6-35b-a3b
+
+tasks:
+  summary:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: openai, model: gpt-5 }
+      - { provider: gemini, model: gemini-2.5-pro }
+
+  chat:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: gemini, model: gemini-2.5-pro }
+      - { provider: openrouter, model: anthropic/claude-sonnet-4.6 }
+
+  explanation:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: openai, model: gpt-5 }
+
+  translation:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: gemini, model: gemini-2.5-flash }
+      - { provider: openai, model: gpt-5-mini }
+
+  figure_description:        # F-14 — Vision 필요, Qwen은 텍스트 reasoning fallback
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: gemini, model: gemini-2.5-pro }
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }   # vision 미지원, 텍스트 보강용
+
+  table_description:
+    provider: gemini
+    model: gemini-2.5-pro
+    fallback:
+      - { provider: openai, model: gpt-5 }
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  paragraph_description:     # F-15 batch
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: gemini, model: gemini-2.5-flash }
+
+  paragraph_importance:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    fallback:
+      - { provider: gemini, model: gemini-2.5-flash-lite }
+
+  podcast_outline:
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  podcast_script:
+    provider: openai
+    model: gpt-5
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  podcast_critique:
+    provider: gemini
+    model: gemini-2.5-pro
+
+  critique:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  classifier:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  highlight:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+  domain_classifier:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+
+# 아래 섹션은 S10 라우터 미사용(보존). embedding은 S9 ingestion.embedder가 담당.
+embedding:
+  provider: openai
+  model: text-embedding-3-large
+  fallback:
+    - { provider: local, model: bge-m3 }   # DAU 5k 이후 self-host
+
+reranker:
+  provider: local
+  model: bge-reranker-v2-m3
+  fallback:
+    - { provider: cohere, model: rerank-multilingual-v3.0 }
+
+tts:
+  default_provider: openai
+  providers:
+    openai:
+      model: tts-1-hd
+      voice_a: alloy
+      voice_b: echo
+    elevenlabs:                # 한국어 품질 부족 시 fallback
+      voice_a_id_env: ELEVENLABS_VOICE_A_ID
+      voice_b_id_env: ELEVENLABS_VOICE_B_ID
+      model: eleven_multilingual_v2
