@@ -3,13 +3,27 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator, Callable
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from paperlight.providers.base import LLMProvider
+from paperlight.providers.gemini_provider import GeminiProvider
+from paperlight.providers.openai_provider import OpenAIProvider
+from paperlight.providers.openrouter_provider import OpenRouterProvider
+from paperlight.providers.stub_provider import StubProvider
+
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "models.yaml"
+
+PROVIDER_REGISTRY: dict[str, Callable[[], LLMProvider]] = {
+    "openrouter": OpenRouterProvider,
+    "openai": OpenAIProvider,
+    "gemini": GeminiProvider,
+    "stub": StubProvider,
+}
 
 
 def _config_path() -> Path:
@@ -54,3 +68,46 @@ def primary_model(task: str) -> str:
     """The primary (non-fallback) model for a task — used as the cache key model."""
     model: str = _entry(task)["model"]
     return model
+
+
+async def stream_task(
+    task: str,
+    messages: list[dict[str, str]],
+) -> AsyncIterator[str]:
+    """Stream a task through its provider chain.
+
+    LLM_PROVIDER=stub forces the offline deterministic provider. Otherwise each
+    candidate is tried in order; an unavailable provider (missing key) or a
+    failure *before the first token* falls through to the next. A failure after
+    tokens were already emitted is re-raised (cannot un-send a partial stream).
+    """
+    if os.environ.get("LLM_PROVIDER") == "stub":
+        async for token in StubProvider().stream_chat(messages, primary_model(task)):
+            yield token
+        return
+
+    last_error: Exception | None = None
+    for provider_name, model in candidates(task):
+        cls = PROVIDER_REGISTRY.get(provider_name)
+        if cls is None:
+            continue
+        try:
+            provider = cls()
+        except RuntimeError as err:
+            last_error = err
+            continue
+        yielded = False
+        try:
+            async for token in provider.stream_chat(messages, model):
+                yielded = True
+                yield token
+            return
+        except Exception as err:  # noqa: BLE001 — fall back only before first token
+            last_error = err
+            if yielded:
+                raise
+            continue
+
+    raise RuntimeError(
+        str(last_error) if last_error else f"no provider available for task {task!r}"
+    )
