@@ -55,6 +55,38 @@ export interface LibraryPaper extends Paper {
   collectionIds: string[];
 }
 
+export interface NormRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface HighlightBbox {
+  rects: NormRect[];
+}
+
+export interface Highlight {
+  id: string;
+  paperId: string;
+  page: number;
+  bbox: HighlightBbox;
+  text: string;
+  color: string | null;
+  category: string;
+  source: string;
+  createdAt: number;
+}
+
+export interface Note {
+  id: string;
+  paperId: string;
+  markdownText: string;
+  s3BackupKey: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 const ARXIV_ID_RE = /(\d{4}\.\d{4,5})/;
 
 export function extractArxivId(input: string): string | null {
