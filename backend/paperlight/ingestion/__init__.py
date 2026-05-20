@@ -1,1 +1,1 @@
-"""paperlight/ingestion package stub. TODO: implement per PRD."""
+"""Ingestion pipeline — S8/S9: arxiv resolve → parse → chunk → embed → Qdrant index."""
