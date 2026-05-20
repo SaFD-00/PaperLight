@@ -12,6 +12,7 @@ import contextlib
 import logging
 from uuid import uuid4
 
+from paperlight.agents.pregen import pregen_paper
 from paperlight.ingestion.chunker import chunk_pages
 from paperlight.ingestion.embedder import embed
 from paperlight.ingestion.parser import parse_pdf
@@ -76,3 +77,9 @@ async def ingest_paper(paper_id: str) -> None:
         logger.exception("ingestion failed for paper %s", paper_id)
         with contextlib.suppress(Exception):
             await _set_status(paper_id, "failed")
+        return
+
+    # S11 auto pre-gen runs only after successful ingestion; its failures must not
+    # flip the already-`ready` status back to `failed`.
+    with contextlib.suppress(Exception):
+        await pregen_paper(paper_id)

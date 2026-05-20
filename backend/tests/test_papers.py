@@ -9,6 +9,7 @@ import tempfile
 from collections.abc import AsyncIterator
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -22,7 +23,8 @@ USER_B = {"X-User-Id": "user-b"}
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncIterator[AsyncClient]:
+async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
+    monkeypatch.setenv("LLM_PROVIDER", "stub")  # S11 pre-gen runs after ingest — keep offline
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     await reset_engine(f"sqlite+aiosqlite:///{path}")

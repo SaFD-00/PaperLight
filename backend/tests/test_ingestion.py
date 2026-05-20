@@ -8,6 +8,7 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 
@@ -61,7 +62,8 @@ async def test_parse_pdf_fixture_has_pages() -> None:
 
 
 @pytest_asyncio.fixture
-async def db_and_stores() -> AsyncIterator[None]:
+async def db_and_stores(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[None]:
+    monkeypatch.setenv("LLM_PROVIDER", "stub")  # S11 pre-gen runs after ingest — keep offline
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     await reset_engine(f"sqlite+aiosqlite:///{path}")
@@ -98,11 +100,39 @@ async def test_ingest_paper_end_to_end(db_and_stores: None) -> None:
         )
         assert count and count > 0
         first = (
-            await session.execute(
-                select(Chunk).where(Chunk.paper_id == paper_id).order_by(Chunk.idx)
+            (
+                await session.execute(
+                    select(Chunk).where(Chunk.paper_id == paper_id).order_by(Chunk.idx)
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
     assert first is not None
 
     hits = get_vector_store().search(embed([first.text])[0], top_k=1, paper_id=paper_id)
     assert hits and hits[0]["id"] == first.id
+
+
+async def test_ingest_pregen_failure_keeps_ready(
+    db_and_stores: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(paper_id: str) -> None:
+        raise RuntimeError("pregen boom")
+
+    monkeypatch.setattr("paperlight.ingestion.pipeline.pregen_paper", boom)
+
+    meta = await resolve_meta(PILOT_ID)
+    data = await fetch_pdf_bytes(meta)
+    paper_id = str(uuid.uuid4())
+    factory = get_session_factory()
+    async with factory() as session:
+        session.add(Paper(id=paper_id, user_id="anonymous", title=meta.title))
+        await session.commit()
+    get_object_store().put_pdf(pdf_key(paper_id), data)
+
+    await ingest_paper(paper_id)  # pregen raises but is isolated
+
+    async with factory() as session:
+        paper = await session.get(Paper, paper_id)
+    assert paper is not None and paper.ingestion_status == "ready"
