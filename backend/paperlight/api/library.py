@@ -322,3 +322,181 @@ async def remove_paper_from_collection(
         delete(LibraryItem).where(LibraryItem.collection_id == cid, LibraryItem.paper_id == pid)
     )
     await session.commit()
+
+
+async def _get_or_create_tag(
+    session: AsyncSession, user_id: str, name: str, color: str | None = None
+) -> Tag:
+    tag = await session.scalar(select(Tag).where(Tag.user_id == user_id, Tag.name == name))
+    if tag is None:
+        tag = Tag(id=str(uuid4()), user_id=user_id, name=name, color=color)
+        session.add(tag)
+        await session.flush()
+    return tag
+
+
+async def _get_or_create_special(
+    session: AsyncSession, user_id: str, kind: str, name: str
+) -> Collection:
+    col = await _get_special(session, user_id, kind)
+    if col is None:
+        col = Collection(
+            id=str(uuid4()),
+            user_id=user_id,
+            parent_id=None,
+            name=name,
+            is_special=True,
+            special_kind=kind,
+            position=0,
+        )
+        session.add(col)
+        await session.flush()
+    return col
+
+
+@router.get("/tags")
+async def list_tags(session: SessionDep, user_id: UserDep) -> list[dict[str, Any]]:
+    tags = (
+        (await session.execute(select(Tag).where(Tag.user_id == user_id).order_by(Tag.name)))
+        .scalars()
+        .all()
+    )
+    out: list[dict[str, Any]] = []
+    for t in tags:
+        count = await session.scalar(
+            select(func.count()).select_from(PaperTag).where(PaperTag.tag_id == t.id)
+        )
+        out.append({"id": t.id, "name": t.name, "color": t.color, "count": count or 0})
+    return out
+
+
+class TagBody(BaseModel):
+    name: str = Field(min_length=1)
+    color: str | None = None
+
+
+@router.post("/papers/{pid}/tags", status_code=status.HTTP_201_CREATED)
+async def add_paper_tag(
+    pid: str, body: TagBody, session: SessionDep, user_id: UserDep
+) -> dict[str, Any]:
+    await _get_owned(session, pid, user_id)
+    tag = await _get_or_create_tag(session, user_id, body.name, body.color)
+    if await session.get(PaperTag, {"paper_id": pid, "tag_id": tag.id}) is None:
+        session.add(PaperTag(paper_id=pid, tag_id=tag.id))
+    await session.commit()
+    return {"id": tag.id, "name": tag.name, "color": tag.color}
+
+
+@router.delete("/papers/{pid}/tags/{tid}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_paper_tag(pid: str, tid: str, session: SessionDep, user_id: UserDep) -> None:
+    await _get_owned(session, pid, user_id)
+    await session.execute(delete(PaperTag).where(PaperTag.paper_id == pid, PaperTag.tag_id == tid))
+    await session.commit()
+
+
+async def _owned_paper_any(session: AsyncSession, pid: str, user_id: str) -> Paper:
+    """Like _get_owned but allows soft-deleted rows (needed for restore)."""
+    paper = await session.get(Paper, pid)
+    if paper is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "paper not found")
+    if paper.user_id != user_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "paper belongs to another user")
+    return paper
+
+
+async def _set_starred(session: AsyncSession, user_id: str, pid: str, starred: bool) -> None:
+    col = await _get_or_create_special(session, user_id, STARRED_KIND, "Starred")
+    if starred:
+        if await session.get(LibraryItem, {"paper_id": pid, "collection_id": col.id}) is None:
+            session.add(LibraryItem(paper_id=pid, collection_id=col.id))
+    else:
+        await session.execute(
+            delete(LibraryItem).where(
+                LibraryItem.paper_id == pid, LibraryItem.collection_id == col.id
+            )
+        )
+
+
+class PaperPatch(BaseModel):
+    status: str | None = None
+    starred: bool | None = None
+    trashed: bool | None = None
+
+
+@router.patch("/papers/{pid}")
+async def patch_paper(
+    pid: str, body: PaperPatch, session: SessionDep, user_id: UserDep
+) -> dict[str, Any]:
+    paper = await _owned_paper_any(session, pid, user_id)
+    if body.status is not None:
+        paper.status = body.status
+    if body.trashed is not None:
+        paper.soft_deleted_at = _now_ms() if body.trashed else None
+    if body.starred is not None:
+        await _set_starred(session, user_id, pid, body.starred)
+    paper.updated_at = _now_ms()
+    await session.commit()
+    return await _paper_payload(session, paper)
+
+
+_BULK_ACTIONS = {"status", "addTag", "removeTag", "move", "trash", "restore"}
+
+
+class BulkBody(BaseModel):
+    paperIds: list[str]
+    action: str
+    value: str | None = None
+
+
+@router.post("/bulk")
+async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> dict[str, int]:
+    if body.action not in _BULK_ACTIONS:
+        raise HTTPException(422, f"unknown action: {body.action}")
+    if body.action in {"status", "addTag", "removeTag", "move"} and not body.value:
+        raise HTTPException(422, "value required for this action")
+
+    target_collection = None
+    if body.action == "move":
+        assert body.value is not None
+        target_collection = await _owned_collection(session, body.value, user_id)
+
+    affected = 0
+    for pid in body.paperIds:
+        paper = await session.get(Paper, pid)
+        if paper is None or paper.user_id != user_id:
+            continue
+        if body.action == "status":
+            paper.status = body.value or paper.status
+            paper.updated_at = _now_ms()
+        elif body.action == "trash":
+            paper.soft_deleted_at = _now_ms()
+        elif body.action == "restore":
+            paper.soft_deleted_at = None
+        elif body.action == "addTag":
+            assert body.value is not None
+            tag = await _get_or_create_tag(session, user_id, body.value)
+            if await session.get(PaperTag, {"paper_id": pid, "tag_id": tag.id}) is None:
+                session.add(PaperTag(paper_id=pid, tag_id=tag.id))
+        elif body.action == "removeTag":
+            existing_tag = await session.scalar(
+                select(Tag).where(Tag.user_id == user_id, Tag.name == body.value)
+            )
+            if existing_tag is not None:
+                await session.execute(
+                    delete(PaperTag).where(
+                        PaperTag.paper_id == pid, PaperTag.tag_id == existing_tag.id
+                    )
+                )
+        elif body.action == "move":
+            assert target_collection is not None
+            if (
+                await session.get(
+                    LibraryItem,
+                    {"paper_id": pid, "collection_id": target_collection.id},
+                )
+                is None
+            ):
+                session.add(LibraryItem(paper_id=pid, collection_id=target_collection.id))
+        affected += 1
+    await session.commit()
+    return {"affected": affected}
