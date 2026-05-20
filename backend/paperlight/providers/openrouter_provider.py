@@ -9,6 +9,8 @@ from collections.abc import AsyncIterator
 import httpx
 from httpx_sse import aconnect_sse
 
+from paperlight.providers.base import reasoning_sink
+
 BASE_URL = "https://openrouter.ai/api/v1"
 
 
@@ -54,6 +56,11 @@ class OpenRouterProvider:
                 if not choices:
                     continue
                 delta = choices[0].get("delta") or {}
+                reasoning = delta.get("reasoning")
+                if reasoning:
+                    sink = reasoning_sink.get()
+                    if sink is not None:
+                        sink(reasoning)
                 content = delta.get("content")
                 if content:
                     yield content

@@ -28,6 +28,7 @@ export function ChatPanel({ paperId }: { paperId: string }) {
   const [followups, setFollowups] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [reasoning, setReasoning] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -69,6 +70,7 @@ export function ChatPanel({ paperId }: { paperId: string }) {
     setInput("");
     setFollowups([]);
     setError(null);
+    setReasoning("");
     setMessages((prev) => [
       ...prev,
       { role: "user", content: q },
@@ -88,6 +90,7 @@ export function ChatPanel({ paperId }: { paperId: string }) {
             patchLastAssistant((m) => ({ ...m, citations: cites }));
           }
           if (Array.isArray(evt.followups)) setFollowups(evt.followups as string[]);
+          if (typeof evt.reasoning === "string") setReasoning((r) => r + evt.reasoning);
         },
         onDone: () => setStreaming(false),
         onError: (err) => {
@@ -161,8 +164,20 @@ export function ChatPanel({ paperId }: { paperId: string }) {
                 </div>
               </div>
             ))}
-            {streaming && (
-              <span className="inline-block h-3 w-0.5 animate-pulse bg-brand-primary align-middle" />
+            {streaming &&
+            reasoning &&
+            messages[messages.length - 1]?.role === "assistant" &&
+            messages[messages.length - 1]?.content === "" ? (
+              <div className="rounded-md border border-border-subtle bg-bg-muted/50 px-2.5 py-1.5 text-xs text-text-muted">
+                <span className="animate-pulse font-medium text-text-secondary">생각 중…</span>
+                <p className="mt-1 max-h-16 overflow-y-auto whitespace-pre-wrap leading-relaxed opacity-80">
+                  {reasoning}
+                </p>
+              </div>
+            ) : (
+              streaming && (
+                <span className="inline-block h-3 w-0.5 animate-pulse bg-brand-primary align-middle" />
+              )
             )}
             {followups.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">

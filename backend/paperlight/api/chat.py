@@ -9,6 +9,8 @@ generator 는 요청 스코프 세션이 닫힌 뒤에도 동작하므로 DB 쓰
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import time
 from collections.abc import AsyncIterator
@@ -33,6 +35,7 @@ from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
+from paperlight.providers.base import reasoning_sink
 from paperlight.providers.cache import stream_with_cache
 from paperlight.storage.db import get_session, session_scope
 
@@ -97,24 +100,55 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
             ChatMessage(id=str(uuid4()), session_id=session_id, role="user", content=question)
         )
 
-    # Phase 2 — retrieve + stream the grounded answer.
+    # Phase 2 — retrieve + stream the grounded answer. Reasoning ("thinking") deltas
+    # arrive on a side channel (reasoning_sink) while content tokens come through the
+    # generator; a queue merges both so reasoning streams live instead of going silent.
     chunks = await retrieve(paper_id, question)
     messages = build_messages(question, chunks, history)
     sig = context_signature(question, chunks, history)
     parts: list[str] = []
+
+    queue: asyncio.Queue[tuple[str, str] | None] = asyncio.Queue()
+    reasoning_sink.set(lambda r: queue.put_nowait(("reasoning", r)))
+
+    async def _produce() -> None:
+        try:
+            async for token in stream_with_cache(
+                "chat",
+                messages,
+                text=sig,
+                paper_id=paper_id,
+                prompt_version=CHAT_PROMPT_VERSION,
+            ):
+                await queue.put(("token", token))
+        except Exception as err:  # noqa: BLE001 — relay upstream failure to UI
+            capture_exception(err)
+            await queue.put(("error", str(err)))
+        finally:
+            await queue.put(None)
+
+    producer = asyncio.create_task(_produce())
+    errored = False
     try:
-        async for token in stream_with_cache(
-            "chat",
-            messages,
-            text=sig,
-            paper_id=paper_id,
-            prompt_version=CHAT_PROMPT_VERSION,
-        ):
-            parts.append(token)
-            yield _format_sse({"token": token})
-    except Exception as err:  # noqa: BLE001 — relay upstream failure to UI
-        capture_exception(err)
-        yield _format_sse({"error": str(err)})
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            kind, value = item
+            if kind == "token":
+                parts.append(value)
+                yield _format_sse({"token": value})
+            elif kind == "reasoning":
+                yield _format_sse({"reasoning": value})
+            else:  # error
+                errored = True
+                yield _format_sse({"error": value})
+    finally:
+        producer.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await producer
+
+    if errored:
         yield "data: [DONE]\n\n"
         return
 

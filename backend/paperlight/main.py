@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -25,9 +27,16 @@ from paperlight.observability.middleware import RequestContextMiddleware
 from paperlight.observability.sentry import init_sentry
 from paperlight.storage.db import init_db
 
+# uvicorn/uv 는 .env 를 자동 로드하지 않으므로 서버 기동 시 직접 로드한다. lifespan 안에서
+# 호출해 실서버(uvicorn)에서만 동작하게 하고, lifespan 을 띄우지 않는 ASGI 테스트는 .env 의
+# 인프라 설정(S3/Qdrant/DB)에 오염되지 않게 한다. override=False 라 호스트(Render/CI)가 주입한
+# 실제 env 가 항상 우선하고, .env 가 없으면 no-op 이다.
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    load_dotenv(_ENV_FILE)
     init_sentry()
     await init_db()
     yield

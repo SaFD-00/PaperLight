@@ -196,6 +196,8 @@ class LLMProvider(Protocol):
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).
 
+**Reasoning 스트리밍**: 기본 모델 `qwen/qwen3.6-35b-a3b`는 추론(reasoning) 모델이라 사고 과정이 OpenRouter SSE의 `delta.reasoning`으로 먼저 흐르고 `delta.content`(최종 답변)는 그 뒤에 온다. 그대로 두면 추론 동안 사용자에게 빈 스트림만 보인다. Chat 경로는 요청 스코프 `reasoning_sink` contextvar(`providers/base.py`)로 reasoning 델타를 받아 `{"reasoning": ...}` SSE 이벤트로 라이브 전송한다(`api/chat.py`가 큐로 content·reasoning 머지). reasoning 은 캐시·영속화·Langfuse output 에 포함하지 않는다. Explain/Translate(단발 task)는 미적용.
+
 ### 5.2 TTSProvider
 
 ```python
@@ -260,6 +262,8 @@ class TTSProvider(Protocol):
 | **local** | `next dev` :3000 | `uvicorn` :8000 | docker-compose Postgres | docker-compose Qdrant | docker-compose MinIO | OpenRouter |
 | **preview** | Vercel preview | Render preview | Supabase staging | Qdrant Cloud staging | R2 staging | OpenRouter |
 | **prod** | Vercel (Seoul edge) | Render (Tokyo) | Supabase (Seoul) | Qdrant Cloud (ap-northeast-1) | R2 (auto) | OpenRouter |
+
+**`.env` 로딩**: `uvicorn`/`uv run`은 `.env`를 자동 로드하지 않는다. 백엔드는 FastAPI `lifespan` startup에서 `load_dotenv(<repo>/.env, override=False)`로 로드 → 로컬 실행 시 API 키·DB·인프라 URL이 `os.environ`에 들어온다. `override=False`라 Render/CI가 주입한 실제 env가 우선하고, `.env` 부재 시 no-op. **import가 아닌 lifespan에 두는 이유**: ASGI 테스트(`ASGITransport`, lifespan 미실행)에 `.env`의 인프라 설정(S3/Qdrant/DB)이 새지 않게 하여 오프라인 테스트를 보존한다.
 
 ### 7.3 Observability
 - **Sentry** — 에러 (FE + BE)
