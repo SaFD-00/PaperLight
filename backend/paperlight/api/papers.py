@@ -29,6 +29,7 @@ from paperlight.agents.pregen import (
     SUMMARY_PROMPT_VERSION,
     TABLE_PROMPT_VERSION,
 )
+from paperlight.agents.references import get_references
 from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
 from paperlight.ingestion.pipeline import ingest_paper
@@ -290,3 +291,12 @@ async def get_insights(paper_id: str, session: SessionDep, user_id: UserDep) -> 
     paragraphs = [para[ch.id] for ch in chunks if ch.id in para]
     figures.sort(key=lambda f: f["page"])
     return {"paragraphs": paragraphs, "figures": figures, "highlights": texts.get(hl_key)}
+
+
+@router.get("/{paper_id}/references")
+async def get_paper_references(
+    paper_id: str, session: SessionDep, user_id: UserDep
+) -> list[dict[str, Any]]:
+    """F-05 — extracted + externally enriched bibliography (memoized)."""
+    await _get_owned(session, paper_id, user_id)
+    return await get_references(paper_id)
