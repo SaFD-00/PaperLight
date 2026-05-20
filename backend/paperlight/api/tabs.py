@@ -1,7 +1,6 @@
 """Tab REST API — FE Zustand ↔ BE single source of truth (last-write-wins).
 
-Phase 1 S7a: user-scoped via `X-User-Id` 헤더 (없으면 `anonymous` default user).
-S7b OAuth 합류 시 헤더 대신 JWT subject로 교체.
+Phase 1 S7b: user-scoped via JWT access cookie → `X-User-Id` 헤더(test) → anonymous.
 camelCase 필드는 FE Zustand store wire format과 1:1 일치시키기 위함.
 """
 # ruff: noqa: N815
@@ -11,23 +10,18 @@ from __future__ import annotations
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from paperlight.auth.dependencies import get_user_id
 from paperlight.models import Tab
-from paperlight.storage.db import DEFAULT_USER_ID, get_session
+from paperlight.storage.db import get_session
 
 router = APIRouter(prefix="/api/tabs", tags=["tabs"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-
-
-async def get_user_id(x_user_id: Annotated[str | None, Header()] = None) -> str:
-    return x_user_id or DEFAULT_USER_ID
-
-
 UserDep = Annotated[str, Depends(get_user_id)]
 
 
