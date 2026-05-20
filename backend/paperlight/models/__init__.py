@@ -1,6 +1,7 @@
 """ORM models — Phase 1 S7a: 10 entities (PRD §8.5) + Tab from Phase 0."""
 
 from paperlight.models.cache import Cache
+from paperlight.models.chunk import Chunk
 from paperlight.models.collection import Collection
 from paperlight.models.highlight import Highlight
 from paperlight.models.library_item import LibraryItem
@@ -15,6 +16,7 @@ from paperlight.models.user import User
 
 __all__ = [
     "Cache",
+    "Chunk",
     "Collection",
     "Highlight",
     "LibraryItem",
