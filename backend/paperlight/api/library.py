@@ -12,10 +12,12 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from paperlight.agents import bib
 from paperlight.api.papers import _get_owned, _paper_dict
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chunk import Chunk
@@ -500,3 +502,62 @@ async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> 
         affected += 1
     await session.commit()
     return {"affected": affected}
+
+
+class ImportBody(BaseModel):
+    format: str
+    content: str
+
+
+@router.post("/import", status_code=status.HTTP_201_CREATED)
+async def import_references(
+    body: ImportBody, session: SessionDep, user_id: UserDep
+) -> dict[str, Any]:
+    try:
+        refs = bib.parse(body.format, body.content)
+    except ValueError as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    created: list[Paper] = []
+    for r in refs:
+        paper = Paper(
+            id=str(uuid4()),
+            user_id=user_id,
+            title=r.title,
+            authors=r.authors or None,
+            year=r.year,
+            venue=r.venue,
+            doi=r.doi,
+            arxiv_id=r.arxiv_id,
+            ingestion_status="pending",
+        )
+        session.add(paper)
+        created.append(paper)
+    await session.commit()
+    return {"imported": len(created), "papers": [_paper_dict(p) for p in created]}
+
+
+class ExportBody(BaseModel):
+    paperIds: list[str]
+    format: str
+
+
+@router.post("/export")
+async def export_references(
+    body: ExportBody, session: SessionDep, user_id: UserDep
+) -> PlainTextResponse:
+    if body.format not in bib.FORMATS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown format: {body.format}")
+    refs: list[bib.ParsedRef] = []
+    for pid in body.paperIds:
+        paper = await _get_owned(session, pid, user_id)
+        refs.append(
+            bib.ParsedRef(
+                title=paper.title,
+                authors=paper.authors or [],
+                year=paper.year,
+                venue=paper.venue,
+                doi=paper.doi,
+                arxiv_id=paper.arxiv_id,
+            )
+        )
+    return PlainTextResponse(bib.export(body.format, refs))
