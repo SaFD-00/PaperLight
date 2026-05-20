@@ -3,9 +3,12 @@
 User highlights (bbox-anchored) + per-paper Markdown note with R2 backup +
 Markdown/Obsidian export. user-scoped via shared `get_user_id`. camelCase wire.
 """
+# ruff: noqa: N815
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Annotated, Any
 from uuid import uuid4
 
@@ -17,7 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.highlight import Highlight
+from paperlight.models.note import Note
 from paperlight.storage.db import get_session
+from paperlight.storage.object_store import get_object_store, note_key
 
 router = APIRouter(prefix="/api/annotations", tags=["annotations"])
 
@@ -93,3 +98,50 @@ async def delete_highlight(hid: str, session: SessionDep, user_id: UserDep) -> N
     h = await _owned_highlight(session, hid, user_id)
     await session.delete(h)
     await session.commit()
+
+
+class NoteBody(BaseModel):
+    markdownText: str
+
+
+def _note_dict(n: Note) -> dict[str, Any]:
+    return {
+        "id": n.id,
+        "paperId": n.paper_id,
+        "markdownText": n.markdown_text,
+        "s3BackupKey": n.s3_backup_key,
+        "createdAt": n.created_at,
+        "updatedAt": n.updated_at,
+    }
+
+
+async def _get_or_create_note(session: AsyncSession, pid: str, user_id: str) -> Note:
+    note = await session.scalar(select(Note).where(Note.paper_id == pid, Note.user_id == user_id))
+    if note is None:
+        note = Note(id=str(uuid4()), user_id=user_id, paper_id=pid, markdown_text="")
+        session.add(note)
+        await session.commit()
+        await session.refresh(note)
+    return note
+
+
+@router.get("/papers/{pid}/note")
+async def get_note(pid: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
+    await _get_owned(session, pid, user_id)
+    note = await _get_or_create_note(session, pid, user_id)
+    return _note_dict(note)
+
+
+@router.put("/papers/{pid}/note")
+async def save_note(
+    pid: str, body: NoteBody, session: SessionDep, user_id: UserDep
+) -> dict[str, Any]:
+    await _get_owned(session, pid, user_id)
+    note = await _get_or_create_note(session, pid, user_id)
+    note.markdown_text = body.markdownText
+    note.s3_backup_key = note_key(note.id)
+    note.updated_at = int(time.time() * 1000)
+    await asyncio.to_thread(get_object_store().put_text, note.s3_backup_key, body.markdownText)
+    await session.commit()
+    await session.refresh(note)
+    return _note_dict(note)
