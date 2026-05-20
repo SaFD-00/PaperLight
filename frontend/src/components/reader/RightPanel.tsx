@@ -8,6 +8,7 @@ import {
   Languages,
   Lightbulb,
   MessageSquare,
+  Quote,
   Sparkles,
   Star,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/panels/ChatPanel";
 import { ExplanationPanel } from "@/components/panels/ExplanationPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
+import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { TranslationPane } from "@/components/panels/TranslationPane";
 import { useReader } from "@/stores/reader";
@@ -24,9 +26,10 @@ type PanelId =
   | "translate"
   | "summary"
   | "insights"
+  | "chat"
+  | "references"
   | "notes"
   | "podcast"
-  | "chat"
   | "bookmarks"
   | "starred";
 
@@ -35,9 +38,10 @@ const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
   { id: "translate", label: "Translation", icon: Languages },
   { id: "summary", label: "Summary", icon: BookOpen },
   { id: "insights", label: "Insights", icon: Sparkles },
+  { id: "chat", label: "Chat", icon: MessageSquare },
+  { id: "references", label: "References", icon: Quote },
   { id: "notes", label: "Notes", icon: FileText },
   { id: "podcast", label: "Podcast", icon: Headphones },
-  { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "bookmarks", label: "Bookmarks", icon: Bookmark },
   { id: "starred", label: "Starred", icon: Star },
 ];
@@ -87,11 +91,13 @@ export function RightPanel({ paperId }: { paperId: string }) {
         {active === "summary" && <SummaryPanel paperId={paperId} />}
         {active === "insights" && <InsightsPanel paperId={paperId} />}
         {active === "chat" && <ChatPanel paperId={paperId} />}
+        {active === "references" && <ReferencesPanel paperId={paperId} />}
         {active !== "explain" &&
           active !== "translate" &&
           active !== "summary" &&
           active !== "insights" &&
-          active !== "chat" && (
+          active !== "chat" &&
+          active !== "references" && (
             <div className="space-y-4 p-4 text-sm text-text-muted">
               <p className="text-xs">
                 {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
