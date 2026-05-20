@@ -1172,16 +1172,16 @@ Cache
 
 ## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
 
-> **마지막 갱신**: 2026-05-20 (Phase 1 S7b 진입 — Auth Stub/Mock)
+> **마지막 갱신**: 2026-05-20 (Phase 1 S8 arXiv import + S9 Ingestion 완료)
 > **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
-> **현재 마일스톤**: → **Phase 1 🚧 S7b (Auth Stub/Mock 모드)** 진행 중
+> **현재 마일스톤**: → **Phase 1** — S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ · S9 ✅ · 다음 **S10 LLM Abstraction**
 
 ### 18.1 Phase 진척도
 
 | Phase | 상태 | 메모 |
 |-------|------|------|
 | Phase 0 (4주) | ✅ 완료 | S1~S6 (T0~T10) 완료, Playwright E2E 8/8 PASS (chromium) — [ROADMAP §2](./ROADMAP.md) |
-| Phase 1 (8주) | 🚧 진행 | S7a ✅ + S7b 🚧 (Auth Stub/Mock — JWT + Session ORM + Cookie + mock-login). 실 Google OAuth는 자격 정보 발급 후. [ROADMAP §3](./ROADMAP.md) |
+| Phase 1 (8주) | 🚧 진행 | S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ (arXiv import) · S9 ✅ (Ingestion: PyMuPDF→chunk→embed→Qdrant). 다음 S10. [ROADMAP §3](./ROADMAP.md) |
 | Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
 | Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
 
@@ -1218,8 +1218,11 @@ Cache
 | 디자인 토큰 CSS | ✅ | S1 T0 — `frontend/src/styles/tokens.css` + Tailwind v4 `@theme inline` 매핑 |
 | Pretendard·Inter 폰트 셋업 | ✅ | S1 T0 — `next/font/local` (Pretendard variable) + `next/font/google` (Inter, JBMono) |
 | pdf.js 정적 자산 (`public/pdfjs/`) | ✅ | S2 T4 — `scripts/copy-pdfjs.mjs` postinstall로 viewer/worker 복사 |
-| Alembic DB 마이그레이션 | ✅ | S7a — 10 엔티티 + Tab 초기 migration (`backend/alembic/versions/0001_phase1_init.py`), `DATABASE_URL` async/sync 양쪽 지원. S7b — `sessions` 테이블 (`0002_session.py`) 추가 |
+| Alembic DB 마이그레이션 | ✅ | S7a — 10 엔티티 + Tab (`0001_phase1_init.py`). S7b — `sessions` (`0002_session.py`). S9 — `chunks` (`0003_chunks.py`) |
 | Auth (Google OAuth + JWT + Cookie) | 🚧 | S7b stub/mock 모드 — `python-jose` HS256 + httpOnly cookie (access 15m / refresh 30d, `Path=/api/auth/refresh`) + refresh rotation + reuse detection + `/api/auth/dev/mock-login`. 실 Google OAuth call은 자격 정보 발급 후 별도 PR |
+| arXiv import + Paper API (S8) | ✅ | `/api/papers` import/list/detail/pdf-url/ingestion(SSE). fixture-first meta(→arXiv Atom fallback) + object_store(S3/MinIO 또는 in-process Local) + presigned URL(TTL 10분) + BackgroundTask ingest. FE `/import` + `usePapers` |
+| Ingestion pipeline (S9) | ✅ | PyMuPDF 파서 → char 청킹(≈512토큰) → embedder(`stub` 결정적 dim=1024 기본 / `fastembed` bge-m3 opt-in) → Qdrant(`:memory:` fallback) 색인 + Chunk ORM. marker 파서·rerank·auto pre-gen(S11)은 후속 |
+| Object store (R2/MinIO/Local) + Vector (Qdrant) | ✅ | `storage/object_store.py`(S3 boto3 / Local HMAC presigned) + `storage/vector.py`(paper_chunks dim=1024 cosine). env `S3_ENDPOINT`/`QDRANT_URL`로 백엔드 선택 |
 | i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
 | i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
 | CI workflow (GitHub Actions) | 🚧 | `.github/workflows/ci.yml` 파일만 존재, 내용 빈 상태 |
@@ -1234,10 +1237,11 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. **다음 진입점**: **Google OAuth 실 호출 합류** — `GOOGLE_OAUTH_CLIENT_ID/SECRET` 발급 → `/api/auth/login/google` 501 placeholder를 실제 OAuth 2.0/OIDC redirect+callback으로 교체. dev mock-login은 그대로 유지(테스트용).
-2. **그 다음**: **S8 arXiv Import + Paper API + R2** → S9 Ingestion → S10 LLM 추상화 확장 → S11 Auto Pre-gen → S12 Chat+Citation → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI+Phase 1 종료 회귀
-3. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant 사용 / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 / GOOGLE_OAUTH 자격 정보 발급 보류 → stub/mock 모드 ([§14](#14-결정사항--구-open-questions--v30에서-모두-해소) TTS 결정 수정 반영 필요)
-4. S7b 검증: BE pytest 23/23 PASS (auth 10 + tabs 7 + explain/health/translate 6) + Playwright Phase 0 8/8 PASS (chromium, 9.8s) + `alembic upgrade head` clean (0001 → 0002)
+1. **다음 진입점**: **S10 LLM Abstraction** — LLMProvider 추상화(Qwen default + OpenAI vision + Gemini table fallback) + `models.yaml` 라우팅. 이후 S11 Auto Pre-gen(Summary/Highlight/F-14/F-15 — S9 chunk/벡터 기반) → S12 Chat+Citation → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI.
+2. **병행 보류**: **Google OAuth 실 호출 합류** — `GOOGLE_OAUTH_CLIENT_ID/SECRET` 발급 시 `/api/auth/login/google` 501 placeholder를 실제 OAuth 2.0/OIDC로 교체. dev mock-login 유지.
+3. **S8/S9 후속 후보**: marker-pdf 파서(`INGEST_PARSER=marker`) 실구현 · fastembed bge-m3 실 임베딩 검증 · reader `/r/{id}`에 presigned PDF 실렌더 연결 · Celery+Redis 전환 · Cohere rerank(Phase 2).
+4. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 / GOOGLE_OAUTH 자격 정보 발급 보류 → stub/mock 모드
+5. S8/S9 검증: BE pytest 44/44 PASS (auth 10 + tabs 7 + explain/health/translate 6 + storage 6 + ingestion 6 + papers 9) + Playwright 11/11 PASS (Phase 0 8 회귀 + s8-import 3, chromium) + `alembic upgrade head` clean (0001 → 0002 → 0003)
 
 ---
 

@@ -12,7 +12,7 @@
 | Phase | 기간 | 범위 | 핵심 산출물 | 상태 |
 |-------|------|------|------------|------|
 | **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | ✅ S6 완료 (T0~T10) — 사용자 브라우저 AC 검증 대기 |
-| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ + S7b Auth Stub/Mock 🚧 (실 Google OAuth는 자격 발급 후) |
+| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth Stub/Mock 🚧 · S8 arXiv import ✅ · S9 Ingestion ✅ (다음 S10 LLM Abstraction) |
 | **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
 
@@ -124,8 +124,8 @@ S1 ──┬──► S2 ──► S4 ──► S6
 |------|------|------|------------------------|------|
 | **S7a** | **Schema** | Postgres 지원 + Alembic + 10 엔티티 ORM + Tab user-scoped | [PRD §8.5](./PRD.md) | ✅ |
 | **S7b** | **Auth (Stub/Mock 모드)** | JWT (HS256, access 15m / refresh 30d) + httpOnly Cookie + Refresh Token rotation + reuse detection + `/api/auth/dev/mock-login` + `useAuth` Zustand store + `/login` 페이지. 실 Google OAuth call은 자격 정보 발급 후 별도 PR | [PRD §7.3](./PRD.md) | 🚧 |
-| **S8** | **arXiv import + Paper API** | URL/ID/파일 업로드 → Paper 생성 → R2(MinIO local) | F-01 보강 | ⬜ |
-| **S9** | **Ingestion pipeline** | marker-pdf 파서 → chunker → embedder(bge-m3) → 로컬 Qdrant 색인 (rerank는 Phase 2) | [PRD §7.2](./PRD.md) | ⬜ |
+| **S8** | **arXiv import + Paper API** | arXiv ID/URL → meta(fixture-first → arXiv Atom fallback) → Paper 생성 + object_store(S3/MinIO 또는 in-process Local) 저장 + BackgroundTask ingest. presigned URL(TTL 10분, PRD §7.3). `/import` 페이지 + `usePapers` store + Library "+ 논문 추가" | F-01 보강 | ✅ |
+| **S9** | **Ingestion pipeline** | PyMuPDF 파서(marker는 `INGEST_PARSER=marker` follow-up) → char 청킹(≈512토큰 슬라이딩) → embedder(stub 결정적 dim=1024 기본, fastembed bge-m3 opt-in) → 로컬 Qdrant(`:memory:` fallback) 색인 + Chunk ORM/alembic 0003. ingestion SSE 진행률. rerank는 Phase 2 | [PRD §7.2](./PRD.md) | ✅ |
 | **S10** | **LLM Abstraction** | LLMProvider 추상화 (Qwen default + OpenAI vision + Gemini table fallback) + models.yaml 라우팅 | [PRD §7.5](./PRD.md) | ⬜ |
 | **S11** | **Auto pre-gen** | Summary (다층) + F-10 Auto-Highlight + F-14 Figure/Table + F-15 Paragraph 자동 + Right Panel 4개 | F-06, F-10, F-14, F-15 | ⬜ |
 | **S12** | **Chat + Citation** | F-03 + F-05 — SSE 스트리밍, 인용 점프, 후속 질문 칩 | F-03, F-05 | ⬜ |
