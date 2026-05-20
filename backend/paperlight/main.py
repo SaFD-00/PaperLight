@@ -20,11 +20,14 @@ from paperlight.api import (
     tabs,
     translate,
 )
+from paperlight.observability.middleware import RequestContextMiddleware
+from paperlight.observability.sentry import init_sentry
 from paperlight.storage.db import init_db
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    init_sentry()
     await init_db()
     yield
 
@@ -36,6 +39,7 @@ def _cors_origins() -> list[str]:
 
 app = FastAPI(title="PaperLight API", version="0.0.1", lifespan=lifespan)
 
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
