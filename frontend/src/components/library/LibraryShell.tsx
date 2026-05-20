@@ -1,24 +1,51 @@
 "use client";
 
-import { BookOpen, FileText, Library, Plus, Tag } from "lucide-react";
+import { Library, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { usePapers } from "@/stores/papers";
+import { useEffect, useMemo } from "react";
+import { CollectionTree } from "@/components/library/CollectionTree";
+import { DetailPanel } from "@/components/library/DetailPanel";
+import { ImportExportMenu } from "@/components/library/ImportExportMenu";
+import { PaperList } from "@/components/library/PaperList";
+import { SearchBar } from "@/components/library/SearchBar";
+import { TagCloud } from "@/components/library/TagCloud";
+import type { LibraryPaper } from "@/lib/types";
+import { useLibrary } from "@/stores/library";
 import { useTabs } from "@/stores/tabs";
 
-const PILOT_PAPERS = [
+const PILOTS: LibraryPaper[] = [
   {
-    paperId: "sample-1",
+    id: "sample-1",
     title: "Code2World: A GUI World Model via Renderable Code Generation",
-    arxiv: "2602.09856",
-    authors: "Zheng et al., 2026",
+    authors: ["Zheng et al., 2026"],
+    year: 2026,
+    venue: null,
+    arxivId: "2602.09856",
+    doi: null,
+    status: "to_read",
+    progressPct: 0,
+    ingestionStatus: "ready",
+    createdAt: 0,
+    updatedAt: 0,
+    tags: [],
+    collectionIds: [],
   },
   {
-    paperId: "sample-2",
+    id: "sample-2",
     title: "How Mobile World Model Guides GUI Agents?",
-    arxiv: "2605.10347",
-    authors: "Xu et al., 2026",
+    authors: ["Xu et al., 2026"],
+    year: 2026,
+    venue: null,
+    arxivId: "2605.10347",
+    doi: null,
+    status: "to_read",
+    progressPct: 0,
+    ingestionStatus: "ready",
+    createdAt: 0,
+    updatedAt: 0,
+    tags: [],
+    collectionIds: [],
   },
 ];
 
@@ -26,119 +53,59 @@ export function LibraryShell() {
   const router = useRouter();
   const openTab = useTabs((s) => s.openTab);
   const tabs = useTabs((s) => s.tabs);
-  const papers = usePapers((s) => s.list);
-  const refreshList = usePapers((s) => s.refreshList);
+
+  const papers = useLibrary((s) => s.papers);
+  const activeCollectionId = useLibrary((s) => s.activeCollectionId);
+  const query = useLibrary((s) => s.query);
+  const filterTagIds = useLibrary((s) => s.filterTagIds);
+  const selectedPaperId = useLibrary((s) => s.selectedPaperId);
+  const selectedPaperIds = useLibrary((s) => s.selectedPaperIds);
+  const refreshAll = useLibrary((s) => s.refreshAll);
 
   useEffect(() => {
-    void refreshList();
-  }, [refreshList]);
+    void refreshAll();
+  }, [refreshAll]);
 
-  function openPaper(paperId: string, title: string) {
-    const existing = tabs.find((t) => t.paperId === paperId);
-    if (existing) {
-      router.push(`/r/${paperId}`);
-      return;
-    }
-    openTab({ paperId, title });
-    router.push(`/r/${paperId}`);
+  const showPilots = activeCollectionId === null && query === "" && filterTagIds.length === 0;
+  const combined = useMemo(
+    () => (showPilots ? [...PILOTS, ...papers] : papers),
+    [showPilots, papers],
+  );
+  const selectedPaper = combined.find((p) => p.id === selectedPaperId) ?? null;
+  const exportIds = selectedPaperIds.length ? selectedPaperIds : papers.map((p) => p.id);
+
+  function openPaper(paper: LibraryPaper) {
+    const existing = tabs.find((t) => t.paperId === paper.id);
+    if (!existing) openTab({ paperId: paper.id, title: paper.title });
+    router.push(`/r/${paper.id}`);
   }
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr]">
-      <header className="flex items-start justify-between gap-3 border-b border-border-subtle px-6 py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <Library className="size-5 text-brand-primary" aria-hidden />
-            내 라이브러리
-          </h1>
-          <p className="mt-1 text-xs text-text-muted">
-            Phase 1에서 4-pane (Tree · List · Detail · Tag Cloud) 본격 도입.
-          </p>
+    <div className="grid h-full grid-rows-[auto_1fr_120px]">
+      <header className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-2.5">
+        <h1 className="flex items-center gap-2 text-base font-semibold">
+          <Library className="size-5 text-brand-primary" aria-hidden />
+          내 라이브러리
+        </h1>
+        <div className="flex items-center gap-2">
+          <SearchBar />
+          <ImportExportMenu exportIds={exportIds} />
+          <Link
+            href="/import"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            <Plus className="size-4" aria-hidden /> 논문 추가
+          </Link>
         </div>
-        <Link
-          href="/import"
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
-        >
-          <Plus className="size-4" aria-hidden /> 논문 추가
-        </Link>
       </header>
 
-      <div className="grid gap-6 overflow-auto px-6 py-6 md:grid-cols-[1fr_280px]">
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            <BookOpen className="size-3.5" aria-hidden /> 파일럿 논문
-          </h2>
-          <ul className="grid gap-3">
-            {PILOT_PAPERS.map((p) => (
-              <li key={p.paperId}>
-                <button
-                  type="button"
-                  onClick={() => openPaper(p.paperId, p.title)}
-                  className="group flex w-full items-start gap-3 rounded-lg border border-border-subtle bg-bg-surface p-4 text-left transition-colors hover:border-brand-primary hover:bg-bg-muted"
-                >
-                  <FileText
-                    className="mt-0.5 size-4 text-text-muted group-hover:text-brand-primary"
-                    aria-hidden
-                  />
-                  <span className="flex-1">
-                    <span className="block text-sm font-medium text-text-primary group-hover:text-brand-primary">
-                      {p.title}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-text-muted">
-                      arXiv:{p.arxiv} · {p.authors}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {papers.length > 0 ? (
-            <>
-              <h2 className="mb-3 mt-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                <BookOpen className="size-3.5" aria-hidden /> 내 논문
-              </h2>
-              <ul className="grid gap-3">
-                {papers.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => openPaper(p.id, p.title)}
-                      className="group flex w-full items-start gap-3 rounded-lg border border-border-subtle bg-bg-surface p-4 text-left transition-colors hover:border-brand-primary hover:bg-bg-muted"
-                    >
-                      <FileText
-                        className="mt-0.5 size-4 text-text-muted group-hover:text-brand-primary"
-                        aria-hidden
-                      />
-                      <span className="flex-1">
-                        <span className="block text-sm font-medium text-text-primary group-hover:text-brand-primary">
-                          {p.title}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-text-muted">
-                          {p.arxivId ? `arXiv:${p.arxivId} · ` : ""}
-                          {p.ingestionStatus}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </section>
-
-        <aside className="grid h-fit gap-3 rounded-lg border border-dashed border-border-default bg-bg-muted p-4 text-xs text-text-muted">
-          <p className="flex items-center gap-2 font-medium text-text-secondary">
-            <Tag className="size-3.5" aria-hidden /> Phase 1 예정
-          </p>
-          <ul className="list-disc space-y-1 pl-4">
-            <li>파일 업로드 (drag &amp; drop)</li>
-            <li>4-pane: Tree · List · Detail · Tag Cloud</li>
-            <li>태그 · 컬렉션 · 멀티 선택 · Bulk 작업</li>
-            <li>Auto pre-gen (Summary · Highlight · F-14 · F-15)</li>
-          </ul>
-        </aside>
+      <div className="grid min-h-0 grid-cols-[250px_minmax(0,1fr)_320px]">
+        <CollectionTree />
+        <PaperList papers={combined} onOpen={openPaper} />
+        <DetailPanel paper={selectedPaper} onOpen={openPaper} />
       </div>
+
+      <TagCloud />
     </div>
   );
 }
