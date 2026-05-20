@@ -13,9 +13,54 @@ let currentUrl = null;
 let currentScale = 1.25;
 let pageWrappers = [];
 let visibilityObserver = null;
+let savedHighlights = [];
+
+const HL_COLORS = {
+  yellow: "rgba(255, 224, 102, 0.5)",
+  blue: "rgba(125, 176, 255, 0.45)",
+  green: "rgba(140, 222, 160, 0.45)",
+  red: "rgba(255, 145, 145, 0.45)",
+};
+
+function hlBackground(color) {
+  if (!color) return HL_COLORS.yellow;
+  return HL_COLORS[color] || color;
+}
+
+// S14: highlight overlay styles (injected once).
+const hlStyle = document.createElement("style");
+hlStyle.textContent =
+  ".highlight-overlay{position:absolute;pointer-events:auto;cursor:pointer;" +
+  "mix-blend-mode:multiply;border-radius:2px;}";
+document.head.appendChild(hlStyle);
 
 function send(type, payload = {}) {
   parent.postMessage({ source: IFRAME_SOURCE, type, ...payload }, "*");
+}
+
+function renderHighlightsForPage(pageNum) {
+  const wrapper = pageWrappers[pageNum - 1];
+  if (!wrapper) return;
+  for (const h of savedHighlights) {
+    if (h.page !== pageNum) continue;
+    for (const r of h.rects || []) {
+      const div = document.createElement("div");
+      div.className = "highlight-overlay";
+      div.dataset.hlId = h.id;
+      div.style.left = r.x * 100 + "%";
+      div.style.top = r.y * 100 + "%";
+      div.style.width = r.w * 100 + "%";
+      div.style.height = r.h * 100 + "%";
+      div.style.background = hlBackground(h.color);
+      div.addEventListener("click", () => send("HIGHLIGHT_CLICK", { id: h.id }));
+      wrapper.appendChild(div);
+    }
+  }
+}
+
+function renderAllHighlights() {
+  for (const el of container.querySelectorAll(".highlight-overlay")) el.remove();
+  for (let i = 1; i <= pageWrappers.length; i++) renderHighlightsForPage(i);
 }
 
 function setEmpty(text) {
@@ -120,6 +165,7 @@ async function loadPdf(url) {
     setEmpty(null);
     send("READY", { numPages: currentDoc.numPages });
     setupVisibility();
+    renderAllHighlights();
   } catch (err) {
     const msg = (err && err.message) || String(err);
     setEmpty("PDF 로드 실패: " + msg);
@@ -130,12 +176,12 @@ async function loadPdf(url) {
 document.addEventListener("selectionchange", () => {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) {
-    send("SELECTION_CHANGE", { text: "", rect: null, page: null });
+    send("SELECTION_CHANGE", { text: "", rect: null, rects: [], page: null });
     return;
   }
   const text = sel.toString().trim();
   if (!text) {
-    send("SELECTION_CHANGE", { text: "", rect: null, page: null });
+    send("SELECTION_CHANGE", { text: "", rect: null, rects: [], page: null });
     return;
   }
   const range = sel.getRangeAt(0);
@@ -149,6 +195,20 @@ document.addEventListener("selectionchange", () => {
     }
     node = node.parentNode;
   }
+  // S14: normalized (0..1) page-relative rects for scale-independent highlight anchoring.
+  let rects = [];
+  const wrapper = pageNum ? pageWrappers[pageNum - 1] : null;
+  if (wrapper) {
+    const wr = wrapper.getBoundingClientRect();
+    rects = Array.from(range.getClientRects())
+      .filter((r) => r.width > 0 && r.height > 0)
+      .map((r) => ({
+        x: (r.left - wr.left) / wr.width,
+        y: (r.top - wr.top) / wr.height,
+        w: r.width / wr.width,
+        h: r.height / wr.height,
+      }));
+  }
   send("SELECTION_CHANGE", {
     text,
     rect: {
@@ -159,6 +219,7 @@ document.addEventListener("selectionchange", () => {
       width: rect.width,
       height: rect.height,
     },
+    rects,
     page: pageNum,
   });
 });
@@ -181,8 +242,18 @@ window.addEventListener("message", async (event) => {
       break;
     }
     case "HIGHLIGHT_REGION":
-      // Phase 0 stub — implemented in F-10 / F-04 highlight (Phase 1+).
+      // Deprecated stub — superseded by RENDER_HIGHLIGHTS (S14).
       break;
+    case "RENDER_HIGHLIGHTS":
+      savedHighlights = msg.highlights || [];
+      renderAllHighlights();
+      break;
+    case "REMOVE_HIGHLIGHT": {
+      savedHighlights = savedHighlights.filter((h) => h.id !== msg.id);
+      for (const el of container.querySelectorAll('.highlight-overlay[data-hl-id="' + msg.id + '"]'))
+        el.remove();
+      break;
+    }
     case "TOGGLE_TRANSLATION":
       // Translation overlay is rendered host-side; iframe stub.
       break;

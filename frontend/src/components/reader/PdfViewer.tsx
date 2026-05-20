@@ -3,25 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import {
   HOST_SOURCE,
-  IFRAME_SOURCE,
   type HostToIframeMessage,
+  IFRAME_SOURCE,
   type IframeToHostMessage,
 } from "@/lib/pdf/messages";
 import { createShadowIframe, type ShadowIframeHandle } from "@/lib/pdf/shadow-iframe";
+import { useMarkup } from "@/stores/markup";
 import { useReader } from "@/stores/reader";
 
 export interface PdfViewerProps {
   pdfUrl: string | null;
+  paperId: string;
 }
 
-export function PdfViewer({ pdfUrl }: PdfViewerProps) {
+export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const setSelection = useReader((s) => s.setSelection);
   const setCurrentPage = useReader((s) => s.setCurrentPage);
   const setPageText = useReader((s) => s.setPageText);
+  const requestPanel = useReader((s) => s.requestPanel);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
   const jumpRequest = useReader((s) => s.jumpRequest);
+  const highlights = useMarkup((s) => s.highlights);
+  const fetchHighlights = useMarkup((s) => s.fetchHighlights);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -99,14 +104,18 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
               width: r.width,
               height: r.height,
             },
+            rects: data.rects ?? [],
           });
           break;
         }
+        case "HIGHLIGHT_CLICK":
+          requestPanel("notes");
+          break;
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setSelection, setCurrentPage, setPageText]);
+  }, [setSelection, setCurrentPage, setPageText, requestPanel]);
 
   // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
   useEffect(() => {
@@ -121,6 +130,26 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "JUMP_TO", page: jumpRequest.page });
   }, [jumpRequest]);
+
+  // S14: 저장된 하이라이트 로드.
+  useEffect(() => {
+    fetchHighlights(paperId);
+  }, [paperId, fetchHighlights]);
+
+  // S14: PDF ready 또는 하이라이트 변경 시 overlay 재렌더 요청.
+  useEffect(() => {
+    if (status !== "ready") return;
+    postToIframe({
+      source: HOST_SOURCE,
+      type: "RENDER_HIGHLIGHTS",
+      highlights: highlights.map((h) => ({
+        id: h.id,
+        page: h.page,
+        color: h.color,
+        rects: h.bbox.rects,
+      })),
+    });
+  }, [status, highlights]);
 
   // Send LOAD_PDF when pdfUrl changes (after iframe shell is ready).
   useEffect(() => {
