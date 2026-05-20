@@ -1172,16 +1172,16 @@ Cache
 
 ## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
 
-> **마지막 갱신**: 2026-05-20 (Phase 1 S10 LLM Abstraction 완료)
+> **마지막 갱신**: 2026-05-20 (Phase 1 S11 Auto pre-gen 완료)
 > **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
-> **현재 마일스톤**: → **Phase 1** — S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ · S9 ✅ · S10 ✅ (LLM Abstraction) · 다음 **S11 Auto pre-gen**
+> **현재 마일스톤**: → **Phase 1** — S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ · S9 ✅ · S10 ✅ · S11 ✅ (Auto pre-gen) · 다음 **S12 Chat+Citation**
 
 ### 18.1 Phase 진척도
 
 | Phase | 상태 | 메모 |
 |-------|------|------|
 | Phase 0 (4주) | ✅ 완료 | S1~S6 (T0~T10) 완료, Playwright E2E 8/8 PASS (chromium) — [ROADMAP §2](./ROADMAP.md) |
-| Phase 1 (8주) | 🚧 진행 | S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ (arXiv import) · S9 ✅ (Ingestion: PyMuPDF→chunk→embed→Qdrant) · S10 ✅ (LLM Abstraction: models.yaml 라우팅 + fallback + 응답 캐시). 다음 S11. [ROADMAP §3](./ROADMAP.md) |
+| Phase 1 (8주) | 🚧 진행 | S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ (arXiv import) · S9 ✅ (Ingestion: PyMuPDF→chunk→embed→Qdrant) · S10 ✅ (LLM Abstraction: models.yaml 라우팅 + fallback + 응답 캐시) · S11 ✅ (Auto pre-gen: summary/highlight/F-14/F-15 → 영구 캐시 + Right Panel Summary·Insights 탭). 다음 S12. [ROADMAP §3](./ROADMAP.md) |
 | Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
 | Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
 
@@ -1224,6 +1224,7 @@ Cache
 | Ingestion pipeline (S9) | ✅ | PyMuPDF 파서 → char 청킹(≈512토큰) → embedder(`stub` 결정적 dim=1024 기본 / `fastembed` bge-m3 opt-in) → Qdrant(`:memory:` fallback) 색인 + Chunk ORM. marker 파서·rerank·auto pre-gen(S11)은 후속 |
 | Object store (R2/MinIO/Local) + Vector (Qdrant) | ✅ | `storage/object_store.py`(S3 boto3 / Local HMAC presigned) + `storage/vector.py`(paper_chunks dim=1024 cosine). env `S3_ENDPOINT`/`QDRANT_URL`로 백엔드 선택 |
 | LLM Abstraction (S10) | ✅ | `config/models.yaml`(default + 13 task) + `providers/router.py`(`candidates`/`primary_model`/`stream_task` fallback) + Provider 레지스트리(OpenRouter 실 + 실 OpenAI/Gemini graceful + `LLM_PROVIDER=stub` 오프라인) + `providers/cache.py` 응답 캐시(Cache ORM, 키 `sha256(task+paper_id+chunk_id+model+prompt_version)`). explain/translate 라우터+캐시 경유. Langfuse(S15)·hot-reload는 후속 |
+| Auto pre-gen (S11) | ✅ | ingestion `ready` 직후 `agents/pregen.py`가 6 task(summary·highlight·figure/table_description·paragraph_description/importance)를 `stream_with_cache(ttl=0)` 경유 생성 → Cache 영구 저장(새 마이그레이션 0). 전체-논문 산출물은 `chunk_id` 센티넬(`summary:{pid}`)로 키 재구성. GET `/papers/{id}/summary`·`/insights` + Right Panel Summary·Insights 탭. figure/table은 본문 텍스트 reasoning(이미지·bbox는 marker-pdf 후속), Auto-Highlight도 Cache text-anchored(`Highlight` 테이블 미사용) |
 | i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
 | i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
 | CI workflow (GitHub Actions) | 🚧 | `.github/workflows/ci.yml` 파일만 존재, 내용 빈 상태 |
@@ -1238,13 +1239,15 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. **다음 진입점**: **S11 Auto pre-gen** — Summary(다층) + F-10 Auto-Highlight + F-14 Figure/Table + F-15 Paragraph 자동(S9 chunk/벡터 + S10 라우터/캐시 기반) → S12 Chat+Citation → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI.
+1. **다음 진입점**: **S12 Chat + Citation** — F-03 + F-05, SSE 스트리밍 + 인용 점프 + 후속 질문 칩(S9 chunk/벡터 + S10 라우터/캐시 + S11 산출물 기반) → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI.
 2. **병행 보류**: **Google OAuth 실 호출 합류** — `GOOGLE_OAUTH_CLIENT_ID/SECRET` 발급 시 `/api/auth/login/google` 501 placeholder를 실제 OAuth 2.0/OIDC로 교체. dev mock-login 유지.
 3. **S8/S9 후속 후보**: marker-pdf 파서(`INGEST_PARSER=marker`) 실구현 · fastembed bge-m3 실 임베딩 검증 · reader `/r/{id}`에 presigned PDF 실렌더 연결 · Celery+Redis 전환 · Cohere rerank(Phase 2).
 4. **S10 후속 후보**: OpenAI/Gemini 실 키 발급 후 fallback 체인 실검증 · `models.yaml` hot-reload(PRD §7.5.5) · Langfuse 추적(S15) · embedding/reranker/tts 섹션의 라우터 연결.
-5. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 / GOOGLE_OAUTH 자격 정보 발급 보류 → stub/mock 모드 / OpenAI·Gemini 키 보류 → graceful unavailable, OpenRouter+stub로 검증
-6. S8/S9 검증: BE pytest 44/44 PASS + Playwright 11/11 PASS (Phase 0 8 회귀 + s8-import 3) + `alembic upgrade head` clean (0001 → 0002 → 0003)
-7. S10 검증: BE pytest 60/60 PASS (S8/S9 44 + router 7 + providers 4 + llm_cache 5) + Playwright 11/11 회귀 PASS (SSE 계약 불변, FE 무변경) + ruff/mypy(신규 파일) clean
+5. **S11 후속 후보**: marker-pdf 도입 후 실 figure 이미지(vision)·bbox 추출 → bbox-anchored `Highlight` 행 삽입(현재는 Cache text-anchored) · pre-gen 동시성/배치·Celery(현재 순차) · F-15 인라인 PDF 오버레이(P/H/I/K·Quick Skim) · Summary 마크다운 실렌더(현재 pre-wrap).
+6. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 / GOOGLE_OAUTH 자격 정보 발급 보류 → stub/mock 모드 / OpenAI·Gemini 키 보류 → graceful unavailable, OpenRouter+stub로 검증
+7. S8/S9 검증: BE pytest 44/44 PASS + Playwright 11/11 PASS (Phase 0 8 회귀 + s8-import 3) + `alembic upgrade head` clean (0001 → 0002 → 0003)
+8. S10 검증: BE pytest 60/60 PASS (S8/S9 44 + router 7 + providers 4 + llm_cache 5) + Playwright 11/11 회귀 PASS (SSE 계약 불변, FE 무변경) + ruff/mypy(신규 파일) clean
+9. S11 검증: BE pytest 76/76 PASS (S10 60 + llm_cache +3 + pregen 6 + pregen_api 6 + ingestion +1) + Playwright 13/13 PASS (11 회귀 + s11-pregen 2) + vitest 6/6 + `alembic upgrade head` clean(신규 0) + ruff/mypy(신규 파일) clean
 
 ---
 
