@@ -85,9 +85,7 @@ async def test_expired_is_ignored(db: None) -> None:
     assert await cache._read("k") is None
 
 
-async def test_prompt_version_separates_keys(
-    db: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_prompt_version_separates_keys(db: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "stub")
     await _collect("hello", prompt_version="v1")
     await _collect("hello", prompt_version="v2")

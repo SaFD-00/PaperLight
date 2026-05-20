@@ -16,10 +16,7 @@ BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 class GeminiProvider:
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = (
-            api_key
-            or os.environ.get("GEMINI_API_KEY")
-            or os.environ.get("GOOGLE_API_KEY")
-            or ""
+            api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
         )
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set")
