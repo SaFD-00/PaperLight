@@ -82,7 +82,7 @@ class S3ObjectStore:
         self._bucket = os.environ.get("S3_BUCKET", "paperlight-pdf")
         self._client = boto3.client(
             "s3",
-            endpoint_url=os.environ.get("S3_ENDPOINT_URL"),
+            endpoint_url=os.environ.get("S3_ENDPOINT"),
             aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
             aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
             region_name=os.environ.get("S3_REGION", "auto"),
@@ -111,7 +111,7 @@ _store: ObjectStore | None = None
 def get_object_store() -> ObjectStore:
     global _store
     if _store is None:
-        _store = S3ObjectStore() if os.environ.get("S3_ENDPOINT_URL") else LocalObjectStore()
+        _store = S3ObjectStore() if os.environ.get("S3_ENDPOINT") else LocalObjectStore()
     return _store
 
 

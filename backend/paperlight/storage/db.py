@@ -62,6 +62,8 @@ DEFAULT_USER_ID = "anonymous"
 
 
 async def init_db() -> None:
+    import paperlight.models  # noqa: F401 — register all ORM tables before create_all
+
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
