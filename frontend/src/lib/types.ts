@@ -26,6 +26,35 @@ export interface Paper {
   updatedAt: number;
 }
 
+export interface Collection {
+  id: string;
+  name: string;
+  parentId: string | null;
+  color: string | null;
+  position: number;
+  isSpecial: boolean;
+  specialKind: string | null;
+  paperCount: number;
+}
+
+export interface LibraryTag {
+  id: string;
+  name: string;
+  color: string | null;
+  count: number;
+}
+
+export interface PaperTagRef {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+export interface LibraryPaper extends Paper {
+  tags: PaperTagRef[];
+  collectionIds: string[];
+}
+
 const ARXIV_ID_RE = /(\d{4}\.\d{4,5})/;
 
 export function extractArxivId(input: string): string | null {
