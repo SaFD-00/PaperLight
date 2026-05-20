@@ -12,7 +12,7 @@
 | Phase | 기간 | 범위 | 핵심 산출물 | 상태 |
 |-------|------|------|------------|------|
 | **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | ✅ S6 완료 (T0~T10) — 사용자 브라우저 AC 검증 대기 |
-| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth Stub/Mock 🚧 · S8 arXiv import ✅ · S9 Ingestion ✅ · S10 LLM Abstraction ✅ · S11 Auto pre-gen ✅ (다음 S12 Chat+Citation) |
+| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth Stub/Mock 🚧 · S8 arXiv import ✅ · S9 Ingestion ✅ · S10 LLM Abstraction ✅ · S11 Auto pre-gen ✅ · S12 Chat+Citation ✅ (다음 S13 Library 4-pane) |
 | **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
 
@@ -128,7 +128,7 @@ S1 ──┬──► S2 ──► S4 ──► S6
 | **S9** | **Ingestion pipeline** | PyMuPDF 파서(marker는 `INGEST_PARSER=marker` follow-up) → char 청킹(≈512토큰 슬라이딩) → embedder(stub 결정적 dim=1024 기본, fastembed bge-m3 opt-in) → 로컬 Qdrant(`:memory:` fallback) 색인 + Chunk ORM/alembic 0003. ingestion SSE 진행률. rerank는 Phase 2 | [PRD §7.2](./PRD.md) | ✅ |
 | **S10** | **LLM Abstraction** | `config/models.yaml`(default + 13 task) 라우팅 + `router.stream_task` fallback 체인(첫 토큰 전 실패만 다음 후보) + Provider 레지스트리(OpenRouter 실 + 실 OpenAI/Gemini graceful + 오프라인 StubProvider, `LLM_PROVIDER=stub`) + Cache ORM 연결 응답 캐시(키 `sha256(task+paper_id+chunk_id+model+prompt_version)`). explain/translate 라우터+캐시 경유. Langfuse/hot-reload는 후속 | [PRD §7.5](./PRD.md) | ✅ |
 | **S11** | **Auto pre-gen** | ingestion `ready` 직후 `agents/pregen.py`가 6 task(summary·highlight·figure/table_description·paragraph_description/importance)를 라우터+캐시 경유로 생성 → **Cache 영구 저장(ttl=0)**, 새 마이그레이션 0. figure/table은 marker-pdf 부재로 본문 텍스트 reasoning(이미지 없음, qwen fallback). Auto-Highlight도 Cache에 text-anchored(=`Highlight` 테이블 bbox 제약 우회, 실 bbox는 marker-pdf 후속). GET `/papers/{id}/summary`·`/insights` + Right Panel Summary·Insights 탭 | F-06, F-10, F-14, F-15 | ✅ |
-| **S12** | **Chat + Citation** | F-03 + F-05 — SSE 스트리밍, 인용 점프, 후속 질문 칩 | F-03, F-05 | ⬜ |
+| **S12** | **Chat + Citation** | F-03 + F-05 — `POST /api/chat` RAG SSE(질문 임베딩→Qdrant 검색→grounded 답변)+`{citations}`/`{followups}` 이벤트, 대화 영속화(`ChatSession`/`ChatMessage`, 마이그레이션 0004)+멀티턴, `GET /api/chat/{id}` 히스토리. FE ChatPanel(정적 퀵칩+후속칩, 인용 칩→`JUMP_TO` 페이지 점프) + References 패널(`GET /papers/{id}/references` — 본문 참고문헌 추출+Crossref/arXiv enrich(stub 기본)+Cache memo). 본문 [12] in-PDF 오버레이·bbox 펄스는 marker-pdf 후속 | F-03, F-05 | ✅ |
 | **S13** | **Library 4-pane** | F-08 — Zotero 패턴 (Tree/List/Detail/TagCloud), 무한 트리, 멀티 태그, 3-상태, Bulk | F-08, [PRD §5.6](./PRD.md) | ⬜ |
 | **S14** | **Markup** | F-11 — 사용자 하이라이트 + Markdown 노트 + S3 백업 + pdf.js 채널 3개 추가 | F-11 | ⬜ |
 | **S15** | **Observability** | Sentry + PostHog + Langfuse 통합 (Phase 1은 트레이스 가시화까지) | [PRD §7.6](./PRD.md) | ⬜ |

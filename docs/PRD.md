@@ -981,6 +981,20 @@ Cache
   hit_count
   expires_at (nullable)
   created_at
+
+ChatSession                       -- S12: 논문별 대화 스레드 (user당 1 get-or-create)
+  id (uuid, PK)
+  paper_id (FK Paper)
+  user_id (FK User)
+  created_at, updated_at
+
+ChatMessage                       -- S12: 대화 메시지 (멀티턴 컨텍스트 + 히스토리)
+  id (uuid, PK)
+  session_id (FK ChatSession)
+  role ('user'|'assistant')
+  content (text)
+  citations jsonb (nullable)      -- [{chunkId, page}] — 답변 근거 chunk (페이지 점프용)
+  created_at
 ```
 
 ---
@@ -1172,16 +1186,16 @@ Cache
 
 ## 18. 구현 현황 (Implementation Status) ⭐ v3.0 신설
 
-> **마지막 갱신**: 2026-05-20 (Phase 1 S11 Auto pre-gen 완료)
+> **마지막 갱신**: 2026-05-20 (Phase 1 S12 Chat + Citation 완료)
 > **참조**: [ROADMAP.md](./ROADMAP.md) — Phase별 task 분해
-> **현재 마일스톤**: → **Phase 1** — S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ · S9 ✅ · S10 ✅ · S11 ✅ (Auto pre-gen) · 다음 **S12 Chat+Citation**
+> **현재 마일스톤**: → **Phase 1** — S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ · S9 ✅ · S10 ✅ · S11 ✅ (Auto pre-gen) · S12 ✅ (Chat+Citation) · 다음 **S13 Library 4-pane**
 
 ### 18.1 Phase 진척도
 
 | Phase | 상태 | 메모 |
 |-------|------|------|
 | Phase 0 (4주) | ✅ 완료 | S1~S6 (T0~T10) 완료, Playwright E2E 8/8 PASS (chromium) — [ROADMAP §2](./ROADMAP.md) |
-| Phase 1 (8주) | 🚧 진행 | S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ (arXiv import) · S9 ✅ (Ingestion: PyMuPDF→chunk→embed→Qdrant) · S10 ✅ (LLM Abstraction: models.yaml 라우팅 + fallback + 응답 캐시) · S11 ✅ (Auto pre-gen: summary/highlight/F-14/F-15 → 영구 캐시 + Right Panel Summary·Insights 탭). 다음 S12. [ROADMAP §3](./ROADMAP.md) |
+| Phase 1 (8주) | 🚧 진행 | S7a ✅ · S7b 🚧 (Auth Stub/Mock) · S8 ✅ (arXiv import) · S9 ✅ (Ingestion: PyMuPDF→chunk→embed→Qdrant) · S10 ✅ (LLM Abstraction: models.yaml 라우팅 + fallback + 응답 캐시) · S11 ✅ (Auto pre-gen: summary/highlight/F-14/F-15 → 영구 캐시 + Right Panel Summary·Insights 탭) · S12 ✅ (Chat+Citation: RAG SSE 채팅 + 대화 영속화 + 인용 페이지 점프 + References 패널). 다음 S13 Library 4-pane. [ROADMAP §3](./ROADMAP.md) |
 | Phase 2 (12주) | ⬜ 대기 | Outline만 — [ROADMAP §4](./ROADMAP.md) |
 | Phase 3 (12주+) | ⬜ 대기 | Outline만 — [ROADMAP §5](./ROADMAP.md) |
 
@@ -1193,9 +1207,9 @@ Cache
 |----|------|-------|------|------|
 | F-01 | PDF 뷰어 (pdf.js + Shadow DOM) | 0 | ✅ (Phase 0 범위) | S2 — pdf.js 4.10 + Shadow DOM iframe + 7-채널 postMessage (LOAD/JUMP/ZOOM/HIGHLIGHT/TOGGLE_TRANSLATION/REQUEST_PAGE_TEXT/PAGE_TEXT). Phase 1에서 arXiv import 합류 시 보강. |
 | F-02 | Translation (병행) | 0 | ✅ (Phase 0 범위) | S5 — `/api/translate` SSE + TranslationPane + TopToolbar [T] 토글. 현재 페이지 한국어 병행. |
-| F-03 | AI Chat | 1 | ⬜ | Phase 1 |
+| F-03 | AI Chat | 1 | ✅ | S12 — `POST /api/chat` RAG SSE(`agents/chat.py` 질문 임베딩→Qdrant 검색→grounded 답변) + `{citations}`/`{followups}` 이벤트 + 대화 영속화(`ChatSession`/`ChatMessage`)·멀티턴 + `GET /api/chat/{id}` 히스토리 + ChatPanel(정적 퀵칩 + 후속칩 + 인용 칩→페이지 점프). 응답 캐시 `chat-v1` TTL 30일 |
 | F-04 | Explanation | 0 | ✅ (Phase 0 범위) | S4 — Floating Menu + `/api/explain` OpenRouter SSE relay + ExplanationPanel 스트리밍. |
-| F-05 | Citation | 1 | ⬜ | Phase 1 |
+| F-05 | Citation | 1 | ✅ | S12 — `GET /api/papers/{id}/references`(`agents/references.py` 본문 참고문헌 추출 + Crossref/arXiv enrich, `REFERENCE_PROVIDER=stub` 기본 오프라인 + Cache memo) + References 패널 카드(제목/저자/연도 + 외부 열기). 본문 [12] in-PDF 마커 오버레이·bbox 펄스는 marker-pdf 후속 |
 | F-06 | Summary (다층) | 1 | ⬜ | Ingestion 자동 |
 | F-07 | Preview | 2 | ⬜ | Phase 2 |
 | F-08 | Library (4-pane) | 1 | ⬜ | Phase 1 — Phase 0은 placeholder만 |
@@ -1218,13 +1232,14 @@ Cache
 | 디자인 토큰 CSS | ✅ | S1 T0 — `frontend/src/styles/tokens.css` + Tailwind v4 `@theme inline` 매핑 |
 | Pretendard·Inter 폰트 셋업 | ✅ | S1 T0 — `next/font/local` (Pretendard variable) + `next/font/google` (Inter, JBMono) |
 | pdf.js 정적 자산 (`public/pdfjs/`) | ✅ | S2 T4 — `scripts/copy-pdfjs.mjs` postinstall로 viewer/worker 복사 |
-| Alembic DB 마이그레이션 | ✅ | S7a — 10 엔티티 + Tab (`0001_phase1_init.py`). S7b — `sessions` (`0002_session.py`). S9 — `chunks` (`0003_chunks.py`) |
+| Alembic DB 마이그레이션 | ✅ | S7a — 10 엔티티 + Tab (`0001_phase1_init.py`). S7b — `sessions` (`0002_session.py`). S9 — `chunks` (`0003_chunks.py`). S12 — `chat_sessions`+`chat_messages` (`0004_chat.py`) |
 | Auth (Google OAuth + JWT + Cookie) | 🚧 | S7b stub/mock 모드 — `python-jose` HS256 + httpOnly cookie (access 15m / refresh 30d, `Path=/api/auth/refresh`) + refresh rotation + reuse detection + `/api/auth/dev/mock-login`. 실 Google OAuth call은 자격 정보 발급 후 별도 PR |
 | arXiv import + Paper API (S8) | ✅ | `/api/papers` import/list/detail/pdf-url/ingestion(SSE). fixture-first meta(→arXiv Atom fallback) + object_store(S3/MinIO 또는 in-process Local) + presigned URL(TTL 10분) + BackgroundTask ingest. FE `/import` + `usePapers` |
 | Ingestion pipeline (S9) | ✅ | PyMuPDF 파서 → char 청킹(≈512토큰) → embedder(`stub` 결정적 dim=1024 기본 / `fastembed` bge-m3 opt-in) → Qdrant(`:memory:` fallback) 색인 + Chunk ORM. marker 파서·rerank·auto pre-gen(S11)은 후속 |
 | Object store (R2/MinIO/Local) + Vector (Qdrant) | ✅ | `storage/object_store.py`(S3 boto3 / Local HMAC presigned) + `storage/vector.py`(paper_chunks dim=1024 cosine). env `S3_ENDPOINT`/`QDRANT_URL`로 백엔드 선택 |
 | LLM Abstraction (S10) | ✅ | `config/models.yaml`(default + 13 task) + `providers/router.py`(`candidates`/`primary_model`/`stream_task` fallback) + Provider 레지스트리(OpenRouter 실 + 실 OpenAI/Gemini graceful + `LLM_PROVIDER=stub` 오프라인) + `providers/cache.py` 응답 캐시(Cache ORM, 키 `sha256(task+paper_id+chunk_id+model+prompt_version)`). explain/translate 라우터+캐시 경유. Langfuse(S15)·hot-reload는 후속 |
 | Auto pre-gen (S11) | ✅ | ingestion `ready` 직후 `agents/pregen.py`가 6 task(summary·highlight·figure/table_description·paragraph_description/importance)를 `stream_with_cache(ttl=0)` 경유 생성 → Cache 영구 저장(새 마이그레이션 0). 전체-논문 산출물은 `chunk_id` 센티넬(`summary:{pid}`)로 키 재구성. GET `/papers/{id}/summary`·`/insights` + Right Panel Summary·Insights 탭. figure/table은 본문 텍스트 reasoning(이미지·bbox는 marker-pdf 후속), Auto-Highlight도 Cache text-anchored(`Highlight` 테이블 미사용) |
+| Chat + Citation (S12) | ✅ | `agents/chat.py`(retrieve: 질문 embed→Qdrant top-k / build_messages: grounded + 직전 N턴 / generate_followups best-effort) + `api/chat.py` `POST /api/chat` SSE(토큰→`{citations}`→`{followups}`→`[DONE]`, 영속은 generator 내 `session_scope()`로 격리)·`GET /api/chat/{id}` 히스토리. `ChatSession`/`ChatMessage` ORM + `0004_chat.py`. `agents/references.py`(헤딩 탐지+엔트리 분할, Crossref enrich `REFERENCE_PROVIDER=stub` 기본, Cache memo) + `GET /papers/{id}/references`. FE ChatPanel·ReferencesPanel + 인용 칩→store `requestJump`→PdfViewer `JUMP_TO`(viewer.js). chat 캐시 `chat-v1` TTL 30일. 본문 [12] in-PDF 오버레이·bbox 펄스는 marker-pdf 후속 |
 | i18n 메시지 카탈로그 (ko) | ⬜ | Phase 0~1 |
 | i18n 4언어 (en/ja/zh-CN/es) | ⬜ | Phase 2 |
 | CI workflow (GitHub Actions) | 🚧 | `.github/workflows/ci.yml` 파일만 존재, 내용 빈 상태 |
@@ -1239,15 +1254,17 @@ Cache
 - Phase 4 결정: v1은 결제 보류, Phase 2에 도입 검토
 
 ### 18.5 다음 액션
-1. **다음 진입점**: **S12 Chat + Citation** — F-03 + F-05, SSE 스트리밍 + 인용 점프 + 후속 질문 칩(S9 chunk/벡터 + S10 라우터/캐시 + S11 산출물 기반) → S13 Library 4-pane → S14 Markup → S15 Observability → S16 CI.
+1. **다음 진입점**: **S13 Library 4-pane** — F-08 (Zotero 패턴 Tree/List/Detail/TagCloud, 무한 트리, 멀티 태그, 3-상태, Bulk) → S14 Markup → S15 Observability → S16 CI.
 2. **병행 보류**: **Google OAuth 실 호출 합류** — `GOOGLE_OAUTH_CLIENT_ID/SECRET` 발급 시 `/api/auth/login/google` 501 placeholder를 실제 OAuth 2.0/OIDC로 교체. dev mock-login 유지.
 3. **S8/S9 후속 후보**: marker-pdf 파서(`INGEST_PARSER=marker`) 실구현 · fastembed bge-m3 실 임베딩 검증 · reader `/r/{id}`에 presigned PDF 실렌더 연결 · Celery+Redis 전환 · Cohere rerank(Phase 2).
 4. **S10 후속 후보**: OpenAI/Gemini 실 키 발급 후 fallback 체인 실검증 · `models.yaml` hot-reload(PRD §7.5.5) · Langfuse 추적(S15) · embedding/reranker/tts 섹션의 라우터 연결.
 5. **S11 후속 후보**: marker-pdf 도입 후 실 figure 이미지(vision)·bbox 추출 → bbox-anchored `Highlight` 행 삽입(현재는 Cache text-anchored) · pre-gen 동시성/배치·Celery(현재 순차) · F-15 인라인 PDF 오버레이(P/H/I/K·Quick Skim) · Summary 마크다운 실렌더(현재 pre-wrap).
+5b. **S12 후속 후보**: 본문 [12] in-PDF 마커 오버레이 호버 카드 + 0.5초 펄스 하이라이트(bbox/marker-pdf 선행) · Crossref/Semantic Scholar/arXiv 실 API 검증(현재 stub 기본·graceful) · Chat [+ Add Reference] 다른 논문 첨부 + 모델 선택기 실동작 · Chat 멀티 스레드/히스토리 검색 UI · 멀티턴 컨텍스트 캐시 최적화 · Chat 답변 Markdown 실렌더(현재 pre-wrap).
 6. **부재 API key 제약** (2026-05-20 사용자 확정): COHERE rerank Phase 1 스킵(Phase 2 이관) / QDRANT Cloud 미사용 → docker-compose 로컬 Qdrant / ELEVENLABS Phase 2 OpenAI tts-1-hd 단독 / GOOGLE_OAUTH 자격 정보 발급 보류 → stub/mock 모드 / OpenAI·Gemini 키 보류 → graceful unavailable, OpenRouter+stub로 검증
 7. S8/S9 검증: BE pytest 44/44 PASS + Playwright 11/11 PASS (Phase 0 8 회귀 + s8-import 3) + `alembic upgrade head` clean (0001 → 0002 → 0003)
 8. S10 검증: BE pytest 60/60 PASS (S8/S9 44 + router 7 + providers 4 + llm_cache 5) + Playwright 11/11 회귀 PASS (SSE 계약 불변, FE 무변경) + ruff/mypy(신규 파일) clean
 9. S11 검증: BE pytest 76/76 PASS (S10 60 + llm_cache +3 + pregen 6 + pregen_api 6 + ingestion +1) + Playwright 13/13 PASS (11 회귀 + s11-pregen 2) + vitest 6/6 + `alembic upgrade head` clean(신규 0) + ruff/mypy(신규 파일) clean
+10. S12 검증: BE pytest 98/98 PASS (S11 76 + chat_agent 6 + chat 7 + references 5 + references_api 4) + Playwright 15/15 PASS (13 회귀 + s12-chat 2) + vitest 6/6 + `alembic upgrade head` 0001→0004 clean(up/down/up) + ruff/mypy(신규 파일) clean
 
 ---
 
