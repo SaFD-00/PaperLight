@@ -16,11 +16,16 @@ from typing import Protocol
 from urllib.parse import urlencode
 
 PDF_KEY_TEMPLATE = "papers/{paper_id}/original.pdf"
+NOTE_KEY_TEMPLATE = "notes/{note_id}.md"
 DEFAULT_TTL_SECONDS = 10 * 60
 
 
 def pdf_key(paper_id: str) -> str:
     return PDF_KEY_TEMPLATE.format(paper_id=paper_id)
+
+
+def note_key(note_id: str) -> str:
+    return NOTE_KEY_TEMPLATE.format(note_id=note_id)
 
 
 def _token_secret() -> str:
@@ -51,6 +56,8 @@ class ObjectStore(Protocol):
     def put_pdf(self, key: str, data: bytes) -> None: ...
     def get_pdf(self, key: str) -> bytes: ...
     def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str: ...
+    def put_text(self, key: str, text: str) -> None: ...
+    def get_text(self, key: str) -> str: ...
 
 
 class LocalObjectStore:
@@ -74,10 +81,19 @@ class LocalObjectStore:
         qs = urlencode({"exp": exp, "sig": sign_pdf_token(paper_id, exp)})
         return f"{_public_base_url()}/api/papers/{paper_id}/pdf?{qs}"
 
+    def put_text(self, key: str, text: str) -> None:
+        self._blobs[key] = text.encode()
+
+    def get_text(self, key: str) -> str:
+        try:
+            return self._blobs[key].decode()
+        except KeyError as err:
+            raise FileNotFoundError(key) from err
+
 
 class S3ObjectStore:
     def __init__(self) -> None:
-        import boto3
+        import boto3  # type: ignore[import-untyped]
 
         self._bucket = os.environ.get("S3_BUCKET", "paperlight-pdf")
         self._client = boto3.client(
@@ -97,12 +113,23 @@ class S3ObjectStore:
         )
 
     def get_pdf(self, key: str) -> bytes:
-        return self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+        return data
 
     def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str:
-        return self._client.generate_presigned_url(
+        url: str = self._client.generate_presigned_url(
             "get_object", Params={"Bucket": self._bucket, "Key": key}, ExpiresIn=ttl
         )
+        return url
+
+    def put_text(self, key: str, text: str) -> None:
+        self._client.put_object(
+            Bucket=self._bucket, Key=key, Body=text.encode(), ContentType="text/markdown"
+        )
+
+    def get_text(self, key: str) -> str:
+        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+        return data.decode()
 
 
 _store: ObjectStore | None = None
