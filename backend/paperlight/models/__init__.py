@@ -8,6 +8,7 @@ from paperlight.models.note import Note
 from paperlight.models.paper import Paper
 from paperlight.models.paper_tag import PaperTag
 from paperlight.models.podcast import Podcast
+from paperlight.models.session import Session
 from paperlight.models.tab import Tab
 from paperlight.models.tag import Tag
 from paperlight.models.user import User
@@ -21,6 +22,7 @@ __all__ = [
     "Paper",
     "PaperTag",
     "Podcast",
+    "Session",
     "Tab",
     "Tag",
     "User",
