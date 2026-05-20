@@ -2,6 +2,7 @@
 
 import { MessageSquare, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { capture } from "@/lib/analytics";
 import { apiFetch } from "@/lib/api";
 import { streamSse } from "@/lib/sse";
 import { useReader } from "@/stores/reader";
@@ -64,6 +65,7 @@ export function ChatPanel({ paperId }: { paperId: string }) {
   function send(question: string) {
     const q = question.trim();
     if (!q || streaming) return;
+    capture("chat_message_sent", { paperId });
     setInput("");
     setFollowups([]);
     setError(null);

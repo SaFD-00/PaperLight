@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AnalyticsProvider } from "@/components/shell/AnalyticsProvider";
 import { TabBar } from "@/components/shell/TabBar";
 import { TopToolbar } from "@/components/shell/TopToolbar";
 import { ThemeProvider } from "@/components/shell/ThemeProvider";
@@ -23,9 +24,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
-      <TabBar />
-      <TopToolbar />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <AnalyticsProvider>
+        <TabBar />
+        <TopToolbar />
+        <main className="flex-1 overflow-hidden">{children}</main>
+      </AnalyticsProvider>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,7 @@
 allowBuilds:
   '@sentry/cli': false
+  core-js: false
+  protobufjs: false
   sharp: true
   unrs-resolver: true
 onlyBuiltDependencies:

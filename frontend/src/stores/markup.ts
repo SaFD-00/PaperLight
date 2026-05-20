@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { capture } from "@/lib/analytics";
 import { apiFetch } from "@/lib/api";
 import type { Highlight, HighlightBbox, Note } from "@/lib/types";
 
@@ -48,6 +49,7 @@ export const useMarkup = create<MarkupState>((set, get) => ({
     });
     if (!res.ok) return null;
     const created = (await res.json()) as Highlight;
+    capture("highlight_created", { color: input.color, page: input.page });
     set({ highlights: [...get().highlights, created] });
     return created;
   },
@@ -67,12 +69,14 @@ export const useMarkup = create<MarkupState>((set, get) => ({
       body: JSON.stringify({ markdownText }),
     });
     if (!res.ok) return;
+    capture("note_saved", { length: markdownText.length });
     set({ note: (await res.json()) as Note });
   },
 
   exportNotes: async (paperId, format) => {
     const res = await apiFetch(`/api/annotations/papers/${paperId}/export?format=${format}`);
     if (!res.ok) return "";
+    capture("export_notes", { format });
     return res.text();
   },
 

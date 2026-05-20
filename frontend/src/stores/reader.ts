@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { capture } from "@/lib/analytics";
 import type { NormRect } from "@/lib/types";
 
 export interface SelectionInfo {
@@ -60,11 +61,17 @@ export const useReader = create<ReaderState>((set) => ({
   jumpRequest: null,
   panelRequest: null,
   setSelection: (s) => set({ selection: s }),
-  triggerExplain: (text) => set({ explainText: text, selection: null }),
+  triggerExplain: (text) => {
+    capture("explain_requested", { length: text.length });
+    set({ explainText: text, selection: null });
+  },
   clearExplain: () => set({ explainText: null }),
   triggerAsk: (text) => set({ askText: text, selection: null }),
   clearAsk: () => set({ askText: null }),
-  triggerTranslateSelection: (sel) => set({ translateSelection: sel, selection: null }),
+  triggerTranslateSelection: (sel) => {
+    capture("translate_requested", { length: sel.text.length });
+    set({ translateSelection: sel, selection: null });
+  },
   clearTranslateSelection: () => set({ translateSelection: null }),
   toggleTranslation: () => set((state) => ({ translationEnabled: !state.translationEnabled })),
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
