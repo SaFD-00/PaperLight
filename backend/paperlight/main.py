@@ -20,6 +20,7 @@ from paperlight.api import (
     tabs,
     translate,
 )
+from paperlight.observability.langfuse_client import shutdown_langfuse
 from paperlight.observability.middleware import RequestContextMiddleware
 from paperlight.observability.sentry import init_sentry
 from paperlight.storage.db import init_db
@@ -30,6 +31,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     init_sentry()
     await init_db()
     yield
+    shutdown_langfuse()
 
 
 def _cors_origins() -> list[str]:

@@ -11,6 +11,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from paperlight.observability.context import paper_id_var
+from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
 
 router = APIRouter(prefix="/api/explain", tags=["explain"])
@@ -36,6 +38,8 @@ def _format_sse(event: dict[str, Any]) -> str:
 
 
 async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
+    if paper_id:
+        paper_id_var.set(paper_id)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"다음 단락을 설명해주세요:\n\n```\n{text}\n```"},
@@ -50,6 +54,7 @@ async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
         ):
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
+        capture_exception(err)
         yield _format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 

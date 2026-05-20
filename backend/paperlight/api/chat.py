@@ -31,6 +31,8 @@ from paperlight.agents.chat import (
 from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
+from paperlight.observability.context import paper_id_var
+from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
 from paperlight.storage.db import get_session, session_scope
 
@@ -74,6 +76,7 @@ async def _get_or_create_session(session: AsyncSession, paper_id: str, user_id: 
 
 
 async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[str]:
+    paper_id_var.set(paper_id)
     # Phase 1 — load prior history (before adding the current turn), persist user message.
     async with session_scope() as session:
         cs = await _get_or_create_session(session, paper_id, user_id)
@@ -110,6 +113,7 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
             parts.append(token)
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay upstream failure to UI
+        capture_exception(err)
         yield _format_sse({"error": str(err)})
         yield "data: [DONE]\n\n"
         return

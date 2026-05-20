@@ -11,6 +11,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from paperlight.observability.context import paper_id_var
+from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
@@ -38,6 +40,8 @@ def _format_sse(event: dict[str, Any]) -> str:
 
 
 async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIterator[str]:
+    if paper_id:
+        paper_id_var.set(paper_id)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
@@ -55,6 +59,7 @@ async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIte
         ):
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
+        capture_exception(err)
         yield _format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
