@@ -21,6 +21,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
   const setPageText = useReader((s) => s.setPageText);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
+  const jumpRequest = useReader((s) => s.jumpRequest);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -113,6 +114,13 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "REQUEST_PAGE_TEXT", page: currentPage });
   }, [translationEnabled, currentPage]);
+
+  // Citation 클릭 → 해당 페이지로 점프 (F-03).
+  useEffect(() => {
+    if (!jumpRequest) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "JUMP_TO", page: jumpRequest.page });
+  }, [jumpRequest]);
 
   // Send LOAD_PDF when pdfUrl changes (after iframe shell is ready).
   useEffect(() => {

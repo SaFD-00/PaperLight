@@ -4,6 +4,8 @@ export interface SseHandler {
   onToken: (token: string) => void;
   onDone: () => void;
   onError: (err: string) => void;
+  /** Non-token JSON events (e.g. {citations}, {followups}). Optional — legacy callers ignore. */
+  onMeta?: (event: Record<string, unknown>) => void;
 }
 
 /**
@@ -57,7 +59,11 @@ export async function streamSse(
             handler.onError(parsed.error);
             return;
           }
-          if (parsed.token) handler.onToken(parsed.token);
+          if (parsed.token) {
+            handler.onToken(parsed.token);
+          } else {
+            handler.onMeta?.(parsed as Record<string, unknown>);
+          }
         } catch {
           // ignore malformed line
         }

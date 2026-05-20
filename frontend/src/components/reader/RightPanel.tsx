@@ -12,6 +12,7 @@ import {
   Star,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ChatPanel } from "@/components/panels/ChatPanel";
 import { ExplanationPanel } from "@/components/panels/ExplanationPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
@@ -85,10 +86,12 @@ export function RightPanel({ paperId }: { paperId: string }) {
         {active === "translate" && <TranslationPane />}
         {active === "summary" && <SummaryPanel paperId={paperId} />}
         {active === "insights" && <InsightsPanel paperId={paperId} />}
+        {active === "chat" && <ChatPanel paperId={paperId} />}
         {active !== "explain" &&
           active !== "translate" &&
           active !== "summary" &&
-          active !== "insights" && (
+          active !== "insights" &&
+          active !== "chat" && (
             <div className="space-y-4 p-4 text-sm text-text-muted">
               <p className="text-xs">
                 {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
