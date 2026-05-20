@@ -11,14 +11,19 @@ import time
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from paperlight.api.papers import _get_owned, _paper_dict
 from paperlight.auth.dependencies import get_user_id
+from paperlight.models.chunk import Chunk
 from paperlight.models.collection import Collection
 from paperlight.models.library_item import LibraryItem
+from paperlight.models.paper import Paper
+from paperlight.models.paper_tag import PaperTag
+from paperlight.models.tag import Tag
 from paperlight.storage.db import get_session
 
 router = APIRouter(prefix="/api/library", tags=["library"])
@@ -26,9 +31,54 @@ router = APIRouter(prefix="/api/library", tags=["library"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserDep = Annotated[str, Depends(get_user_id)]
 
+STARRED_KIND = "starred"
+SENTINEL_STARRED = "__starred__"
+SENTINEL_UNREAD = "__unread__"
+SENTINEL_RECENT = "__recent__"
+SENTINEL_TRASH = "__trash__"
+
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+async def _get_special(session: AsyncSession, user_id: str, kind: str) -> Collection | None:
+    row: Collection | None = await session.scalar(
+        select(Collection).where(
+            Collection.user_id == user_id,
+            Collection.is_special.is_(True),
+            Collection.special_kind == kind,
+        )
+    )
+    return row
+
+
+async def _paper_payload(session: AsyncSession, paper: Paper) -> dict[str, Any]:
+    base = _paper_dict(paper)
+    tag_rows = (
+        (
+            await session.execute(
+                select(Tag)
+                .join(PaperTag, PaperTag.tag_id == Tag.id)
+                .where(PaperTag.paper_id == paper.id)
+                .order_by(Tag.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    base["tags"] = [{"id": t.id, "name": t.name, "color": t.color} for t in tag_rows]
+    coll_ids = (
+        (
+            await session.execute(
+                select(LibraryItem.collection_id).where(LibraryItem.paper_id == paper.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    base["collectionIds"] = list(coll_ids)
+    return base
 
 
 async def _owned_collection(session: AsyncSession, cid: str, user_id: str) -> Collection:
@@ -158,4 +208,117 @@ async def delete_collection(cid: str, session: SessionDep, user_id: UserDep) -> 
         stack.extend(children.get(cur, []))
     await session.execute(delete(LibraryItem).where(LibraryItem.collection_id.in_(to_delete)))
     await session.execute(delete(Collection).where(Collection.id.in_(to_delete)))
+    await session.commit()
+
+
+_SORT_COLUMNS = {
+    "created": Paper.created_at,
+    "title": Paper.title,
+    "year": Paper.year,
+    "status": Paper.status,
+}
+
+
+@router.get("/papers")
+async def list_library_papers(
+    session: SessionDep,
+    user_id: UserDep,
+    collection_id: Annotated[str | None, Query(alias="collectionId")] = None,
+    tag_ids: Annotated[str | None, Query(alias="tagIds")] = None,
+    paper_status: Annotated[str | None, Query(alias="status")] = None,
+    q: str | None = None,
+    scope: str = "title,author",
+    sort: str = "created",
+    order: str = "desc",
+) -> list[dict[str, Any]]:
+    stmt = select(Paper).where(Paper.user_id == user_id)
+
+    if collection_id == SENTINEL_TRASH:
+        stmt = stmt.where(Paper.soft_deleted_at.is_not(None))
+    else:
+        stmt = stmt.where(Paper.soft_deleted_at.is_(None))
+        if collection_id == SENTINEL_UNREAD:
+            stmt = stmt.where(Paper.status == "to_read")
+        elif collection_id == SENTINEL_RECENT:
+            stmt = stmt.where(Paper.status != "to_read")
+        elif collection_id == SENTINEL_STARRED:
+            starred = await _get_special(session, user_id, STARRED_KIND)
+            if starred is None:
+                return []
+            stmt = stmt.where(
+                Paper.id.in_(
+                    select(LibraryItem.paper_id).where(LibraryItem.collection_id == starred.id)
+                )
+            )
+        elif collection_id:
+            col = await _owned_collection(session, collection_id, user_id)
+            stmt = stmt.where(
+                Paper.id.in_(
+                    select(LibraryItem.paper_id).where(LibraryItem.collection_id == col.id)
+                )
+            )
+
+    if paper_status:
+        stmt = stmt.where(Paper.status == paper_status)
+
+    if tag_ids:
+        for tid in (t for t in tag_ids.split(",") if t):
+            stmt = stmt.where(Paper.id.in_(select(PaperTag.paper_id).where(PaperTag.tag_id == tid)))
+
+    if q:
+        scopes = {s for s in scope.split(",") if s}
+        like = f"%{q}%"
+        conds = []
+        if "title" in scopes:
+            conds.append(Paper.title.ilike(like))
+        if "author" in scopes:
+            conds.append(cast(Paper.authors, String).ilike(like))
+        if "tag" in scopes:
+            conds.append(
+                Paper.id.in_(
+                    select(PaperTag.paper_id)
+                    .join(Tag, Tag.id == PaperTag.tag_id)
+                    .where(Tag.name.ilike(like))
+                )
+            )
+        if "content" in scopes:
+            conds.append(Paper.id.in_(select(Chunk.paper_id).where(Chunk.text.ilike(like))))
+        if conds:
+            stmt = stmt.where(or_(*conds))
+
+    if collection_id == SENTINEL_RECENT:
+        stmt = stmt.order_by(Paper.updated_at.desc())
+    else:
+        sort_col = _SORT_COLUMNS.get(sort, Paper.created_at)
+        stmt = stmt.order_by(sort_col.asc() if order == "asc" else sort_col.desc())
+
+    rows = (await session.execute(stmt)).scalars().all()
+    return [await _paper_payload(session, p) for p in rows]
+
+
+class MembershipBody(BaseModel):
+    paperIds: list[str]
+
+
+@router.post("/collections/{cid}/papers", status_code=status.HTTP_204_NO_CONTENT)
+async def add_papers_to_collection(
+    cid: str, body: MembershipBody, session: SessionDep, user_id: UserDep
+) -> None:
+    await _owned_collection(session, cid, user_id)
+    for pid in body.paperIds:
+        await _get_owned(session, pid, user_id)
+        existing = await session.get(LibraryItem, {"paper_id": pid, "collection_id": cid})
+        if existing is None:
+            session.add(LibraryItem(paper_id=pid, collection_id=cid))
+    await session.commit()
+
+
+@router.delete("/collections/{cid}/papers/{pid}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_paper_from_collection(
+    cid: str, pid: str, session: SessionDep, user_id: UserDep
+) -> None:
+    await _owned_collection(session, cid, user_id)
+    await session.execute(
+        delete(LibraryItem).where(LibraryItem.collection_id == cid, LibraryItem.paper_id == pid)
+    )
     await session.commit()
