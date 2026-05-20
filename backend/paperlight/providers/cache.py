@@ -73,6 +73,18 @@ async def _write(
             )
 
 
+async def read_cached(
+    task: str,
+    *,
+    paper_id: str | None,
+    chunk_id: str,
+    prompt_version: str,
+) -> str | None:
+    """Read a cached response without triggering generation (pre-gen GET path)."""
+    key = cache_key(task, paper_id, chunk_id, primary_model(task), prompt_version)
+    return await _read(key)
+
+
 async def stream_with_cache(
     task: str,
     messages: list[dict[str, str]],
@@ -81,6 +93,7 @@ async def stream_with_cache(
     prompt_version: str,
     paper_id: str | None = None,
     chunk_id: str | None = None,
+    ttl: int = DEFAULT_TTL_SECONDS,
 ) -> AsyncIterator[str]:
     model = primary_model(task)
     content_id = chunk_id or hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
@@ -97,4 +110,4 @@ async def stream_with_cache(
         yield token
     full = "".join(buffer)
     if full.strip():
-        await _write(key, task, paper_id, full, model, DEFAULT_TTL_SECONDS)
+        await _write(key, task, paper_id, full, model, ttl)

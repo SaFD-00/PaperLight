@@ -85,6 +85,45 @@ async def test_expired_is_ignored(db: None) -> None:
     assert await cache._read("k") is None
 
 
+async def test_ttl_zero_is_permanent(db: None) -> None:
+    await cache._write("kperm", "summary", None, "txt", "m", 0)
+    async with session_scope() as session:
+        row = await session.get(Cache, "kperm")
+    assert row is not None
+    assert row.expires_at is None
+
+
+async def test_read_cached_roundtrip(db: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "stub")
+    out = ""
+    async for tok in cache.stream_with_cache(
+        "summary",
+        [{"role": "user", "content": "x"}],
+        text="x",
+        prompt_version="s-v1",
+        paper_id="p1",
+        chunk_id="summary:p1",
+        ttl=0,
+    ):
+        out += tok
+    got = await cache.read_cached(
+        "summary", paper_id="p1", chunk_id="summary:p1", prompt_version="s-v1"
+    )
+    assert got == out
+    key = cache.cache_key("summary", "p1", "summary:p1", primary_model("summary"), "s-v1")
+    async with session_scope() as session:
+        row = await session.get(Cache, key)
+    assert row is not None
+    assert row.expires_at is None
+
+
+async def test_read_cached_miss_returns_none(db: None) -> None:
+    got = await cache.read_cached(
+        "summary", paper_id="nope", chunk_id="summary:nope", prompt_version="s-v1"
+    )
+    assert got is None
+
+
 async def test_prompt_version_separates_keys(db: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "stub")
     await _collect("hello", prompt_version="v1")
