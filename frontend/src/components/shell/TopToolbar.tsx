@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import clsx from "clsx";
 import {
   ChevronLeft,
   Globe,
   Image as ImageIcon,
   ListTree,
+  LogOut,
   Menu,
   Minus,
   Play,
@@ -18,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SettingsMenu } from "@/components/shell/SettingsMenu";
+import { useAuth } from "@/stores/auth";
 import { type Density, type Theme, useSettings } from "@/stores/settings";
 import { useReader } from "@/stores/reader";
 
@@ -55,6 +58,10 @@ export function TopToolbar() {
 
   const translationEnabled = useReader((s) => s.translationEnabled);
   const toggleTranslation = useReader((s) => s.toggleTranslation);
+
+  const authUser = useAuth((s) => s.user);
+  const logout = useAuth((s) => s.logout);
+  const isLoggedIn = authUser !== null && !authUser.anonymous;
 
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-3">
@@ -135,9 +142,23 @@ export function TopToolbar() {
           <Search size={14} />
         </IconButton>
         <SettingsMenu />
-        <IconButton label="계정">
-          <UserRound size={14} />
-        </IconButton>
+        {isLoggedIn ? (
+          <IconButton
+            label={`로그아웃 (${authUser?.email ?? ""})`}
+            onClick={() => void logout()}
+          >
+            <LogOut size={14} />
+          </IconButton>
+        ) : (
+          <Link
+            href="/login"
+            aria-label="로그인"
+            title="로그인"
+            className="grid h-8 w-8 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-muted hover:text-text-primary"
+          >
+            <UserRound size={14} />
+          </Link>
+        )}
         <IconButton label="재생">
           <Play size={14} />
         </IconButton>

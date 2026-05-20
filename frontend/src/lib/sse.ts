@@ -23,6 +23,7 @@ export async function streamSse(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
       signal,
+      credentials: "include",
     });
   } catch (err) {
     handler.onError(err instanceof Error ? err.message : "network error");

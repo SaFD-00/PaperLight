@@ -22,6 +22,7 @@ export async function pushTabUpsert(tab: Tab): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(toWire(tab)),
+      credentials: "include",
     });
   } catch (err) {
     silentFail(err);
@@ -38,6 +39,7 @@ export async function pushTabPatch(
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ...patch, updatedAt: Date.now() }),
+      credentials: "include",
     });
   } catch (err) {
     silentFail(err);
@@ -47,7 +49,10 @@ export async function pushTabPatch(
 export async function pushTabDelete(id: string): Promise<void> {
   if (!isBrowser()) return;
   try {
-    await fetch(apiUrl(`/api/tabs/${encodeURIComponent(id)}`), { method: "DELETE" });
+    await fetch(apiUrl(`/api/tabs/${encodeURIComponent(id)}`), {
+      method: "DELETE",
+      credentials: "include",
+    });
   } catch (err) {
     silentFail(err);
   }
@@ -56,7 +61,7 @@ export async function pushTabDelete(id: string): Promise<void> {
 export async function fetchTabs(): Promise<Tab[] | null> {
   if (!isBrowser()) return null;
   try {
-    const res = await fetch(apiUrl("/api/tabs"));
+    const res = await fetch(apiUrl("/api/tabs"), { credentials: "include" });
     if (!res.ok) return null;
     const data = (await res.json()) as TabWire[];
     return data.map(({ updatedAt: _u, ...t }) => t);
