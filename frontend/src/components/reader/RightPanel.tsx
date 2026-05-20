@@ -8,10 +8,13 @@ import {
   Languages,
   Lightbulb,
   MessageSquare,
+  Sparkles,
   Star,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ExplanationPanel } from "@/components/panels/ExplanationPanel";
+import { InsightsPanel } from "@/components/panels/InsightsPanel";
+import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { TranslationPane } from "@/components/panels/TranslationPane";
 import { useReader } from "@/stores/reader";
 
@@ -19,6 +22,7 @@ type PanelId =
   | "explain"
   | "translate"
   | "summary"
+  | "insights"
   | "notes"
   | "podcast"
   | "chat"
@@ -29,6 +33,7 @@ const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
   { id: "explain", label: "Explanation", icon: Lightbulb },
   { id: "translate", label: "Translation", icon: Languages },
   { id: "summary", label: "Summary", icon: BookOpen },
+  { id: "insights", label: "Insights", icon: Sparkles },
   { id: "notes", label: "Notes", icon: FileText },
   { id: "podcast", label: "Podcast", icon: Headphones },
   { id: "chat", label: "Chat", icon: MessageSquare },
@@ -36,7 +41,7 @@ const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
   { id: "starred", label: "Starred", icon: Star },
 ];
 
-export function RightPanel() {
+export function RightPanel({ paperId }: { paperId: string }) {
   const [active, setActive] = useState<PanelId>("explain");
   const explainText = useReader((s) => s.explainText);
   const translationEnabled = useReader((s) => s.translationEnabled);
@@ -78,13 +83,18 @@ export function RightPanel() {
       <div className="flex-1 overflow-hidden">
         {active === "explain" && <ExplanationPanel />}
         {active === "translate" && <TranslationPane />}
-        {active !== "explain" && active !== "translate" && (
-          <div className="space-y-4 p-4 text-sm text-text-muted">
-            <p className="text-xs">
-              {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
-            </p>
-          </div>
-        )}
+        {active === "summary" && <SummaryPanel paperId={paperId} />}
+        {active === "insights" && <InsightsPanel paperId={paperId} />}
+        {active !== "explain" &&
+          active !== "translate" &&
+          active !== "summary" &&
+          active !== "insights" && (
+            <div className="space-y-4 p-4 text-sm text-text-muted">
+              <p className="text-xs">
+                {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
+              </p>
+            </div>
+          )}
       </div>
     </aside>
   );

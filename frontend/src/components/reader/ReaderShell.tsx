@@ -9,7 +9,7 @@ export function ReaderShell({ paperId }: { paperId: string }) {
       <div className="grid h-full" style={{ gridTemplateColumns: "180px minmax(0, 1fr) 360px" }}>
         <Sidebar />
         <Center paperId={paperId} />
-        <RightPanel />
+        <RightPanel paperId={paperId} />
       </div>
       <FloatingSelectionMenu />
     </>
