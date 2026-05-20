@@ -268,6 +268,18 @@ class TTSProvider(Protocol):
 - **Prometheus + Grafana** — 인프라 메트릭 (Phase 2+)
 - **OpenTelemetry** — distributed trace across FE → BE → Provider
 
+**S15 구현(Phase 1 — 트레이스 가시화)**: 전부 **env 게이팅**(키 부재 시 완전 no-op → 로컬/CI/테스트 무영향). BE `paperlight/observability/`(settings·trace contextvars·`init_sentry`·순수 ASGI `RequestContextMiddleware`로 `X-Request-Id`·`get_langfuse` + `stream_task` generation 래핑). FE `@sentry/nextjs`(withSentryConfig + instrumentation + error boundary) + `posthog-js`(`lib/analytics` + `AnalyticsProvider`). Prometheus/Grafana/OpenTelemetry는 Phase 2.
+
+**환경 변수** (미설정 시 해당 통합 비활성):
+
+| 대상 | Backend | Frontend |
+|------|---------|----------|
+| Sentry | `SENTRY_DSN` · `SENTRY_ENVIRONMENT` · `SENTRY_TRACES_SAMPLE_RATE` | `NEXT_PUBLIC_SENTRY_DSN` · `NEXT_PUBLIC_SENTRY_ENVIRONMENT` · (빌드 소스맵) `SENTRY_AUTH_TOKEN`·`SENTRY_ORG`·`SENTRY_PROJECT` |
+| Langfuse | `LANGFUSE_PUBLIC_KEY` · `LANGFUSE_SECRET_KEY` · `LANGFUSE_HOST` | — |
+| PostHog | — | `NEXT_PUBLIC_POSTHOG_KEY` · `NEXT_PUBLIC_POSTHOG_HOST` |
+
+**Trace 키**(PRD §7.9): `request_id`(미들웨어) · `user_id`(`get_user_id`) · `paper_id`(chat/explain/translate, best-effort) · `task`/`model`(Langfuse generation). `tab_id`는 BE LLM 경로 미가용 → 후속.
+
 ---
 
 ## 8. 빌드·배포
