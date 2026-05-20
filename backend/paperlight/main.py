@@ -9,7 +9,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from paperlight.api import auth, chat, explain, library, papers, podcast, tabs, translate
+from paperlight.api import (
+    annotations,
+    auth,
+    chat,
+    explain,
+    library,
+    papers,
+    podcast,
+    tabs,
+    translate,
+)
 from paperlight.storage.db import init_db
 
 
@@ -35,6 +45,7 @@ app.add_middleware(
 )
 
 app.include_router(papers.router)
+app.include_router(annotations.router)
 app.include_router(chat.router)
 app.include_router(podcast.router)
 app.include_router(library.router)
