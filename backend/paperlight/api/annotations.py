@@ -12,7 +12,8 @@ import time
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,8 +22,11 @@ from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.highlight import Highlight
 from paperlight.models.note import Note
+from paperlight.models.paper import Paper
 from paperlight.storage.db import get_session
 from paperlight.storage.object_store import get_object_store, note_key
+
+EXPORT_FORMATS = ("markdown", "obsidian")
 
 router = APIRouter(prefix="/api/annotations", tags=["annotations"])
 
@@ -145,3 +149,57 @@ async def save_note(
     await session.commit()
     await session.refresh(note)
     return _note_dict(note)
+
+
+def _render_export(paper: Paper, highlights: list[Highlight], note: Note | None, fmt: str) -> str:
+    authors = ", ".join(paper.authors or [])
+    lines: list[str] = []
+    if fmt == "obsidian":
+        lines.append("---")
+        lines.append(f"title: {paper.title}")
+        if authors:
+            lines.append(f"authors: {authors}")
+        if paper.arxiv_id:
+            lines.append(f"arxiv: {paper.arxiv_id}")
+        lines.append("---")
+        lines.append("")
+    lines.append(f"# {paper.title}")
+    if authors:
+        lines.append(f"_{authors}_")
+    lines.append("")
+    lines.append("## Highlights")
+    if highlights:
+        for h in highlights:
+            label = h.color or h.category
+            lines.append(f"- (p.{h.page}, {label}) {h.text}")
+    else:
+        lines.append("_(없음)_")
+    lines.append("")
+    lines.append("## Notes")
+    lines.append(note.markdown_text if note and note.markdown_text else "_(없음)_")
+    return "\n".join(lines) + "\n"
+
+
+@router.get("/papers/{pid}/export")
+async def export_annotations(
+    pid: str,
+    session: SessionDep,
+    user_id: UserDep,
+    fmt: Annotated[str, Query(alias="format")] = "markdown",
+) -> PlainTextResponse:
+    if fmt not in EXPORT_FORMATS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unknown format")
+    paper = await _get_owned(session, pid, user_id)
+    highlights = list(
+        (
+            await session.execute(
+                select(Highlight)
+                .where(Highlight.paper_id == pid, Highlight.user_id == user_id)
+                .order_by(Highlight.page, Highlight.created_at)
+            )
+        ).scalars()
+    )
+    note = await session.scalar(select(Note).where(Note.paper_id == pid, Note.user_id == user_id))
+    return PlainTextResponse(
+        _render_export(paper, highlights, note, fmt), media_type="text/markdown"
+    )
