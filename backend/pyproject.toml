@@ -21,6 +21,8 @@ dependencies = [
     "pymupdf>=1.27.2.3",
     "boto3>=1.43.11",
     "qdrant-client>=1.18.0",
+    "sentry-sdk[fastapi]>=2.20",
+    "langfuse>=3.0",
 ]
 
 [project.optional-dependencies]
