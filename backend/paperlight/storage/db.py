@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -52,7 +53,20 @@ def _build_engine(url: str) -> AsyncEngine:
     connect_args: dict[str, Any] = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
-    return create_async_engine(url, future=True, connect_args=connect_args)
+    engine = create_async_engine(url, future=True, connect_args=connect_args)
+    if url.startswith("sqlite"):
+        # SQLite is single-writer: concurrent cache writes (translate/explain SSE +
+        # pregen) otherwise fail instantly with "database is locked". busy_timeout
+        # makes writers wait; WAL lets readers proceed during a write. :memory:
+        # ignores WAL (no error). Postgres skips this branch entirely.
+        @event.listens_for(engine.sync_engine, "connect")
+        def _sqlite_pragmas(dbapi_conn: Any, _record: Any) -> None:
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA busy_timeout=5000")
+            cur.close()
+
+    return engine
 
 
 def get_engine() -> AsyncEngine:

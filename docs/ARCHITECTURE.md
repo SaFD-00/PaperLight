@@ -89,7 +89,7 @@ PaperLight/
       │ 7. LangGraph "summary-pipeline" 노드 트리거
       ▼
 [OpenRouter / Qwen3.6-35B]
-      │ 8. Summary (다층) + F-10 Auto-Highlight + F-14 Figure + F-15 Paragraph 생성
+      │ 8. Summary (다층) + F-10 Auto-Highlight + F-14 Figure + F-15 Paragraph + F-05 References 생성
       ▼
 [Postgres: cache 영구 저장] ◄── 9. status=ready
       │
@@ -221,6 +221,7 @@ class TTSProvider(Protocol):
 - 10개 핵심 엔티티 ([PRD §8.4](./PRD.md)): User, Paper, Collection, LibraryItem, Tag, Tab, Note, Highlight, Podcast, Cache.
 - Soft delete: `soft_deleted_at TIMESTAMPTZ NULL` — 30일 후 hard delete (GDPR §8.2).
 - 마이그레이션 도구: **Alembic** (Phase 1 도입). Phase 0은 로컬 SQLite 단일 파일.
+- **SQLite 동시성**: 로컬 sqlite는 단일 writer라 동시 캐시 write(translate/explain SSE + pregen)가 `database is locked`로 즉시 실패한다. `storage/db.py`가 sqlite 연결마다 `PRAGMA journal_mode=WAL`(reader 비차단) + `PRAGMA busy_timeout=5000`(writer 대기·재시도)을 건다. Postgres·`:memory:`는 무영향.
 - **드라이버 정규화**: Supabase/Render/.env 가 주는 `postgresql://`(또는 `postgres://`)는 SQLAlchemy 기본이 동기 psycopg2(미설치)다. `storage/db.py`가 async 엔진 빌드 시 `postgresql+asyncpg://`로 정규화한다(`_normalize_async_url`). sqlite URL 은 무변경.
 
 ### 6.2 Qdrant (Cloud, ap-northeast-1)
@@ -236,8 +237,9 @@ class TTSProvider(Protocol):
 
 ### 6.5 Cache 정책
 - LLM 응답 캐시 (Cache 테이블, `key = sha256(task + paper_id + chunk_id + model + prompt_v)`):
-  - Summary / F-14 / F-15 → **영구 (TTL ∞)**
-  - Explanation / Translation → 24시간
+  - Summary / F-14 / F-15 → **영구 (TTL ∞)** — ingestion pregen
+  - References → **30일** — ingestion pregen(`get_references`), 만료 후 lazy 재생성
+  - Explanation / Translation → 24시간 — on-demand(pregen 제외, 임의 선택/페이지 의존)
   - Chat → 캐시 안 함 (대화 컨텍스트 의존)
 
 ---

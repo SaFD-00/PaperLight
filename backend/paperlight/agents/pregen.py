@@ -3,7 +3,8 @@
 ingestion `ready` 직후 호출되어 다층 Summary + Auto-Highlight(F-10) + Figure/Table
 설명(F-14) + 단락별 통찰(F-15)을 task별 라우터/캐시(S10) 경유로 생성한다. 모든 산출물은
 `Cache` 테이블에 영구(ttl=0) 저장 — 전용 테이블/마이그레이션 없음. figure/table은 marker-pdf
-부재로 본문 텍스트 reasoning만 수행(이미지 없음). 각 task는 격리되어 1개 실패가 전체를
+부재로 본문 텍스트 reasoning만 수행(이미지 없음). 마지막으로 References(F-05)도 미리 추출/보강해
+Cache memo(30일)에 채워 패널 첫 클릭 대기를 없앤다. 각 task는 격리되어 1개 실패가 전체를
 중단하지 않는다.
 """
 
@@ -14,6 +15,7 @@ import re
 
 from sqlalchemy import select
 
+from paperlight.agents.references import get_references
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.providers.cache import stream_with_cache
@@ -181,3 +183,9 @@ async def pregen_paper(paper_id: str) -> None:
                 chunk_id=ch.id,
                 version=TABLE_PROMPT_VERSION,
             )
+
+    # References(F-05): 추출+보강을 미리 Cache memo에 채워 패널 첫 클릭 대기 제거. 격리.
+    try:
+        await get_references(paper_id)
+    except Exception:
+        logger.exception("pregen references failed for paper %s", paper_id)
