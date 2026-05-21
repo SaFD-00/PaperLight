@@ -27,6 +27,15 @@ export type OutlineItem = {
   level: number;
 };
 
+/** Backend(marker) figure/table bbox — 정규화 top-left. 프론트 휴리스틱 대체. */
+export type FigureLayout = {
+  page: number;
+  kind: "figure" | "table";
+  label: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  captionText: string;
+};
+
 export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "LOAD_PDF"; url: string }
   | { source: typeof HOST_SOURCE; type: "JUMP_TO"; page: number }
@@ -43,6 +52,7 @@ export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "REQUEST_PAGE_TEXT"; page: number }
   | { source: typeof HOST_SOURCE; type: "REQUEST_OUTLINE" }
   | { source: typeof HOST_SOURCE; type: "REQUEST_THUMBNAILS" }
+  | { source: typeof HOST_SOURCE; type: "RENDER_FIGURES"; page: number; figures: FigureLayout[] }
   | {
       source: typeof HOST_SOURCE;
       type: "RENDER_TRANSLATION";
@@ -86,6 +96,7 @@ export type IframeToHostMessage =
     }
   | { source: typeof IFRAME_SOURCE; type: "HIGHLIGHT_CLICK"; id: string }
   | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string }
+  | { source: typeof IFRAME_SOURCE; type: "REQUEST_FIGURES"; page: number }
   | { source: typeof IFRAME_SOURCE; type: "OUTLINE"; items: OutlineItem[] }
   | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string }
   | {

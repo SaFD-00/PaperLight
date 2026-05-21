@@ -456,6 +456,31 @@ function cropRegion(pageNum, region) {
   return out.toDataURL("image/png");
 }
 
+// 백엔드 figure(정규화 top-left bbox) → 내부 anchor 형식(휴리스틱과 동일 region/btn).
+function backendToAnchor(f) {
+  const b = f.bbox || {};
+  return {
+    kind: f.kind,
+    label: f.label || "",
+    captionText: f.captionText || "",
+    region: { x: b.x || 0, y: b.y || 0, w: b.w || 0, h: b.h || 0 },
+    btn: { left: clamp01(b.x || 0), top: clamp01(b.y || 0) },
+  };
+}
+
+// host RENDER_FIGURES 수신: 기존 버튼을 걷어내고 백엔드 bbox로 교체(없으면 휴리스틱 폴백).
+async function applyBackendFigures(pageNum, figures) {
+  const wrapper = pageWrappers[pageNum - 1];
+  if (!wrapper) return;
+  for (const el of wrapper.querySelectorAll(".figure-explain-btn")) el.remove();
+  if (Array.isArray(figures) && figures.length > 0) {
+    pageFigureAnchors[pageNum - 1] = figures.map(backendToAnchor);
+  } else {
+    pageFigureAnchors[pageNum - 1] = await detectFigureAnchors(pageNum);
+  }
+  await renderFigureAnchors(pageNum);
+}
+
 // 캡션마다 설명 버튼을 wrapper에 배치(정규화 % 위치라 줌 재렌더에도 유지).
 async function renderFigureAnchors(pageNum) {
   const wrapper = pageWrappers[pageNum - 1];
@@ -601,7 +626,8 @@ async function buildPage(pageNum) {
   pageWrappers[pageNum - 1] = wrapper;
 
   await paintPage(pageNum, currentScale);
-  void renderFigureAnchors(pageNum); // 캡션 설명 버튼(비차단).
+  // 백엔드(marker) figure bbox를 요청 → host가 RENDER_FIGURES로 응답. 빈 응답이면 휴리스틱 폴백.
+  send("REQUEST_FIGURES", { page: pageNum });
 }
 
 function captureScrollAnchor() {
@@ -877,6 +903,9 @@ window.addEventListener("message", async (event) => {
       send("PAGE_TEXT", { page: msg.page, text });
       break;
     }
+    case "RENDER_FIGURES":
+      await applyBackendFigures(msg.page, msg.figures);
+      break;
     case "REQUEST_OUTLINE": {
       const items = await buildOutline();
       send("OUTLINE", { items });

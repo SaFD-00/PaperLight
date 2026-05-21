@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import {
+  type FigureLayout,
   HOST_SOURCE,
   type HostToIframeMessage,
   IFRAME_SOURCE,
@@ -57,6 +59,10 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   // 페이지별 번역 캐시 + REQUEST_PAGE_TEXT 디듀프(논문 전환 시 리셋).
   const transCacheRef = useRef<Map<number, PageTranslation>>(new Map());
   const requestedRef = useRef<Set<number>>(new Set());
+  // 백엔드 figure bbox(페이지별) + 로드 완료 플래그 + REQUEST_FIGURES 받은 페이지.
+  const figuresByPageRef = useRef<Map<number, FigureLayout[]>>(new Map());
+  const figuresLoadedRef = useRef(false);
+  const requestedFiguresRef = useRef<Set<number>>(new Set());
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -200,6 +206,18 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
           });
           break;
         }
+        case "REQUEST_FIGURES": {
+          requestedFiguresRef.current.add(data.page);
+          // fetch 미완료면 보류 — 완료 시 figures fetch effect가 해당 페이지로 push.
+          if (!figuresLoadedRef.current) break;
+          postToIframe({
+            source: HOST_SOURCE,
+            type: "RENDER_FIGURES",
+            page: data.page,
+            figures: figuresByPageRef.current.get(data.page) ?? [],
+          });
+          break;
+        }
         case "HIGHLIGHT_CLICK":
           requestPanel("notes");
           break;
@@ -248,6 +266,47 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     transCacheRef.current.clear();
     requestedRef.current.clear();
     if (iframeReadyRef.current) postToIframe({ source: HOST_SOURCE, type: "CLEAR_TRANSLATION" });
+  }, [paperId]);
+
+  // 백엔드 figure bbox를 논문당 1회 fetch(marker 모드에서만 채워짐). 늦게 도착하면
+  // 이미 REQUEST_FIGURES를 보낸 페이지에 push해 휴리스틱 버튼을 정밀 bbox로 교체한다.
+  useEffect(() => {
+    figuresByPageRef.current = new Map();
+    figuresLoadedRef.current = false;
+    requestedFiguresRef.current.clear();
+    let alive = true;
+    apiFetch(`/api/papers/${paperId}/figures`)
+      .then(async (res) => {
+        if (!alive) return;
+        if (!res.ok) {
+          figuresLoadedRef.current = true;
+          return;
+        }
+        const body = (await res.json()) as { figures: FigureLayout[] };
+        const map = new Map<number, FigureLayout[]>();
+        for (const f of body.figures ?? []) {
+          const arr = map.get(f.page) ?? [];
+          arr.push(f);
+          map.set(f.page, arr);
+        }
+        if (!alive) return;
+        figuresByPageRef.current = map;
+        figuresLoadedRef.current = true;
+        for (const page of requestedFiguresRef.current) {
+          postToIframe({
+            source: HOST_SOURCE,
+            type: "RENDER_FIGURES",
+            page,
+            figures: map.get(page) ?? [],
+          });
+        }
+      })
+      .catch(() => {
+        if (alive) figuresLoadedRef.current = true;
+      });
+    return () => {
+      alive = false;
+    };
   }, [paperId]);
 
   // 번역 컬럼 글꼴(종류·크기)을 iframe에 전달 (iframe은 host CSS 변수를 못 봄).
