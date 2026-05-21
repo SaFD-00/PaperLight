@@ -3,6 +3,7 @@
 import { Center } from "@/components/reader/Center";
 import { FloatingSelectionMenu } from "@/components/reader/FloatingSelectionMenu";
 import { RightPanel } from "@/components/reader/RightPanel";
+import { SelectionExplainPopover } from "@/components/reader/SelectionExplainPopover";
 import { SelectionTranslatePopover } from "@/components/reader/SelectionTranslatePopover";
 import { Sidebar } from "@/components/reader/Sidebar";
 import { TranslationSidePanel } from "@/components/reader/TranslationSidePanel";
@@ -23,6 +24,7 @@ export function ReaderShell({ paperId }: { paperId: string }) {
       </div>
       <FloatingSelectionMenu paperId={paperId} />
       <SelectionTranslatePopover />
+      <SelectionExplainPopover />
     </>
   );
 }

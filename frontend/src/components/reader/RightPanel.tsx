@@ -5,7 +5,6 @@ import {
   BookOpen,
   FileText,
   Headphones,
-  Lightbulb,
   MessageSquare,
   Quote,
   Sparkles,
@@ -13,7 +12,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/panels/ChatPanel";
-import { ExplanationPanel } from "@/components/panels/ExplanationPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
 import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
@@ -21,7 +19,6 @@ import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { useReader } from "@/stores/reader";
 
 type PanelId =
-  | "explain"
   | "summary"
   | "insights"
   | "chat"
@@ -32,7 +29,6 @@ type PanelId =
   | "starred";
 
 const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookOpen }[] = [
-  { id: "explain", label: "Explanation", hint: "선택한 텍스트를 쉽게 풀어 설명합니다", icon: Lightbulb },
   { id: "summary", label: "Summary", hint: "논문 전체를 요약해 보여줍니다", icon: BookOpen },
   { id: "insights", label: "Insights", hint: "논문의 핵심 통찰을 정리합니다", icon: Sparkles },
   { id: "chat", label: "Chat", hint: "논문 내용에 대해 질문하고 대화합니다", icon: MessageSquare },
@@ -44,14 +40,9 @@ const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookO
 ];
 
 export function RightPanel({ paperId }: { paperId: string }) {
-  const [active, setActive] = useState<PanelId>("explain");
-  const explainText = useReader((s) => s.explainText);
+  const [active, setActive] = useState<PanelId>("summary");
   const askText = useReader((s) => s.askText);
   const panelRequest = useReader((s) => s.panelRequest);
-
-  useEffect(() => {
-    if (explainText) setActive("explain");
-  }, [explainText]);
 
   useEffect(() => {
     if (askText) setActive("chat");
@@ -89,14 +80,12 @@ export function RightPanel({ paperId }: { paperId: string }) {
         })}
       </div>
       <div className="flex-1 overflow-hidden">
-        {active === "explain" && <ExplanationPanel />}
         {active === "summary" && <SummaryPanel paperId={paperId} />}
         {active === "insights" && <InsightsPanel paperId={paperId} />}
         {active === "chat" && <ChatPanel paperId={paperId} />}
         {active === "references" && <ReferencesPanel paperId={paperId} />}
         {active === "notes" && <NotesPanel paperId={paperId} />}
-        {active !== "explain" &&
-          active !== "summary" &&
+        {active !== "summary" &&
           active !== "insights" &&
           active !== "chat" &&
           active !== "references" &&

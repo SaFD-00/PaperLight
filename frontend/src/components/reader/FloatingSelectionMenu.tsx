@@ -44,7 +44,7 @@ export function FloatingSelectionMenu({ paperId }: { paperId: string }) {
         <button
           type="button"
           className="flex items-center gap-1 rounded px-2 py-1 hover:bg-bg-muted"
-          onClick={() => triggerExplain(text)}
+          onClick={() => triggerExplain({ text, hostRect })}
           aria-label="선택 설명"
         >
           <Lightbulb className="size-3.5" aria-hidden /> 설명

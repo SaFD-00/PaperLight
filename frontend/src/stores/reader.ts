@@ -23,9 +23,15 @@ export interface TranslateSelection {
   hostRect: SelectionInfo["hostRect"];
 }
 
+export interface ExplainSelection {
+  text: string;
+  hostRect: SelectionInfo["hostRect"];
+}
+
 interface ReaderState {
   selection: SelectionInfo | null;
-  explainText: string | null;
+  /** 인라인 설명 팝오버 대상(선택 텍스트 + 호스트 좌표). */
+  explainSelection: ExplainSelection | null;
   askText: string | null;
   translateSelection: TranslateSelection | null;
   /** 해석 패널(우측, AI 패널과 별개) 열림 여부. 상단 [T] 토글과 연동. */
@@ -45,7 +51,7 @@ interface ReaderState {
   /** S14: request RightPanel to switch tabs (e.g. highlight click → notes). */
   panelRequest: { panel: string; nonce: number } | null;
   setSelection: (s: SelectionInfo | null) => void;
-  triggerExplain: (text: string) => void;
+  triggerExplain: (sel: ExplainSelection) => void;
   clearExplain: () => void;
   triggerAsk: (text: string) => void;
   clearAsk: () => void;
@@ -70,7 +76,7 @@ const ZOOM_STEP = 10;
 
 export const useReader = create<ReaderState>((set) => ({
   selection: null,
-  explainText: null,
+  explainSelection: null,
   askText: null,
   translateSelection: null,
   translationEnabled: false,
@@ -83,11 +89,11 @@ export const useReader = create<ReaderState>((set) => ({
   jumpRequest: null,
   panelRequest: null,
   setSelection: (s) => set({ selection: s }),
-  triggerExplain: (text) => {
-    capture("explain_requested", { length: text.length });
-    set({ explainText: text, selection: null });
+  triggerExplain: (sel) => {
+    capture("explain_requested", { length: sel.text.length });
+    set({ explainSelection: sel, selection: null });
   },
-  clearExplain: () => set({ explainText: null }),
+  clearExplain: () => set({ explainSelection: null }),
   triggerAsk: (text) => set({ askText: text, selection: null }),
   clearAsk: () => set({ askText: null }),
   triggerTranslateSelection: (sel) => {
