@@ -12,6 +12,7 @@ let currentDoc = null;
 let currentUrl = null;
 let currentScale = 1.25;
 let pageWrappers = [];
+let pageObjects = [];
 let visibilityObserver = null;
 let savedHighlights = [];
 
@@ -72,39 +73,32 @@ function setEmpty(text) {
   }
 }
 
-async function renderPage(pageNum, scale) {
-  const page = await currentDoc.getPage(pageNum);
+// 이미 만들어진 page-wrapper의 canvas/text-layer를 주어진 배율로 다시 그린다.
+async function paintPage(pageNum, scale) {
+  const wrapper = pageWrappers[pageNum - 1];
+  const page = pageObjects[pageNum - 1];
+  if (!wrapper || !page) return;
   const viewport = page.getViewport({ scale });
 
-  const wrapper = document.createElement("div");
-  wrapper.className = "page-wrapper";
   wrapper.style.width = viewport.width + "px";
   wrapper.style.height = viewport.height + "px";
-  wrapper.dataset.pageNum = String(pageNum);
 
-  const canvas = document.createElement("canvas");
-  canvas.className = "page-canvas";
+  const canvas = wrapper.querySelector(".page-canvas");
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.floor(viewport.width * dpr);
   canvas.height = Math.floor(viewport.height * dpr);
   canvas.style.width = viewport.width + "px";
   canvas.style.height = viewport.height + "px";
-  wrapper.appendChild(canvas);
-
-  const textLayerDiv = document.createElement("div");
-  textLayerDiv.className = "text-layer";
-  textLayerDiv.style.width = viewport.width + "px";
-  textLayerDiv.style.height = viewport.height + "px";
-  textLayerDiv.style.setProperty("--scale-factor", String(scale));
-  wrapper.appendChild(textLayerDiv);
-
-  container.appendChild(wrapper);
-  pageWrappers[pageNum - 1] = wrapper;
 
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
   await page.render({ canvasContext: ctx, viewport }).promise;
 
+  const textLayerDiv = wrapper.querySelector(".text-layer");
+  textLayerDiv.style.width = viewport.width + "px";
+  textLayerDiv.style.height = viewport.height + "px";
+  textLayerDiv.style.setProperty("--scale-factor", String(scale));
+  textLayerDiv.replaceChildren();
   try {
     if (typeof pdfjsLib.TextLayer === "function") {
       const textContent = await page.getTextContent();
@@ -118,6 +112,110 @@ async function renderPage(pageNum, scale) {
   } catch (err) {
     // Text layer optional; selection will not work for this page.
     console.warn("[viewer] text layer failed for page", pageNum, err);
+  }
+}
+
+// 줌 즉시 미리보기: 기존 캔버스 래스터를 새 크기로 CSS 스트레치(재래스터 전까지 흐릿하게 보임).
+function resizeLayout(pageNum, scale) {
+  const wrapper = pageWrappers[pageNum - 1];
+  const page = pageObjects[pageNum - 1];
+  if (!wrapper || !page) return;
+  const viewport = page.getViewport({ scale });
+  wrapper.style.width = viewport.width + "px";
+  wrapper.style.height = viewport.height + "px";
+  const canvas = wrapper.querySelector(".page-canvas");
+  canvas.style.width = viewport.width + "px";
+  canvas.style.height = viewport.height + "px";
+  const textLayerDiv = wrapper.querySelector(".text-layer");
+  textLayerDiv.style.width = viewport.width + "px";
+  textLayerDiv.style.height = viewport.height + "px";
+  textLayerDiv.style.setProperty("--scale-factor", String(scale));
+}
+
+// 페이지 DOM을 한 번 생성하고 페이지 객체를 캐시한 뒤 현재 배율로 그린다.
+async function buildPage(pageNum) {
+  const page = await currentDoc.getPage(pageNum);
+  pageObjects[pageNum - 1] = page;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "page-wrapper";
+  wrapper.dataset.pageNum = String(pageNum);
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "page-canvas";
+  wrapper.appendChild(canvas);
+
+  const textLayerDiv = document.createElement("div");
+  textLayerDiv.className = "text-layer";
+  wrapper.appendChild(textLayerDiv);
+
+  container.appendChild(wrapper);
+  pageWrappers[pageNum - 1] = wrapper;
+
+  await paintPage(pageNum, currentScale);
+}
+
+function captureScrollAnchor() {
+  const cTop = container.getBoundingClientRect().top;
+  for (let i = 0; i < pageWrappers.length; i++) {
+    const w = pageWrappers[i];
+    if (!w) continue;
+    const r = w.getBoundingClientRect();
+    if (r.bottom > cTop) {
+      return { index: i, ratio: r.height ? (cTop - r.top) / r.height : 0 };
+    }
+  }
+  return { index: 0, ratio: 0 };
+}
+
+function restoreScrollAnchor(anchor) {
+  if (!anchor) return;
+  const w = pageWrappers[anchor.index];
+  if (!w) return;
+  const cTop = container.getBoundingClientRect().top;
+  const r = w.getBoundingClientRect();
+  const pageContentTop = r.top - cTop + container.scrollTop;
+  container.scrollTop = pageContentTop + anchor.ratio * r.height;
+}
+
+let isRerendering = false;
+let queuedScale = null;
+
+// 줌 요청을 직렬화(같은 캔버스 동시 렌더 방지) + 최신 배율로 합치기.
+function requestRerender(scale) {
+  queuedScale = scale;
+  if (!isRerendering) void pumpRerender();
+}
+
+async function pumpRerender() {
+  isRerendering = true;
+  while (queuedScale != null) {
+    const scale = queuedScale;
+    queuedScale = null;
+    await rerenderAtScale(scale);
+  }
+  isRerendering = false;
+}
+
+// 보이는 페이지(startIdx)부터 아래로, 그다음 위로 재렌더하도록 순서를 만든다(1-based).
+function paintOrder(startIdx, n) {
+  const order = [];
+  for (let i = startIdx; i < n; i++) order.push(i + 1);
+  for (let i = startIdx - 1; i >= 0; i--) order.push(i + 1);
+  return order;
+}
+
+// 제자리 재렌더: DOM/문서 재생성 없이 캐시된 페이지를 새 배율로 다시 그리고 스크롤 위치 보존.
+async function rerenderAtScale(scale) {
+  if (!currentDoc) return;
+  currentScale = scale;
+  const anchor = captureScrollAnchor();
+  for (let i = 1; i <= pageWrappers.length; i++) resizeLayout(i, scale);
+  restoreScrollAnchor(anchor);
+  // 보이는 페이지부터 선명하게 다시 그린다.
+  for (const i of paintOrder(anchor.index, pageWrappers.length)) {
+    if (queuedScale != null) return; // 더 최신 배율 요청이 있으면 중단하고 양보
+    await paintPage(i, scale);
   }
 }
 
@@ -152,6 +250,7 @@ async function loadPdf(url) {
   disposeVisibility();
   container.innerHTML = "";
   pageWrappers = [];
+  pageObjects = [];
   if (currentDoc) {
     try { await currentDoc.destroy(); } catch (_) { /* noop */ }
     currentDoc = null;
@@ -160,7 +259,7 @@ async function loadPdf(url) {
     currentUrl = url;
     currentDoc = await pdfjsLib.getDocument({ url, disableAutoFetch: false }).promise;
     for (let i = 1; i <= currentDoc.numPages; i++) {
-      await renderPage(i, currentScale);
+      await buildPage(i);
     }
     setEmpty(null);
     send("READY", { numPages: currentDoc.numPages });
@@ -237,8 +336,9 @@ window.addEventListener("message", async (event) => {
       break;
     }
     case "SET_ZOOM": {
-      currentScale = Math.max(0.25, Math.min(4, msg.scale));
-      if (currentUrl) await loadPdf(currentUrl);
+      const scale = Math.max(0.25, Math.min(4, msg.scale));
+      if (currentDoc) requestRerender(scale);
+      else currentScale = scale;
       break;
     }
     case "HIGHLIGHT_REGION":
