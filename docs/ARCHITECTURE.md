@@ -189,14 +189,14 @@ class LLMProvider(Protocol):
 ```
 
 **기본 라우팅** (Phase 0~1):
-- 일반 텍스트 추론 → `openrouter/qwen/qwen3.6-35b-a3b`
+- 일반 텍스트 추론 → `gemini/gemini-3.1-flash-lite` (Gemini API). qwen은 이전 기본 — 일부 fallback에 잔존
 - Figure description (Vision) → `openai/gpt-5` (F-14)
 - Table description → `gemini/gemini-2.5-pro` (F-14 fallback)
 - 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial)
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).
 
-**Reasoning 스트리밍**: 기본 모델 `qwen/qwen3.6-35b-a3b`는 추론(reasoning) 모델이라 사고 과정이 OpenRouter SSE의 `delta.reasoning`으로 먼저 흐르고 `delta.content`(최종 답변)는 그 뒤에 온다. 그대로 두면 추론 동안 사용자에게 빈 스트림만 보인다. Chat 경로는 요청 스코프 `reasoning_sink` contextvar(`providers/base.py`)로 reasoning 델타를 받아 `{"reasoning": ...}` SSE 이벤트로 라이브 전송한다(`api/chat.py`가 큐로 content·reasoning 머지). reasoning 은 캐시·영속화·Langfuse output 에 포함하지 않는다. Explain/Translate(단발 task)는 미적용.
+**Reasoning 스트리밍**: OpenRouter `qwen` 계열은 추론(reasoning) 모델이라 사고 과정이 OpenRouter SSE의 `delta.reasoning`으로 먼저 흐르고 `delta.content`(최종 답변)는 그 뒤에 온다. 그대로 두면 추론 동안 사용자에게 빈 스트림만 보인다. Chat 경로는 요청 스코프 `reasoning_sink` contextvar(`providers/base.py`)로 reasoning 델타를 받아 `{"reasoning": ...}` SSE 이벤트로 라이브 전송한다(`api/chat.py`가 큐로 content·reasoning 머지). reasoning 은 캐시·영속화·Langfuse output 에 포함하지 않는다. **기본 모델을 `gemini-3.1-flash-lite`로 전환한 뒤로는 chat primary에 reasoning 델타가 없어 일반 content 스트림이며, reasoning_sink 경로는 OpenRouter reasoning 모델을 fallback 으로 탈 때만 활성된다.** Explain/Translate(단발 task)는 미적용.
 
 ### 5.2 TTSProvider
 

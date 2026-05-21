@@ -1,35 +1,35 @@
 # LLM task routing — PRD §7.5.4 v3.0. Loaded by paperlight.providers.router.
 version: "2026.05.19"
 
-# 실험·실행 기본 모델 (PRD §7.5 v3.0)
+# 실험·실행 기본 모델 (Gemini API gemini-3.1-flash-lite)
 default:
-  provider: openrouter
-  model: qwen/qwen3.6-35b-a3b
+  provider: gemini
+  model: gemini-3.1-flash-lite
 
 tasks:
   summary:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: openai, model: gpt-5 }
       - { provider: gemini, model: gemini-2.5-pro }
 
   chat:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: gemini, model: gemini-2.5-pro }
       - { provider: openrouter, model: anthropic/claude-sonnet-4.6 }
 
   explanation:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: openai, model: gpt-5 }
 
   translation:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: gemini, model: gemini-2.5-flash }
       - { provider: openai, model: gpt-5-mini }
@@ -49,14 +49,14 @@ tasks:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
   paragraph_description:     # F-15 batch
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: gemini, model: gemini-2.5-flash }
 
   paragraph_importance:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
     fallback:
       - { provider: gemini, model: gemini-2.5-flash-lite }
 
@@ -77,20 +77,20 @@ tasks:
     model: gemini-2.5-pro
 
   critique:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
 
   classifier:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
 
   highlight:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
 
   domain_classifier:
-    provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    provider: gemini
+    model: gemini-3.1-flash-lite
 
 # 아래 섹션은 S10 라우터 미사용(보존). embedding은 S9 ingestion.embedder가 담당.
 embedding:
