@@ -45,10 +45,18 @@ html,
 body {
   height: 100%;
   font-family: var(--font-sans);
-  font-size: var(--font-body);
   background-color: var(--bg-base);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+/* rem 기반 Tailwind 텍스트가 root에 종속 → 여기서 곱하면 리더 전체가 스케일.
+ * --reader-font-scale 는 리더 라우트(ReaderShell)에서만 1 이외 값으로 설정된다. */
+html {
+  font-size: calc(var(--font-body) * var(--reader-font-scale));
+}
+body {
+  font-size: 1rem;
 }
 
 *:focus-visible {

@@ -90,6 +90,9 @@
   --pad-card: 12px;
   --gap-list: 2px;
   --sidebar-item-h: 32px;
+
+  /* Reader-only font scale (리더 라우트에서만 토글, Library 미영향) */
+  --reader-font-scale: 1;
 }
 
 :root[data-theme="dark"] {

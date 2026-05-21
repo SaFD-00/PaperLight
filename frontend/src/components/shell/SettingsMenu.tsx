@@ -1,9 +1,17 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, MoreHorizontal } from "lucide-react";
+import { Check, Minus, MoreHorizontal, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type Density, type Theme, useSettings } from "@/stores/settings";
+import {
+  type Density,
+  READER_FONT_SCALE_MAX,
+  READER_FONT_SCALE_MIN,
+  READER_FONT_SCALE_STEP,
+  type Theme,
+  type TranslationFontFamily,
+  useSettings,
+} from "@/stores/settings";
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: "auto", label: "Auto (시스템 설정)" },
@@ -17,14 +25,23 @@ const DENSITIES: { value: Density; label: string; rowH: string }[] = [
   { value: "spacious", label: "Spacious", rowH: "56px" },
 ];
 
+const TRANSLATION_FONTS: { value: TranslationFontFamily; label: string }[] = [
+  { value: "sans", label: "Sans (Pretendard)" },
+  { value: "serif", label: "Serif (본명조)" },
+];
+
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const theme = useSettings((s) => s.theme);
   const density = useSettings((s) => s.density);
+  const translationFontFamily = useSettings((s) => s.translationFontFamily);
+  const readerFontScale = useSettings((s) => s.readerFontScale);
   const setTheme = useSettings((s) => s.setTheme);
   const setDensity = useSettings((s) => s.setDensity);
+  const setTranslationFontFamily = useSettings((s) => s.setTranslationFontFamily);
+  const setReaderFontScale = useSettings((s) => s.setReaderFontScale);
 
   useEffect(() => {
     if (!open) return;
@@ -105,9 +122,53 @@ export function SettingsMenu() {
           ))}
 
           <div className="my-1 h-px bg-border-subtle" />
-          <p className="px-2 pb-1 pt-1 text-[10px] text-text-muted">
-            Phase 0 — 본격 Settings 화면은 Phase 1
+          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+            번역 글꼴
           </p>
+          {TRANSLATION_FONTS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={translationFontFamily === f.value}
+              onClick={() => setTranslationFontFamily(f.value)}
+              className={clsx(
+                "flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-bg-muted",
+                translationFontFamily === f.value && "text-brand-primary",
+              )}
+            >
+              <span>{f.label}</span>
+              {translationFontFamily === f.value && <Check className="size-3.5" />}
+            </button>
+          ))}
+
+          <div className="my-1 h-px bg-border-subtle" />
+          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+            리더 글꼴 크기
+          </p>
+          <div className="flex items-center justify-between px-2 py-1">
+            <button
+              type="button"
+              aria-label="글꼴 작게"
+              disabled={readerFontScale <= READER_FONT_SCALE_MIN}
+              onClick={() => setReaderFontScale(readerFontScale - READER_FONT_SCALE_STEP)}
+              className="grid h-6 w-6 place-items-center rounded text-text-secondary hover:bg-bg-muted hover:text-text-primary disabled:opacity-40"
+            >
+              <Minus size={12} />
+            </button>
+            <span className="font-mono text-xs tabular-nums text-text-primary">
+              {Math.round(readerFontScale * 100)}%
+            </span>
+            <button
+              type="button"
+              aria-label="글꼴 크게"
+              disabled={readerFontScale >= READER_FONT_SCALE_MAX}
+              onClick={() => setReaderFontScale(readerFontScale + READER_FONT_SCALE_STEP)}
+              className="grid h-6 w-6 place-items-center rounded text-text-secondary hover:bg-bg-muted hover:text-text-primary disabled:opacity-40"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
         </div>
       )}
     </div>
