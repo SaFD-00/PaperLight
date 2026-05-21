@@ -221,6 +221,7 @@ class TTSProvider(Protocol):
 - 10개 핵심 엔티티 ([PRD §8.4](./PRD.md)): User, Paper, Collection, LibraryItem, Tag, Tab, Note, Highlight, Podcast, Cache.
 - Soft delete: `soft_deleted_at TIMESTAMPTZ NULL` — 30일 후 hard delete (GDPR §8.2).
 - 마이그레이션 도구: **Alembic** (Phase 1 도입). Phase 0은 로컬 SQLite 단일 파일.
+- **드라이버 정규화**: Supabase/Render/.env 가 주는 `postgresql://`(또는 `postgres://`)는 SQLAlchemy 기본이 동기 psycopg2(미설치)다. `storage/db.py`가 async 엔진 빌드 시 `postgresql+asyncpg://`로 정규화한다(`_normalize_async_url`). sqlite URL 은 무변경.
 
 ### 6.2 Qdrant (Cloud, ap-northeast-1)
 - 컬렉션: `paper_chunks` (vector dim = 1024 for bge-m3, payload = paper_id, page, bbox, text).
@@ -264,6 +265,8 @@ class TTSProvider(Protocol):
 | **prod** | Vercel (Seoul edge) | Render (Tokyo) | Supabase (Seoul) | Qdrant Cloud (ap-northeast-1) | R2 (auto) | OpenRouter |
 
 **`.env` 로딩**: `uvicorn`/`uv run`은 `.env`를 자동 로드하지 않는다. 백엔드는 FastAPI `lifespan` startup에서 `load_dotenv(<repo>/.env, override=False)`로 로드 → 로컬 실행 시 API 키·DB·인프라 URL이 `os.environ`에 들어온다. `override=False`라 Render/CI가 주입한 실제 env가 우선하고, `.env` 부재 시 no-op. **import가 아닌 lifespan에 두는 이유**: ASGI 테스트(`ASGITransport`, lifespan 미실행)에 `.env`의 인프라 설정(S3/Qdrant/DB)이 새지 않게 하여 오프라인 테스트를 보존한다.
+
+**로컬 빠른 실행 모드(Docker 불필요)**: `.env`에서 `DATABASE_URL`·`QDRANT_URL`·`S3_ENDPOINT` 3개만 주석 처리하면 sqlite(`db.py` 기본) + LocalObjectStore(`object_store.py:get_object_store`) + 인메모리 Qdrant(`vector.py`)로 폴백한다. API 키는 그대로 로드돼 AI는 동작. 풀 인프라는 3줄 주석 해제 후 `docker-compose up -d`.
 
 ### 7.3 Observability
 - **Sentry** — 에러 (FE + BE)

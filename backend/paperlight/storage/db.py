@@ -37,7 +37,18 @@ def get_database_url() -> str:
     )
 
 
+def _normalize_async_url(url: str) -> str:
+    """Map a bare Postgres URL (Supabase/Render/.env hand out `postgresql://`) to the
+    async driver. SQLAlchemy defaults `postgresql://` to psycopg2 (sync, not installed);
+    this app is async, so route it through asyncpg."""
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+asyncpg://" + url[len(prefix) :]
+    return url
+
+
 def _build_engine(url: str) -> AsyncEngine:
+    url = _normalize_async_url(url)
     connect_args: dict[str, Any] = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
