@@ -2,6 +2,7 @@
 
 import { MessageSquare, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "@/components/common/Markdown";
 import { capture } from "@/lib/analytics";
 import { apiFetch } from "@/lib/api";
 import { streamSse } from "@/lib/sse";
@@ -146,7 +147,11 @@ export function ChatPanel({ paperId }: { paperId: string }) {
                       : "max-w-[85%] rounded-md bg-bg-muted px-2.5 py-1.5 text-text-primary"
                   }
                 >
-                  <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                  {m.role === "assistant" ? (
+                    <Markdown>{m.content}</Markdown>
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                  )}
                   {m.citations && m.citations.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {m.citations.map((c) => (

@@ -2,6 +2,7 @@
 
 import { Languages, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "@/components/common/Markdown";
 import { streamSse } from "@/lib/sse";
 import { useReader } from "@/stores/reader";
 
@@ -58,9 +59,11 @@ export function SelectionTranslatePopover() {
           <X className="size-3.5" />
         </button>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
-        {content || (status === "error" ? "번역 실패" : "번역 중…")}
-      </p>
+      {content ? (
+        <Markdown>{content}</Markdown>
+      ) : (
+        <p className="text-sm text-text-muted">{status === "error" ? "번역 실패" : "번역 중…"}</p>
+      )}
     </div>
   );
 }

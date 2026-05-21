@@ -2,6 +2,7 @@
 
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Markdown } from "@/components/common/Markdown";
 import { apiFetch } from "@/lib/api";
 
 interface Paragraph {
@@ -83,9 +84,7 @@ export function InsightsPanel({ paperId }: { paperId: string }) {
             {data.highlights && (
               <div>
                 <h3 className="mb-1 text-xs font-semibold text-text-secondary">Auto Highlights</h3>
-                <article className="whitespace-pre-wrap leading-relaxed text-text-primary">
-                  {data.highlights}
-                </article>
+                <Markdown>{data.highlights}</Markdown>
               </div>
             )}
             {data.figures.length > 0 && (
@@ -97,7 +96,7 @@ export function InsightsPanel({ paperId }: { paperId: string }) {
                       <div className="mb-0.5 text-[11px] uppercase tracking-wide text-text-muted">
                         {f.kind} · p.{f.page}
                       </div>
-                      <p className="whitespace-pre-wrap text-text-primary">{f.description}</p>
+                      <Markdown>{f.description}</Markdown>
                     </li>
                   ))}
                 </ul>
@@ -121,7 +120,7 @@ export function InsightsPanel({ paperId }: { paperId: string }) {
                           </span>
                         )}
                       </div>
-                      <p className="text-text-primary">{p.description}</p>
+                      {p.description && <Markdown>{p.description}</Markdown>}
                     </li>
                   ))}
                 </ul>

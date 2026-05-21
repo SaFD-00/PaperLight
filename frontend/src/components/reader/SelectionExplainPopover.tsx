@@ -2,6 +2,7 @@
 
 import { Lightbulb, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "@/components/common/Markdown";
 import { streamSse } from "@/lib/sse";
 import { useReader } from "@/stores/reader";
 
@@ -66,12 +67,10 @@ export function SelectionExplainPopover() {
           <p className="text-text-muted">설명 생성 중…</p>
         )}
         {status === "error" && <p className="text-danger">설명 생성에 실패했습니다.</p>}
-        <article className="whitespace-pre-wrap leading-relaxed text-text-primary">
-          {content}
-          {status === "streaming" && content !== "" && (
-            <span className="ml-1 inline-block h-3 w-0.5 animate-pulse bg-brand-primary align-middle" />
-          )}
-        </article>
+        {content !== "" && <Markdown>{content}</Markdown>}
+        {status === "streaming" && content !== "" && (
+          <span className="ml-1 inline-block h-3 w-0.5 animate-pulse bg-brand-primary align-middle" />
+        )}
       </div>
     </div>
   );

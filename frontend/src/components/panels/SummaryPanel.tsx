@@ -2,6 +2,7 @@
 
 import { BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Markdown } from "@/components/common/Markdown";
 import { apiFetch } from "@/lib/api";
 
 type Status = "loading" | "empty" | "ready" | "error";
@@ -51,9 +52,7 @@ export function SummaryPanel({ paperId }: { paperId: string }) {
         {status === "empty" && (
           <p className="text-text-muted">아직 요약이 생성되지 않았습니다. 인제스트 직후 자동 생성됩니다.</p>
         )}
-        {status === "ready" && (
-          <article className="whitespace-pre-wrap leading-relaxed text-text-primary">{text}</article>
-        )}
+        {status === "ready" && <Markdown>{text}</Markdown>}
       </section>
     </div>
   );
