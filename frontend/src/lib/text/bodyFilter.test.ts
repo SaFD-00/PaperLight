@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 // viewer.js 와 동일한 순수 모듈(런타임/테스트 단일 소스).
-import { type BodyItem, extractBody, mapBodyRange } from "../../../public/pdfjs/bodyFilter.js";
+import {
+  type BodyItem,
+  extractBody,
+  mapBodyRange,
+  parseCaptionLabel,
+} from "../../../public/pdfjs/bodyFilter.js";
 
 function item(str: string, opts: Partial<BodyItem> = {}): BodyItem {
   return {
@@ -63,6 +68,90 @@ describe("extractBody", () => {
     ];
     const { bodyText } = extractBody(items);
     expect(bodyText.trim()).toBe("A sentence of real body content goes here.");
+  });
+
+  it("drops multi-line caption continuation in small font until body resumes", () => {
+    // 본문이 폰트 비중에서 우세해야 modal=10(본문 크기)로 잡힌다(실제 논문 분포).
+    const items = [
+      item("Real body paragraph one with enough length to set the modal font here.", {
+        fontHeight: 10,
+      }),
+      item("Another full body sentence continues the same paragraph with more text.", {
+        fontHeight: 10,
+      }),
+      item("A third body sentence keeps the body font clearly dominant on the page.", {
+        fontHeight: 10,
+      }),
+      item("Figure 1: Overview of empirical results across prediction formats", {
+        fontHeight: 8,
+      }), // 캡션(작은 폰트) → drop + captionMode
+      item("and imagination-based training across many judge models and runs.", {
+        fontHeight: 8,
+      }), // 캡션 연속 줄(긴 텍스트지만 작은 폰트) → drop
+      item("A central design choice in mobile world models is the format here.", {
+        fontHeight: 10,
+      }), // 본문 폰트 복귀 → keep
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("Real body paragraph one");
+    expect(bodyText).toContain("A central design choice");
+    expect(bodyText).not.toContain("Figure 1");
+    expect(bodyText).not.toContain("imagination-based training");
+  });
+
+  it("keeps same-size body line right after caption (conservative)", () => {
+    const items = [
+      item("Body paragraph that establishes the modal body font size here.", {
+        fontHeight: 10,
+      }),
+      item("Figure 2: a caption rendered in the same font size as body text.", {
+        fontHeight: 10,
+      }), // 캡션이지만 본문과 같은 폰트 → 캡션 줄만 drop
+      item("This following sentence is body and must be kept intact here.", {
+        fontHeight: 10,
+      }), // keep (captionMode 미발동)
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).not.toContain("Figure 2");
+    expect(bodyText).toContain("This following sentence is body");
+  });
+
+  it("drops Korean figure/table captions", () => {
+    const items = [
+      item("이 문장은 충분히 긴 한국어 본문 문장으로 모달 폰트를 정합니다.", { fontHeight: 10 }),
+      item("그림 1: 예측 형식별 실험 결과 개요.", { fontHeight: 8 }), // 그림 캡션 → drop
+      item("표 2: 모델별 정확도 비교.", { fontHeight: 8 }), // 표 캡션 → drop
+      item("다음 본문 문장은 그대로 유지되어야 합니다.", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("이 문장은 충분히 긴");
+    expect(bodyText).toContain("다음 본문 문장은 그대로 유지");
+    expect(bodyText).not.toContain("그림 1");
+    expect(bodyText).not.toContain("표 2");
+  });
+});
+
+describe("parseCaptionLabel", () => {
+  it("parses English figure/table labels with normalized kind", () => {
+    expect(parseCaptionLabel("Figure 1: Overview of results")).toEqual({
+      kind: "figure",
+      label: "Figure 1",
+    });
+    expect(parseCaptionLabel("Table 3 shows the comparison")).toEqual({
+      kind: "table",
+      label: "Table 3",
+    });
+    expect(parseCaptionLabel("Fig. 2 caption")).toEqual({ kind: "figure", label: "Figure 2" });
+  });
+
+  it("parses Korean labels", () => {
+    expect(parseCaptionLabel("그림 1: 결과 개요")).toEqual({ kind: "figure", label: "그림 1" });
+    expect(parseCaptionLabel("표 2: 정확도")).toEqual({ kind: "table", label: "표 2" });
+  });
+
+  it("returns null for non-captions", () => {
+    expect(parseCaptionLabel("A normal body sentence.")).toBeNull();
+    expect(parseCaptionLabel("Figure caption without a number")).toBeNull();
   });
 });
 

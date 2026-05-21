@@ -29,3 +29,11 @@ export function mapBodyRange(
   bodyStart: number,
   bodyEnd: number,
 ): { startOffset: number; endOffset: number } | null;
+
+/** 캡션 머리말 정규식(영문 + 그림/표). 캡션 판별과 라벨 파싱에서 공유. */
+export const CAPTION_RE: RegExp;
+
+/** 캡션 텍스트에서 종류와 정규화된 라벨을 추출. */
+export function parseCaptionLabel(
+  text: string,
+): { kind: "figure" | "table"; label: string } | null;

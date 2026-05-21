@@ -5,7 +5,9 @@
 // 핵심 불변식: 입력 items[].str 의 연결 순서 = text-layer.textContent offset 공간.
 // drop된 item은 bodyText 에서 빠지되, keep된 item의 globalStart 는 보존된다.
 
-const CAPTION_RE = /^(figure|fig\.?|table|algorithm|listing)\s*\d/i;
+// 캡션 머리말(라벨 번호 포함). 영문 + 한국어(그림/표) 모두 매칭. .test(불리언)와
+// parseCaptionLabel(.exec)에서 공유한다.
+export const CAPTION_RE = /^(figure|fig\.?|table|algorithm|listing|그림|표)\s*(\d+)/i;
 const REF_HEADING_RE = /^(references|bibliography|acknowledg(e?ments)?)\b/i;
 const NUMERIC_LINE_RE = /^[\d.,()[\]{}%±+\-–—\s/:;=*]+$/;
 // pdf.js styles 의 fontFamily 에 흔히 나타나는 수식 폰트군.
@@ -86,6 +88,8 @@ export function extractBody(items) {
   const lines = groupLines(items);
   const modal = modalHeight(items);
   let refReached = false;
+  // 작은 폰트 캡션 직후 같은 소형 폰트로 이어지는 멀티라인 캡션을 본문 재개 전까지 제거.
+  let captionMode = false;
 
   let bodyText = "";
   /** @type {import("./bodyFilter").BodySegment[]} */
@@ -95,6 +99,14 @@ export function extractBody(items) {
     const trimmed = line.text.trim();
     const len = nonSpaceLen(trimmed);
 
+    // 캡션 연속 줄: 본문 폰트(>= modal*0.9)로 복귀하면 모드 해제 후 일반 규칙 적용, 아니면 drop.
+    if (captionMode && !refReached) {
+      const backToBody =
+        trimmed !== "" && modal > 0 && line.medianHeight >= modal * 0.9;
+      if (backToBody) captionMode = false;
+      else continue;
+    }
+
     let drop = false;
     if (refReached) {
       drop = true;
@@ -102,6 +114,10 @@ export function extractBody(items) {
       drop = true;
     } else if (CAPTION_RE.test(trimmed)) {
       drop = true;
+      // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).
+      if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.9) {
+        captionMode = true;
+      }
     } else if (REF_HEADING_RE.test(trimmed) && len < 24) {
       // 단독 References/Bibliography 헤딩 이후 본문 제거.
       refReached = true;
@@ -162,4 +178,21 @@ export function mapBodyRange(segments, bodyStart, bodyEnd) {
   }
   if (startOffset === null || endOffset === null) return null;
   return { startOffset, endOffset };
+}
+
+/**
+ * 캡션 텍스트에서 종류와 정규화된 라벨을 추출한다(Figure/Table 인라인 설명 앵커용).
+ * @param {string} text
+ * @returns {{ kind: "figure" | "table", label: string } | null}
+ */
+export function parseCaptionLabel(text) {
+  const m = CAPTION_RE.exec(text.trim());
+  if (!m) return null;
+  const word = m[1].toLowerCase();
+  const kind = word.startsWith("tab") || m[1] === "표" ? "table" : "figure";
+  let head;
+  if (m[1] === "그림") head = "그림";
+  else if (m[1] === "표") head = "표";
+  else head = kind === "table" ? "Table" : "Figure";
+  return { kind, label: `${head} ${m[2]}` };
 }
