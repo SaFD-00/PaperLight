@@ -45,18 +45,27 @@ export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "REQUEST_THUMBNAILS" }
   | {
       source: typeof HOST_SOURCE;
-      type: "HIGHLIGHT_SENTENCE";
+      type: "RENDER_TRANSLATION";
       page: number;
-      startOffset: number;
-      endOffset: number;
+      pairs: TranslationPair[];
+      /** true면 컬럼을 비우고 다시 채움(캐시 재푸시·재시작). */
+      replace?: boolean;
     }
-  | { source: typeof HOST_SOURCE; type: "CLEAR_SENTENCE_HIGHLIGHT" }
+  | { source: typeof HOST_SOURCE; type: "CLEAR_TRANSLATION"; page?: number }
   | {
       source: typeof HOST_SOURCE;
       type: "SET_TRANSLATION_FONT";
       family: "sans" | "serif";
       scale: number;
     };
+
+/** 페이지별 정렬 번역 한 문장. offset 은 body(필터된 본문) 공간 기준. */
+export type TranslationPair = {
+  i: number;
+  tgt: string;
+  bodyStart: number;
+  bodyEnd: number;
+};
 
 export type IframeToHostMessage =
   | {
@@ -78,10 +87,4 @@ export type IframeToHostMessage =
   | { source: typeof IFRAME_SOURCE; type: "HIGHLIGHT_CLICK"; id: string }
   | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string }
   | { source: typeof IFRAME_SOURCE; type: "OUTLINE"; items: OutlineItem[] }
-  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string }
-  | {
-      source: typeof IFRAME_SOURCE;
-      type: "SENTENCE_HOVER";
-      page: number | null;
-      offset: number | null;
-    };
+  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string };

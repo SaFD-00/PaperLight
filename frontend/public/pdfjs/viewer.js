@@ -1,5 +1,5 @@
 import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
-import { extractBody } from "/pdfjs/bodyFilter.js";
+import { extractBody, mapBodyRange } from "/pdfjs/bodyFilter.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
 
@@ -15,6 +15,8 @@ let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
 let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
+let translationCols = []; // 페이지별 번역 컬럼 element.
+let translationSentences = []; // 페이지별 [{ i, el, globalStart, globalEnd }] (교차 하이라이트용).
 let visibilityObserver = null;
 let savedHighlights = [];
 
@@ -218,6 +220,86 @@ function highlightSentence(pageNum, startOffset, endOffset) {
   }
 }
 
+// ── 페이지별 번역 컬럼 ───────────────────────────────────────────────────────
+// 번역 컬럼에 인덱스 순서를 유지하며 문장 span 삽입.
+function insertSentenceSpan(col, el, idx) {
+  let next = null;
+  for (const c of col.querySelectorAll(".t-sentence")) {
+    if (Number(c.dataset.i) > idx) {
+      next = c;
+      break;
+    }
+  }
+  col.insertBefore(el, next);
+}
+
+// host가 스트리밍으로 보내는 번역 pair를 해당 페이지 컬럼에 증분 반영.
+function renderTranslation(pageNum, pairs, replace) {
+  const col = translationCols[pageNum - 1];
+  if (!col) return;
+  const segments = pageSegments[pageNum - 1] || [];
+  let store = translationSentences[pageNum - 1];
+  if (replace || !store) {
+    col.innerHTML = "";
+    store = [];
+    translationSentences[pageNum - 1] = store;
+  } else {
+    const ph = col.querySelector(".t-empty");
+    if (ph) ph.remove();
+  }
+  for (const p of pairs || []) {
+    let entry = store[p.i];
+    if (!entry) {
+      const el = document.createElement("span");
+      el.className = "t-sentence";
+      el.dataset.i = String(p.i);
+      const mapped = mapBodyRange(segments, p.bodyStart, p.bodyEnd);
+      entry = {
+        i: p.i,
+        el,
+        globalStart: mapped ? mapped.startOffset : -1,
+        globalEnd: mapped ? mapped.endOffset : -1,
+      };
+      store[p.i] = entry;
+      el.addEventListener("mouseenter", () => {
+        if (entry.globalStart >= 0) highlightSentence(pageNum, entry.globalStart, entry.globalEnd);
+      });
+      el.addEventListener("mouseleave", () => clearLinkedOverlays());
+      insertSentenceSpan(col, el, p.i);
+    }
+    entry.el.textContent = (p.tgt || "") + " ";
+  }
+}
+
+function clearTranslation(pageNum) {
+  if (pageNum == null) {
+    for (const col of translationCols) if (col) col.innerHTML = "";
+    translationSentences = [];
+    return;
+  }
+  const col = translationCols[pageNum - 1];
+  if (col) col.innerHTML = "";
+  translationSentences[pageNum - 1] = null;
+}
+
+// PDF 본문 hover → 같은 페이지 번역 컬럼의 대응 문장 강조(전역 offset 범위로 탐색).
+function highlightTranslationAt(pageNum, offset) {
+  const store = translationSentences[pageNum - 1];
+  if (!store) return;
+  for (const entry of store) {
+    if (!entry) continue;
+    const on = offset >= entry.globalStart && offset < entry.globalEnd && entry.globalStart >= 0;
+    entry.el.classList.toggle("t-active", on);
+  }
+}
+
+function clearTranslationActive() {
+  for (const store of translationSentences) {
+    if (!store) continue;
+    for (const entry of store) if (entry && entry.el) entry.el.classList.remove("t-active");
+  }
+}
+
 // 페이지 본문만 추출(Figure 캡션·표·수식·페이지번호 제거) + body↔원문 offset 매핑.
 // 가정: items[].str 연결 == text-layer.textContent. 어긋나면 필터 없이 전체 텍스트로 폴백.
 async function extractBodyText(pageNum) {
@@ -323,6 +405,10 @@ async function buildPage(pageNum) {
   const page = await currentDoc.getPage(pageNum);
   pageObjects[pageNum - 1] = page;
 
+  // 한 페이지 = [PDF | 번역 컬럼] 가로 배치(row). 같은 스크롤 컨테이너라 스크롤·줌 자동 동기화.
+  const row = document.createElement("div");
+  row.className = "page-row";
+
   const wrapper = document.createElement("div");
   wrapper.className = "page-wrapper";
   wrapper.dataset.pageNum = String(pageNum);
@@ -334,8 +420,16 @@ async function buildPage(pageNum) {
   const textLayerDiv = document.createElement("div");
   textLayerDiv.className = "text-layer";
   wrapper.appendChild(textLayerDiv);
+  row.appendChild(wrapper);
 
-  container.appendChild(wrapper);
+  const col = document.createElement("div");
+  col.className = "page-translation";
+  col.dataset.pageNum = String(pageNum);
+  col.innerHTML = '<span class="t-empty">번역 대기 중…</span>';
+  row.appendChild(col);
+  translationCols[pageNum - 1] = col;
+
+  container.appendChild(row);
   pageWrappers[pageNum - 1] = wrapper;
 
   await paintPage(pageNum, currentScale);
@@ -438,6 +532,8 @@ async function loadPdf(url) {
   pageWrappers = [];
   pageObjects = [];
   pageSegments = [];
+  translationCols = [];
+  translationSentences = [];
   if (currentDoc) {
     try { await currentDoc.destroy(); } catch (_) { /* noop */ }
     currentDoc = null;
@@ -510,7 +606,7 @@ document.addEventListener("selectionchange", () => {
   });
 });
 
-// PDF 본문 hover → 해석 패널에 대응 문장 알림(해석 패널 열림일 때만).
+// PDF 본문 hover → 같은 페이지 번역 컬럼의 대응 문장 강조(iframe 내부에서 직접 처리).
 let lastHoverOffset = -1;
 let lastHoverPage = -1;
 container.addEventListener("mousemove", (e) => {
@@ -536,13 +632,14 @@ container.addEventListener("mousemove", (e) => {
   if (offset === lastHoverOffset && pageNum === lastHoverPage) return;
   lastHoverOffset = offset;
   lastHoverPage = pageNum;
-  send("SENTENCE_HOVER", { page: pageNum, offset });
+  clearTranslationActive();
+  highlightTranslationAt(pageNum, offset);
 });
 container.addEventListener("mouseleave", () => {
   if (!hoverEnabled) return;
   lastHoverOffset = -1;
   lastHoverPage = -1;
-  send("SENTENCE_HOVER", { page: null, offset: null });
+  clearTranslationActive();
 });
 
 window.addEventListener("message", async (event) => {
@@ -578,9 +675,10 @@ window.addEventListener("message", async (event) => {
     }
     case "TOGGLE_TRANSLATION":
       hoverEnabled = !!msg.enabled;
+      container.classList.toggle("pages--translate", hoverEnabled);
       if (!hoverEnabled) {
         clearLinkedOverlays();
-        send("SENTENCE_HOVER", { page: null, offset: null });
+        clearTranslationActive();
       }
       break;
     case "SET_TRANSLATION_FONT": {
@@ -597,11 +695,11 @@ window.addEventListener("message", async (event) => {
       );
       break;
     }
-    case "HIGHLIGHT_SENTENCE":
-      highlightSentence(msg.page, msg.startOffset, msg.endOffset);
+    case "RENDER_TRANSLATION":
+      renderTranslation(msg.page, msg.pairs, msg.replace);
       break;
-    case "CLEAR_SENTENCE_HIGHLIGHT":
-      clearLinkedOverlays();
+    case "CLEAR_TRANSLATION":
+      clearTranslation(msg.page);
       break;
     case "REQUEST_PAGE_TEXT": {
       const { text, segments } = await extractBodyText(msg.page);

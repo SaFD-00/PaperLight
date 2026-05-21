@@ -28,17 +28,53 @@ html, body {
 }
 #pages {
   height: 100%;
-  overflow-y: auto;
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 24px 0 64px;
+  padding: 24px 24px 64px;
   gap: 16px;
+}
+/* 한 페이지 = [PDF | 번역 컬럼] 가로 배치(번역이 길면 행이 늘어 다음 페이지를 자연히 밂).
+ * 콘텐츠 크기로 잡고 가운데 정렬하되, 넓으면 좌측부터(가로 스크롤 가능·좌측 미잘림). */
+.page-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: max-content;
+  margin-inline: auto;
 }
 .page-wrapper {
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   position: relative;
+  flex: 0 0 auto;
+}
+.page-translation {
+  display: none;
+  width: var(--translation-col-width, 360px);
+  flex: 0 0 auto;
+  background: #fff;
+  color: #1a1a1f;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  padding: 16px 18px;
+  font-family: var(--translation-font-family);
+  font-size: calc(15px * var(--translation-font-scale));
+  line-height: 1.75;
+}
+#pages.pages--translate .page-translation {
+  display: block;
+}
+.page-translation .t-empty {
+  color: #999;
+}
+.page-translation .t-sentence {
+  cursor: default;
+  border-radius: 2px;
+}
+.page-translation .t-sentence:hover,
+.page-translation .t-sentence.t-active {
+  background: rgba(124, 92, 252, 0.18);
 }
 .page-canvas { display: block; }
 .text-layer {

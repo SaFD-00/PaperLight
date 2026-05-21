@@ -8,9 +8,19 @@ import {
   type IframeToHostMessage,
 } from "@/lib/pdf/messages";
 import { createShadowIframe, type ShadowIframeHandle } from "@/lib/pdf/shadow-iframe";
+import { streamSse } from "@/lib/sse";
+import { type Sentence, splitSentences } from "@/lib/text/sentences";
 import { useMarkup } from "@/stores/markup";
 import { useReader } from "@/stores/reader";
 import { useSettings } from "@/stores/settings";
+
+/** 페이지별 번역 진행 상태 캐시(렌더는 iframe 컬럼이 담당, host는 데이터 펌프). */
+interface PageTranslation {
+  sentences: Sentence[];
+  pairs: Record<number, string>;
+  status: "streaming" | "done" | "error";
+  ctrl: AbortController;
+}
 
 export interface PdfViewerProps {
   pdfUrl: string | null;
@@ -25,15 +35,12 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const setSelection = useReader((s) => s.setSelection);
   const setCurrentPage = useReader((s) => s.setCurrentPage);
   const setTotalPages = useReader((s) => s.setTotalPages);
-  const setPageText = useReader((s) => s.setPageText);
   const requestPanel = useReader((s) => s.requestPanel);
   const setOutline = useReader((s) => s.setOutline);
   const setThumbnail = useReader((s) => s.setThumbnail);
   const requestOutline = useReader((s) => s.requestOutline);
   const outlineRequest = useReader((s) => s.outlineRequest);
   const thumbnailsRequest = useReader((s) => s.thumbnailsRequest);
-  const setHoveredSentence = useReader((s) => s.setHoveredSentence);
-  const linkedHighlight = useReader((s) => s.linkedHighlight);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
   const zoom = useReader((s) => s.zoom);
@@ -46,6 +53,9 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
   const prevZoomRef = useRef(zoom);
+  // 페이지별 번역 캐시 + REQUEST_PAGE_TEXT 디듀프(논문 전환 시 리셋).
+  const transCacheRef = useRef<Map<number, PageTranslation>>(new Map());
+  const requestedRef = useRef<Set<number>>(new Set());
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -99,9 +109,54 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
         case "PAGE_VISIBLE":
           setCurrentPage(data.page);
           break;
-        case "PAGE_TEXT":
-          setPageText(data.page, data.text);
+        case "PAGE_TEXT": {
+          // 본문(필터된) 텍스트 → 문장 정렬 번역 스트리밍 → iframe 컬럼으로 push.
+          if (!translationEnabled) break;
+          const page = data.page;
+          const cache = transCacheRef.current;
+          if (cache.has(page)) break; // 이미 스트리밍/완료(컬럼 DOM은 iframe이 유지).
+          const sentences = splitSentences(data.text);
+          if (sentences.length === 0) break;
+          const ctrl = new AbortController();
+          const entry: PageTranslation = { sentences, pairs: {}, status: "streaming", ctrl };
+          cache.set(page, entry);
+          streamSse(
+            "/api/translate",
+            {
+              sentences: sentences.map((s) => s.text),
+              aligned: true,
+              targetLang: "ko",
+              paperId,
+              page,
+            },
+            {
+              onToken: () => {},
+              onMeta: (ev) => {
+                const pair = ev.pair as { i: number; tgt: string } | undefined;
+                if (!pair || typeof pair.i !== "number") return;
+                const s = entry.sentences[pair.i];
+                if (!s) return;
+                const isFirst = Object.keys(entry.pairs).length === 0;
+                entry.pairs[pair.i] = pair.tgt;
+                postToIframe({
+                  source: HOST_SOURCE,
+                  type: "RENDER_TRANSLATION",
+                  page,
+                  pairs: [{ i: pair.i, tgt: pair.tgt, bodyStart: s.start, bodyEnd: s.end }],
+                  replace: isFirst,
+                });
+              },
+              onDone: () => {
+                entry.status = "done";
+              },
+              onError: () => {
+                entry.status = "error";
+              },
+            },
+            ctrl.signal,
+          );
           break;
+        }
         case "SELECTION_CHANGE": {
           if (!data.text || !data.rect) {
             setSelection(null);
@@ -133,13 +188,6 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
         case "THUMBNAIL":
           setThumbnail(data.page, data.dataUrl);
           break;
-        case "SENTENCE_HOVER":
-          setHoveredSentence(
-            data.page != null && data.offset != null
-              ? { page: data.page, offset: data.offset }
-              : null,
-          );
-          break;
       }
     }
     window.addEventListener("message", onMessage);
@@ -148,42 +196,37 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     setSelection,
     setCurrentPage,
     setTotalPages,
-    setPageText,
     requestPanel,
     setOutline,
     setThumbnail,
     requestOutline,
-    setHoveredSentence,
+    translationEnabled,
+    paperId,
   ]);
 
-  // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
+  // 번역 ON & 보이는 페이지가 미요청이면 본문 텍스트 요청(스크롤 따라 lazy).
   useEffect(() => {
     if (!translationEnabled) return;
+    if (status !== "ready") return;
     if (!iframeReadyRef.current) return;
+    if (requestedRef.current.has(currentPage)) return;
+    requestedRef.current.add(currentPage);
     postToIframe({ source: HOST_SOURCE, type: "REQUEST_PAGE_TEXT", page: currentPage });
-  }, [translationEnabled, currentPage]);
+  }, [translationEnabled, currentPage, status]);
 
-  // 해석 패널 열림 상태를 iframe에 알려 본문 hover 리포팅을 켜고 끈다.
+  // 토글 상태를 iframe에 알려 번역 컬럼 표시/숨김 + 본문 hover를 켜고 끈다.
   useEffect(() => {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "TOGGLE_TRANSLATION", enabled: translationEnabled });
   }, [translationEnabled, status]);
 
-  // 해석 패널 문장 hover → PDF 대응 원문 하이라이트.
+  // 논문 전환 시 번역 캐시/요청 기록 리셋 + iframe 컬럼 초기화.
   useEffect(() => {
-    if (!iframeReadyRef.current) return;
-    if (linkedHighlight) {
-      postToIframe({
-        source: HOST_SOURCE,
-        type: "HIGHLIGHT_SENTENCE",
-        page: linkedHighlight.page,
-        startOffset: linkedHighlight.startOffset,
-        endOffset: linkedHighlight.endOffset,
-      });
-    } else {
-      postToIframe({ source: HOST_SOURCE, type: "CLEAR_SENTENCE_HIGHLIGHT" });
-    }
-  }, [linkedHighlight]);
+    for (const e of transCacheRef.current.values()) e.ctrl.abort();
+    transCacheRef.current.clear();
+    requestedRef.current.clear();
+    if (iframeReadyRef.current) postToIframe({ source: HOST_SOURCE, type: "CLEAR_TRANSLATION" });
+  }, [paperId]);
 
   // 번역 컬럼 글꼴(종류·크기)을 iframe에 전달 (iframe은 host CSS 변수를 못 봄).
   useEffect(() => {

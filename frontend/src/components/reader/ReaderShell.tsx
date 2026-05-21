@@ -7,13 +7,11 @@ import { RightPanel } from "@/components/reader/RightPanel";
 import { SelectionExplainPopover } from "@/components/reader/SelectionExplainPopover";
 import { SelectionTranslatePopover } from "@/components/reader/SelectionTranslatePopover";
 import { Sidebar } from "@/components/reader/Sidebar";
-import { TranslationSidePanel } from "@/components/reader/TranslationSidePanel";
 import { useReader } from "@/stores/reader";
 import { useSettings } from "@/stores/settings";
 
 export function ReaderShell({ paperId }: { paperId: string }) {
   const sidebarOpen = useReader((s) => s.sidebarOpen);
-  const translationOpen = useReader((s) => s.translationEnabled);
   const aiPanelOpen = useReader((s) => s.aiPanelOpen);
   const readerFontScale = useSettings((s) => s.readerFontScale);
 
@@ -29,7 +27,6 @@ export function ReaderShell({ paperId }: { paperId: string }) {
       <div className="flex h-full">
         {sidebarOpen && <Sidebar />}
         <Center paperId={paperId} />
-        {translationOpen && <TranslationSidePanel paperId={paperId} />}
         {aiPanelOpen && <RightPanel paperId={paperId} />}
       </div>
       <FloatingSelectionMenu paperId={paperId} />
