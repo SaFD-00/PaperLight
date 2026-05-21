@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import importlib.util
 import os
 import tempfile
 from collections.abc import AsyncIterator
@@ -21,6 +22,8 @@ from paperlight.ingestion.parser import parse_pdf
 from paperlight.ingestion.render import render_region
 from paperlight.providers.cache import load_figure_layout, save_figure_layout
 from paperlight.storage.db import init_db, reset_engine
+
+_HAS_MARKER = importlib.util.find_spec("marker") is not None
 
 
 def _blank_pdf() -> bytes:
@@ -45,6 +48,9 @@ def test_pymupdf_yields_no_figures(monkeypatch: pytest.MonkeyPatch) -> None:
     assert all(p.figures == () for p in pages)
 
 
+@pytest.mark.skipif(
+    _HAS_MARKER, reason="marker 설치 시 실제 모델 로드 경로 — 폴백 검증 불가(E2E는 수동)"
+)
 def test_marker_without_dependency_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
     # marker-pdf 미설치 환경: 텍스트는 살아있고 figure는 빈 채로 폴백(ingestion 실패 금지).
     monkeypatch.setenv("INGEST_PARSER", "marker")

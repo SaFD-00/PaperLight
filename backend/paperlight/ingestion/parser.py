@@ -75,6 +75,7 @@ def _marker_figures(data: bytes) -> dict[int, list[FigureRegion]]:
         converter = PdfConverter(
             config=cfg.generate_config_dict(),
             artifact_dict=create_model_dict(),
+            processor_list=cfg.get_processors(),
             renderer=cfg.get_renderer(),
         )
         rendered = converter(tf.name)
@@ -88,13 +89,13 @@ def _battr(block: Any, name: str, default: Any = None) -> Any:
     return getattr(block, name, default)
 
 
+# marker block_type 정확 매칭 — TableCell(셀)·TableGroup/FigureGroup(묶음)은 제외하고
+# 최상위 Figure/Table/Picture만 도표 영역으로 본다.
+_MARKER_KINDS = {"figure": "figure", "picture": "figure", "table": "table"}
+
+
 def _marker_kind(block_type: str) -> str | None:
-    t = (block_type or "").lower()
-    if "table" in t:
-        return "table"
-    if "figure" in t or "picture" in t:
-        return "figure"
-    return None
+    return _MARKER_KINDS.get((block_type or "").strip().lower())
 
 
 def _iter_blocks(node: Any) -> list[Any]:
