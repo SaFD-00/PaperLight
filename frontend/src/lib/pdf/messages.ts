@@ -20,6 +20,13 @@ export type HighlightOverlay = {
   rects: NormRect[];
 };
 
+/** A flattened TOC entry resolved to a 1-based page number. */
+export type OutlineItem = {
+  title: string;
+  page: number;
+  level: number;
+};
+
 export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "LOAD_PDF"; url: string }
   | { source: typeof HOST_SOURCE; type: "JUMP_TO"; page: number }
@@ -33,7 +40,9 @@ export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "RENDER_HIGHLIGHTS"; highlights: HighlightOverlay[] }
   | { source: typeof HOST_SOURCE; type: "REMOVE_HIGHLIGHT"; id: string }
   | { source: typeof HOST_SOURCE; type: "TOGGLE_TRANSLATION"; enabled: boolean }
-  | { source: typeof HOST_SOURCE; type: "REQUEST_PAGE_TEXT"; page: number };
+  | { source: typeof HOST_SOURCE; type: "REQUEST_PAGE_TEXT"; page: number }
+  | { source: typeof HOST_SOURCE; type: "REQUEST_OUTLINE" }
+  | { source: typeof HOST_SOURCE; type: "REQUEST_THUMBNAILS" };
 
 export type IframeToHostMessage =
   | {
@@ -53,4 +62,6 @@ export type IframeToHostMessage =
       page: number | null;
     }
   | { source: typeof IFRAME_SOURCE; type: "HIGHLIGHT_CLICK"; id: string }
-  | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string };
+  | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string }
+  | { source: typeof IFRAME_SOURCE; type: "OUTLINE"; items: OutlineItem[] }
+  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string };

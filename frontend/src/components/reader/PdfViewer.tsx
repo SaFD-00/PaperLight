@@ -26,6 +26,11 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const setTotalPages = useReader((s) => s.setTotalPages);
   const setPageText = useReader((s) => s.setPageText);
   const requestPanel = useReader((s) => s.requestPanel);
+  const setOutline = useReader((s) => s.setOutline);
+  const setThumbnail = useReader((s) => s.setThumbnail);
+  const requestOutline = useReader((s) => s.requestOutline);
+  const outlineRequest = useReader((s) => s.outlineRequest);
+  const thumbnailsRequest = useReader((s) => s.thumbnailsRequest);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
   const zoom = useReader((s) => s.zoom);
@@ -76,6 +81,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
             setTotalPages(data.numPages);
             setCurrentPage(1);
             setErrorMsg(null);
+            requestOutline();
             return;
           }
           // shell ready (no PDF yet)
@@ -116,11 +122,26 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
         case "HIGHLIGHT_CLICK":
           requestPanel("notes");
           break;
+        case "OUTLINE":
+          setOutline(data.items);
+          break;
+        case "THUMBNAIL":
+          setThumbnail(data.page, data.dataUrl);
+          break;
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setSelection, setCurrentPage, setTotalPages, setPageText, requestPanel]);
+  }, [
+    setSelection,
+    setCurrentPage,
+    setTotalPages,
+    setPageText,
+    requestPanel,
+    setOutline,
+    setThumbnail,
+    requestOutline,
+  ]);
 
   // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
   useEffect(() => {
@@ -143,6 +164,19 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "JUMP_TO", page: jumpRequest.page });
   }, [jumpRequest]);
+
+  // Sidebar 요청 → iframe에 outline/thumbnail 요청 전달.
+  useEffect(() => {
+    if (!outlineRequest) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "REQUEST_OUTLINE" });
+  }, [outlineRequest]);
+
+  useEffect(() => {
+    if (!thumbnailsRequest) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "REQUEST_THUMBNAILS" });
+  }, [thumbnailsRequest]);
 
   // S14: 저장된 하이라이트 로드.
   useEffect(() => {

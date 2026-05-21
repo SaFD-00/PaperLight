@@ -39,6 +39,94 @@ function send(type, payload = {}) {
   parent.postMessage({ source: IFRAME_SOURCE, type, ...payload }, "*");
 }
 
+// ── TOC(outline) ────────────────────────────────────────────────────────────
+const SECTION_TITLES = [
+  "Abstract", "Introduction", "Background", "Related Work", "Method", "Methods",
+  "Methodology", "Approach", "Experiments", "Results", "Evaluation", "Discussion",
+  "Conclusion", "Conclusions", "References", "Appendix",
+];
+
+async function destToPage(dest) {
+  try {
+    let explicit = dest;
+    if (typeof dest === "string") explicit = await currentDoc.getDestination(dest);
+    if (!Array.isArray(explicit) || !explicit[0]) return null;
+    const pageIndex = await currentDoc.getPageIndex(explicit[0]);
+    return pageIndex + 1;
+  } catch (_) {
+    return null;
+  }
+}
+
+// 본문에서 대표 섹션 제목을 찾는 휴리스틱(내장 outline이 없을 때 폴백).
+// Title Case 대소문자 구분으로 prose 내 소문자 단어와의 오탐을 줄인다.
+function heuristicOutline() {
+  const seen = new Set();
+  const items = [];
+  for (let i = 0; i < pageWrappers.length; i++) {
+    const layer = pageWrappers[i] ? pageWrappers[i].querySelector(".text-layer") : null;
+    const text = layer ? layer.textContent || "" : "";
+    if (!text) continue;
+    for (const title of SECTION_TITLES) {
+      if (seen.has(title)) continue;
+      const re = new RegExp("(?:^|[^A-Za-z])((?:\\d+(?:\\.\\d+)*\\s+)?" + title + ")(?![A-Za-z])");
+      const m = text.match(re);
+      if (m) {
+        seen.add(title);
+        items.push({ title: m[1].trim(), page: i + 1, level: 0 });
+      }
+    }
+  }
+  items.sort((a, b) => a.page - b.page || a.title.localeCompare(b.title));
+  return items;
+}
+
+async function buildOutline() {
+  if (!currentDoc) return [];
+  let outline = null;
+  try {
+    outline = await currentDoc.getOutline();
+  } catch (_) {
+    outline = null;
+  }
+  if (outline && outline.length) {
+    const items = [];
+    const walk = async (nodes, level) => {
+      for (const node of nodes) {
+        const page = await destToPage(node.dest);
+        const title = (node.title || "").trim();
+        if (page && title) items.push({ title, page, level });
+        if (node.items && node.items.length) await walk(node.items, level + 1);
+      }
+    };
+    await walk(outline, 0);
+    if (items.length) return items;
+  }
+  return heuristicOutline();
+}
+
+// 페이지별 작은 썸네일을 순차로 렌더해 증분 전송.
+async function sendThumbnails() {
+  if (!currentDoc) return;
+  const targetW = 140;
+  for (let i = 0; i < pageObjects.length; i++) {
+    const page = pageObjects[i];
+    if (!page) continue;
+    try {
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: targetW / base.width });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      send("THUMBNAIL", { page: i + 1, dataUrl: canvas.toDataURL("image/jpeg", 0.7) });
+    } catch (_) {
+      // 동시 렌더 충돌 등은 건너뜀.
+    }
+    await new Promise((r) => setTimeout(r, 0)); // 양보
+  }
+}
+
 function renderHighlightsForPage(pageNum) {
   const wrapper = pageWrappers[pageNum - 1];
   if (!wrapper) return;
@@ -364,6 +452,14 @@ window.addEventListener("message", async (event) => {
       send("PAGE_TEXT", { page: msg.page, text });
       break;
     }
+    case "REQUEST_OUTLINE": {
+      const items = await buildOutline();
+      send("OUTLINE", { items });
+      break;
+    }
+    case "REQUEST_THUMBNAILS":
+      await sendThumbnails();
+      break;
   }
 });
 

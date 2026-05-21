@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { capture } from "@/lib/analytics";
+import type { OutlineItem } from "@/lib/pdf/messages";
 import type { NormRect } from "@/lib/types";
 
 export interface SelectionInfo {
@@ -40,6 +41,12 @@ interface ReaderState {
   aiPanelOpen: boolean;
   /** 좌측 사이드바(TOC/페이지) 열림 여부. */
   sidebarOpen: boolean;
+  /** 좌측 사이드바 표시 모드. */
+  sidebarMode: "toc" | "pages";
+  /** PDF에서 추출한 목차(TOC). */
+  outline: OutlineItem[];
+  /** 페이지별 썸네일 dataURL. */
+  thumbnails: Record<number, string>;
   /** 본문 확대율(%) — 100 = 기본 배율. */
   zoom: number;
   currentPage: number;
@@ -50,6 +57,9 @@ interface ReaderState {
   jumpRequest: { page: number; nonce: number } | null;
   /** S14: request RightPanel to switch tabs (e.g. highlight click → notes). */
   panelRequest: { panel: string; nonce: number } | null;
+  /** Sidebar → PdfViewer: request outline / thumbnails (nonce re-fires). */
+  outlineRequest: { nonce: number } | null;
+  thumbnailsRequest: { nonce: number } | null;
   setSelection: (s: SelectionInfo | null) => void;
   triggerExplain: (sel: ExplainSelection) => void;
   clearExplain: () => void;
@@ -61,6 +71,11 @@ interface ReaderState {
   setTranslation: (enabled: boolean) => void;
   toggleAiPanel: () => void;
   toggleSidebar: () => void;
+  setSidebarMode: (mode: "toc" | "pages") => void;
+  setOutline: (items: OutlineItem[]) => void;
+  setThumbnail: (page: number, dataUrl: string) => void;
+  requestOutline: () => void;
+  requestThumbnails: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   setCurrentPage: (page: number) => void;
@@ -82,12 +97,17 @@ export const useReader = create<ReaderState>((set) => ({
   translationEnabled: false,
   aiPanelOpen: true,
   sidebarOpen: true,
+  sidebarMode: "toc",
+  outline: [],
+  thumbnails: {},
   zoom: 100,
   currentPage: 1,
   totalPages: 0,
   pageText: {},
   jumpRequest: null,
   panelRequest: null,
+  outlineRequest: null,
+  thumbnailsRequest: null,
   setSelection: (s) => set({ selection: s }),
   triggerExplain: (sel) => {
     capture("explain_requested", { length: sel.text.length });
@@ -105,6 +125,12 @@ export const useReader = create<ReaderState>((set) => ({
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
   toggleAiPanel: () => set((state) => ({ aiPanelOpen: !state.aiPanelOpen })),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  setSidebarMode: (mode) => set({ sidebarMode: mode }),
+  setOutline: (items) => set({ outline: items }),
+  setThumbnail: (page, dataUrl) =>
+    set((state) => ({ thumbnails: { ...state.thumbnails, [page]: dataUrl } })),
+  requestOutline: () => set({ outlineRequest: { nonce: Date.now() } }),
+  requestThumbnails: () => set({ thumbnailsRequest: { nonce: Date.now() } }),
   zoomIn: () => set((state) => ({ zoom: Math.min(ZOOM_MAX, state.zoom + ZOOM_STEP) })),
   zoomOut: () => set((state) => ({ zoom: Math.max(ZOOM_MIN, state.zoom - ZOOM_STEP) })),
   setCurrentPage: (page) => set({ currentPage: page }),

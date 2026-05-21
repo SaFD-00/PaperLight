@@ -62,6 +62,8 @@ export function TopToolbar() {
   const aiPanelOpen = useReader((s) => s.aiPanelOpen);
   const toggleAiPanel = useReader((s) => s.toggleAiPanel);
   const toggleSidebar = useReader((s) => s.toggleSidebar);
+  const sidebarOpen = useReader((s) => s.sidebarOpen);
+  const setSidebarMode = useReader((s) => s.setSidebarMode);
   const zoom = useReader((s) => s.zoom);
   const zoomIn = useReader((s) => s.zoomIn);
   const zoomOut = useReader((s) => s.zoomOut);
@@ -78,7 +80,13 @@ export function TopToolbar() {
         <IconButton label="목차 토글" onClick={toggleSidebar}>
           <ChevronLeft size={16} />
         </IconButton>
-        <IconButton label="썸네일">
+        <IconButton
+          label="썸네일"
+          onClick={() => {
+            setSidebarMode("pages");
+            if (!sidebarOpen) toggleSidebar();
+          }}
+        >
           <Menu size={16} />
         </IconButton>
         <IconButton label="페이지 내 검색">
