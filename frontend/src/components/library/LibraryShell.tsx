@@ -67,10 +67,14 @@ export function LibraryShell() {
   }, [refreshAll]);
 
   const showPilots = activeCollectionId === null && query === "" && filterTagIds.length === 0;
-  const combined = useMemo(
-    () => (showPilots ? [...PILOTS, ...papers] : papers),
-    [showPilots, papers],
-  );
+  const combined = useMemo(() => {
+    if (!showPilots) return papers;
+    // Once the backend seeds the pilots, GET /api/papers returns them too;
+    // dedupe by id so they don't show twice (API row wins over the placeholder).
+    const byId = new Map<string, LibraryPaper>();
+    for (const p of [...PILOTS, ...papers]) byId.set(p.id, p);
+    return [...byId.values()];
+  }, [showPilots, papers]);
   const selectedPaper = combined.find((p) => p.id === selectedPaperId) ?? null;
   const exportIds = selectedPaperIds.length ? selectedPaperIds : papers.map((p) => p.id);
 
