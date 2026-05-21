@@ -221,6 +221,12 @@ function highlightSentence(pageNum, startOffset, endOffset) {
 }
 
 // ── 페이지별 번역 컬럼 ───────────────────────────────────────────────────────
+// 번역 컬럼 높이를 PDF 페이지 높이로 제한 → 넘치는 번역은 컬럼 내부 스크롤(다음 페이지 안 밂).
+function syncTranslationHeight(pageNum, height) {
+  const col = translationCols[pageNum - 1];
+  if (col) col.style.maxHeight = height + "px";
+}
+
 // 번역 컬럼에 인덱스 순서를 유지하며 문장 span 삽입.
 function insertSentenceSpan(col, el, idx) {
   let next = null;
@@ -350,6 +356,7 @@ async function paintPage(pageNum, scale) {
 
   wrapper.style.width = viewport.width + "px";
   wrapper.style.height = viewport.height + "px";
+  syncTranslationHeight(pageNum, viewport.height);
 
   const canvas = wrapper.querySelector(".page-canvas");
   const dpr = window.devicePixelRatio || 1;
@@ -391,6 +398,7 @@ function resizeLayout(pageNum, scale) {
   const viewport = page.getViewport({ scale });
   wrapper.style.width = viewport.width + "px";
   wrapper.style.height = viewport.height + "px";
+  syncTranslationHeight(pageNum, viewport.height);
   const canvas = wrapper.querySelector(".page-canvas");
   canvas.style.width = viewport.width + "px";
   canvas.style.height = viewport.height + "px";

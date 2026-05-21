@@ -34,7 +34,7 @@ html, body {
   padding: 24px 24px 64px;
   gap: 16px;
 }
-/* 한 페이지 = [PDF | 번역 컬럼] 가로 배치(번역이 길면 행이 늘어 다음 페이지를 자연히 밂).
+/* 한 페이지 = [PDF | 번역 컬럼] 가로 배치(번역 컬럼은 페이지 높이로 제한·내부 스크롤).
  * 콘텐츠 크기로 잡고 가운데 정렬하되, 넓으면 좌측부터(가로 스크롤 가능·좌측 미잘림). */
 .page-row {
   display: flex;
@@ -53,6 +53,8 @@ html, body {
   display: none;
   width: var(--translation-col-width, 360px);
   flex: 0 0 auto;
+  /* 페이지 높이로 제한(viewer.js가 max-height 지정) — 넘치는 번역은 컬럼 내부 스크롤. */
+  overflow-y: auto;
   background: #fff;
   color: #1a1a1f;
   border-radius: 4px;
