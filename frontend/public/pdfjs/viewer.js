@@ -1,4 +1,5 @@
 import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
+import { extractBody } from "/pdfjs/bodyFilter.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
 
@@ -13,6 +14,7 @@ let currentUrl = null;
 let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
+let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
 let visibilityObserver = null;
 let savedHighlights = [];
 
@@ -216,6 +218,38 @@ function highlightSentence(pageNum, startOffset, endOffset) {
   }
 }
 
+// 페이지 본문만 추출(Figure 캡션·표·수식·페이지번호 제거) + body↔원문 offset 매핑.
+// 가정: items[].str 연결 == text-layer.textContent. 어긋나면 필터 없이 전체 텍스트로 폴백.
+async function extractBodyText(pageNum) {
+  const wrapper = pageWrappers[pageNum - 1];
+  const layer = wrapper ? wrapper.querySelector(".text-layer") : null;
+  const fullText = layer ? layer.textContent || "" : "";
+  const identity = [
+    { bodyStart: 0, bodyEnd: fullText.length, globalStart: 0, globalEnd: fullText.length },
+  ];
+  const page = pageObjects[pageNum - 1];
+  if (!page) return { text: fullText, segments: identity };
+  try {
+    const tc = await page.getTextContent();
+    const joined = tc.items.map((it) => it.str).join("");
+    if (joined !== fullText) return { text: fullText, segments: identity };
+    const pageH = page.getViewport({ scale: 1 }).height;
+    const styles = tc.styles || {};
+    const items = tc.items.map((it) => ({
+      str: it.str,
+      hasEOL: !!it.hasEOL,
+      fontHeight: it.height || Math.hypot(it.transform[2], it.transform[3]),
+      normTop: pageH > 0 ? (pageH - it.transform[5]) / pageH : 0,
+      fontFamily: (styles[it.fontName] && styles[it.fontName].fontFamily) || "",
+    }));
+    const { bodyText, segments } = extractBody(items);
+    if (!bodyText) return { text: fullText, segments: identity }; // 전부 drop되면 폴백.
+    return { text: bodyText, segments };
+  } catch (_) {
+    return { text: fullText, segments: identity };
+  }
+}
+
 function setEmpty(text) {
   if (text) {
     empty.textContent = text;
@@ -403,6 +437,7 @@ async function loadPdf(url) {
   container.innerHTML = "";
   pageWrappers = [];
   pageObjects = [];
+  pageSegments = [];
   if (currentDoc) {
     try { await currentDoc.destroy(); } catch (_) { /* noop */ }
     currentDoc = null;
@@ -569,9 +604,8 @@ window.addEventListener("message", async (event) => {
       clearLinkedOverlays();
       break;
     case "REQUEST_PAGE_TEXT": {
-      const wrapper = pageWrappers[(msg.page || 1) - 1];
-      const layer = wrapper?.querySelector(".text-layer");
-      const text = layer ? layer.textContent || "" : "";
+      const { text, segments } = await extractBodyText(msg.page);
+      pageSegments[(msg.page || 1) - 1] = segments;
       send("PAGE_TEXT", { page: msg.page, text });
       break;
     }
