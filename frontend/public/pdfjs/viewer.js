@@ -1,5 +1,5 @@
 import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
-import { extractBody, mapBodyRange } from "/pdfjs/bodyFilter.js";
+import { extractBody, mapBodyRange, parseCaptionLabel } from "/pdfjs/bodyFilter.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
 
@@ -15,6 +15,7 @@ let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
 let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
+let pageFigureAnchors = []; // 페이지별 [{ kind, label, captionText, region }] (Figure/Table 설명 앵커).
 let translationCols = []; // 페이지별 번역 컬럼 element.
 let translationSentences = []; // 페이지별 [{ i, el, globalStart, globalEnd }] (교차 하이라이트용).
 let visibilityObserver = null;
@@ -39,7 +40,14 @@ hlStyle.textContent =
   "mix-blend-mode:multiply;border-radius:2px;}" +
   // 원문↔해석 교차 하이라이트(연회색 transient).
   ".linked-overlay{position:absolute;pointer-events:none;" +
-  "background:rgba(0,0,0,0.10);border-radius:2px;}";
+  "background:rgba(0,0,0,0.10);border-radius:2px;}" +
+  // Figure/Table 인라인 설명 버튼(캡션 위치 앵커).
+  ".figure-explain-btn{position:absolute;transform:translateY(-115%);z-index:5;" +
+  "display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;" +
+  "border:1px solid rgba(0,0,0,0.12);background:rgba(255,255,255,0.92);" +
+  "color:#374151;font:600 11px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer;" +
+  "box-shadow:0 1px 3px rgba(0,0,0,0.12);opacity:0.55;transition:opacity .12s;}" +
+  ".figure-explain-btn:hover{opacity:1;background:#fff;border-color:rgba(0,0,0,0.22);}";
 document.head.appendChild(hlStyle);
 
 // 해석 패널이 열렸을 때만 문장 hover 리포팅 활성화.
@@ -338,6 +346,158 @@ async function extractBodyText(pageNum) {
   }
 }
 
+// ── Figure/Table 인라인 설명 앵커 ───────────────────────────────────────────────
+// 캡션(Figure N / Table N / 그림 N / 표 N)을 찾아 설명 대상 이미지 영역(region, 정규화
+// 0..1)과 버튼 위치를 추정한다. Figure 캡션은 그림 아래, Table 캡션은 표 위라는 관례 사용.
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+async function detectFigureAnchors(pageNum) {
+  const page = pageObjects[pageNum - 1];
+  if (!page) return [];
+  let tc;
+  try {
+    tc = await page.getTextContent();
+  } catch (_) {
+    return [];
+  }
+  const vp = page.getViewport({ scale: 1 });
+  const pageW = vp.width;
+  const pageH = vp.height;
+  if (pageW <= 0 || pageH <= 0) return [];
+
+  const anchors = [];
+  let cur = [];
+  const flush = () => {
+    if (cur.length === 0) return;
+    const items = cur;
+    cur = [];
+    const text = items.map((x) => x.str).join("").trim();
+    const label = parseCaptionLabel(text);
+    if (!label) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let baseY = Infinity;
+    let topY = -Infinity;
+    for (const it of items) {
+      const x = it.transform[4];
+      const y = it.transform[5];
+      const w = it.width || 0;
+      const h = it.height || Math.hypot(it.transform[2], it.transform[3]) || 0;
+      if (x < minX) minX = x;
+      if (x + w > maxX) maxX = x + w;
+      if (y < baseY) baseY = y;
+      if (y + h > topY) topY = y + h;
+    }
+    const capTop = clamp01((pageH - topY) / pageH);
+    const capBot = clamp01((pageH - baseY) / pageH);
+    const cx = (minX + maxX) / 2 / pageW;
+    const wNorm = (maxX - minX) / pageW;
+    // 가로: 넓은 캡션 → 전폭, 좁은 캡션 → 캡션 중심이 속한 컬럼.
+    let rx;
+    let rw;
+    if (wNorm > 0.55) {
+      rx = 0.02;
+      rw = 0.96;
+    } else if (cx < 0.5) {
+      rx = 0.02;
+      rw = 0.47;
+    } else {
+      rx = 0.51;
+      rw = 0.47;
+    }
+    // 세로: figure는 캡션 위, table은 캡션 아래(최대 페이지 높이 42% 밴드).
+    const BAND = 0.42;
+    let ry;
+    let rh;
+    if (label.kind === "table") {
+      ry = capBot;
+      rh = Math.min(BAND, 1 - capBot);
+    } else {
+      ry = Math.max(0, capTop - BAND);
+      rh = capTop - ry;
+    }
+    if (rh <= 0.03) return;
+    anchors.push({
+      kind: label.kind,
+      label: label.label,
+      captionText: text.slice(0, 400),
+      region: { x: rx, y: ry, w: rw, h: rh },
+      btn: { left: clamp01(minX / pageW), top: capTop },
+    });
+  };
+  for (const it of tc.items) {
+    if (typeof it.str !== "string") continue;
+    cur.push(it);
+    if (it.hasEOL) flush();
+  }
+  flush();
+  return anchors;
+}
+
+// 페이지 캔버스에서 정규화 region을 잘라 PNG dataURL로 반환.
+function cropRegion(pageNum, region) {
+  const wrapper = pageWrappers[pageNum - 1];
+  const src = wrapper ? wrapper.querySelector(".page-canvas") : null;
+  if (!src || !src.width || !src.height) return null;
+  const sx = Math.round(region.x * src.width);
+  const sy = Math.round(region.y * src.height);
+  const sw = Math.max(1, Math.round(region.w * src.width));
+  const sh = Math.max(1, Math.round(region.h * src.height));
+  const scale = Math.min(1, 1200 / sw); // 페이로드 상한.
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(sw * scale));
+  out.height = Math.max(1, Math.round(sh * scale));
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  return out.toDataURL("image/png");
+}
+
+// 캡션마다 설명 버튼을 wrapper에 배치(정규화 % 위치라 줌 재렌더에도 유지).
+async function renderFigureAnchors(pageNum) {
+  const wrapper = pageWrappers[pageNum - 1];
+  if (!wrapper) return;
+  let anchors = pageFigureAnchors[pageNum - 1];
+  if (!anchors) {
+    anchors = await detectFigureAnchors(pageNum);
+    pageFigureAnchors[pageNum - 1] = anchors;
+  }
+  if (!wrapper.isConnected || wrapper.querySelector(".figure-explain-btn")) return;
+  for (const a of anchors) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "figure-explain-btn";
+    btn.textContent = a.kind === "table" ? "표 설명" : "그림 설명";
+    btn.style.left = (a.btn.left * 100).toFixed(2) + "%";
+    btn.style.top = (a.btn.top * 100).toFixed(2) + "%";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const imageDataUrl = cropRegion(pageNum, a.region);
+      if (!imageDataUrl) return;
+      const r = btn.getBoundingClientRect();
+      send("FIGURE_EXPLAIN", {
+        page: pageNum,
+        kind: a.kind,
+        label: a.label,
+        captionText: a.captionText,
+        imageDataUrl,
+        rect: {
+          left: r.left,
+          top: r.top,
+          right: r.right,
+          bottom: r.bottom,
+          width: r.width,
+          height: r.height,
+        },
+      });
+    });
+    wrapper.appendChild(btn);
+  }
+}
+
 function setEmpty(text) {
   if (text) {
     empty.textContent = text;
@@ -441,6 +601,7 @@ async function buildPage(pageNum) {
   pageWrappers[pageNum - 1] = wrapper;
 
   await paintPage(pageNum, currentScale);
+  void renderFigureAnchors(pageNum); // 캡션 설명 버튼(비차단).
 }
 
 function captureScrollAnchor() {
@@ -540,6 +701,7 @@ async function loadPdf(url) {
   pageWrappers = [];
   pageObjects = [];
   pageSegments = [];
+  pageFigureAnchors = [];
   translationCols = [];
   translationSentences = [];
   if (currentDoc) {

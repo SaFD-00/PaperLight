@@ -87,4 +87,16 @@ export type IframeToHostMessage =
   | { source: typeof IFRAME_SOURCE; type: "HIGHLIGHT_CLICK"; id: string }
   | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string }
   | { source: typeof IFRAME_SOURCE; type: "OUTLINE"; items: OutlineItem[] }
-  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string };
+  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string }
+  | {
+      source: typeof IFRAME_SOURCE;
+      type: "FIGURE_EXPLAIN";
+      page: number;
+      kind: "figure" | "table";
+      label: string;
+      captionText: string;
+      /** 캡션 영역을 잘라낸 PNG dataURL(비전 입력). */
+      imageDataUrl: string;
+      /** 설명 버튼의 iframe-viewport rect(호스트가 offset 보정해 팝오버 배치). */
+      rect: SelectionRect;
+    };

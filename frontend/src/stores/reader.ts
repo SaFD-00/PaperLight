@@ -29,10 +29,21 @@ export interface ExplainSelection {
   hostRect: SelectionInfo["hostRect"];
 }
 
+export interface FigureExplain {
+  page: number;
+  kind: "figure" | "table";
+  label: string;
+  captionText: string;
+  imageDataUrl: string;
+  hostRect: SelectionInfo["hostRect"];
+}
+
 interface ReaderState {
   selection: SelectionInfo | null;
   /** 인라인 설명 팝오버 대상(선택 텍스트 + 호스트 좌표). */
   explainSelection: ExplainSelection | null;
+  /** Figure/Table 인라인 설명 팝오버 대상(crop 이미지 + 호스트 좌표). */
+  figureExplain: FigureExplain | null;
   askText: string | null;
   translateSelection: TranslateSelection | null;
   /** 해석 패널(우측, AI 패널과 별개) 열림 여부. 상단 [T] 토글과 연동. */
@@ -62,6 +73,8 @@ interface ReaderState {
   setSelection: (s: SelectionInfo | null) => void;
   triggerExplain: (sel: ExplainSelection) => void;
   clearExplain: () => void;
+  triggerFigureExplain: (fig: FigureExplain) => void;
+  clearFigureExplain: () => void;
   triggerAsk: (text: string) => void;
   clearAsk: () => void;
   triggerTranslateSelection: (sel: TranslateSelection) => void;
@@ -90,6 +103,7 @@ const ZOOM_STEP = 10;
 export const useReader = create<ReaderState>((set) => ({
   selection: null,
   explainSelection: null,
+  figureExplain: null,
   askText: null,
   translateSelection: null,
   translationEnabled: false,
@@ -111,6 +125,11 @@ export const useReader = create<ReaderState>((set) => ({
     set({ explainSelection: sel, selection: null });
   },
   clearExplain: () => set({ explainSelection: null }),
+  triggerFigureExplain: (fig) => {
+    capture("figure_explain_requested", { kind: fig.kind });
+    set({ figureExplain: fig, selection: null });
+  },
+  clearFigureExplain: () => set({ figureExplain: null }),
   triggerAsk: (text) => set({ askText: text, selection: null }),
   clearAsk: () => set({ askText: null }),
   triggerTranslateSelection: (sel) => {

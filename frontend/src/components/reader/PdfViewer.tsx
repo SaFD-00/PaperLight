@@ -39,6 +39,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const setOutline = useReader((s) => s.setOutline);
   const setThumbnail = useReader((s) => s.setThumbnail);
   const requestOutline = useReader((s) => s.requestOutline);
+  const triggerFigureExplain = useReader((s) => s.triggerFigureExplain);
   const outlineRequest = useReader((s) => s.outlineRequest);
   const thumbnailsRequest = useReader((s) => s.thumbnailsRequest);
   const translationEnabled = useReader((s) => s.translationEnabled);
@@ -179,6 +180,26 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
           });
           break;
         }
+        case "FIGURE_EXPLAIN": {
+          const iframeRect = handle.iframe.getBoundingClientRect();
+          const r = data.rect;
+          triggerFigureExplain({
+            page: data.page,
+            kind: data.kind,
+            label: data.label,
+            captionText: data.captionText,
+            imageDataUrl: data.imageDataUrl,
+            hostRect: {
+              left: iframeRect.left + r.left,
+              top: iframeRect.top + r.top,
+              right: iframeRect.left + r.right,
+              bottom: iframeRect.top + r.bottom,
+              width: r.width,
+              height: r.height,
+            },
+          });
+          break;
+        }
         case "HIGHLIGHT_CLICK":
           requestPanel("notes");
           break;
@@ -200,6 +221,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     setOutline,
     setThumbnail,
     requestOutline,
+    triggerFigureExplain,
     translationEnabled,
     paperId,
   ]);

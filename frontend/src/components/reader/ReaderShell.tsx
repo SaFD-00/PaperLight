@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Center } from "@/components/reader/Center";
+import { FigureExplainPopover } from "@/components/reader/FigureExplainPopover";
 import { FloatingSelectionMenu } from "@/components/reader/FloatingSelectionMenu";
 import { RightPanel } from "@/components/reader/RightPanel";
 import { SelectionExplainPopover } from "@/components/reader/SelectionExplainPopover";
@@ -32,6 +33,7 @@ export function ReaderShell({ paperId }: { paperId: string }) {
       <FloatingSelectionMenu paperId={paperId} />
       <SelectionTranslatePopover />
       <SelectionExplainPopover />
+      <FigureExplainPopover paperId={paperId} />
     </>
   );
 }
