@@ -42,7 +42,15 @@ export type HostToIframeMessage =
   | { source: typeof HOST_SOURCE; type: "TOGGLE_TRANSLATION"; enabled: boolean }
   | { source: typeof HOST_SOURCE; type: "REQUEST_PAGE_TEXT"; page: number }
   | { source: typeof HOST_SOURCE; type: "REQUEST_OUTLINE" }
-  | { source: typeof HOST_SOURCE; type: "REQUEST_THUMBNAILS" };
+  | { source: typeof HOST_SOURCE; type: "REQUEST_THUMBNAILS" }
+  | {
+      source: typeof HOST_SOURCE;
+      type: "HIGHLIGHT_SENTENCE";
+      page: number;
+      startOffset: number;
+      endOffset: number;
+    }
+  | { source: typeof HOST_SOURCE; type: "CLEAR_SENTENCE_HIGHLIGHT" };
 
 export type IframeToHostMessage =
   | {
@@ -64,4 +72,10 @@ export type IframeToHostMessage =
   | { source: typeof IFRAME_SOURCE; type: "HIGHLIGHT_CLICK"; id: string }
   | { source: typeof IFRAME_SOURCE; type: "PAGE_TEXT"; page: number; text: string }
   | { source: typeof IFRAME_SOURCE; type: "OUTLINE"; items: OutlineItem[] }
-  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string };
+  | { source: typeof IFRAME_SOURCE; type: "THUMBNAIL"; page: number; dataUrl: string }
+  | {
+      source: typeof IFRAME_SOURCE;
+      type: "SENTENCE_HOVER";
+      page: number | null;
+      offset: number | null;
+    };

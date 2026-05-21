@@ -32,8 +32,14 @@ function hlBackground(color) {
 const hlStyle = document.createElement("style");
 hlStyle.textContent =
   ".highlight-overlay{position:absolute;pointer-events:auto;cursor:pointer;" +
-  "mix-blend-mode:multiply;border-radius:2px;}";
+  "mix-blend-mode:multiply;border-radius:2px;}" +
+  // 원문↔해석 교차 하이라이트(연회색 transient).
+  ".linked-overlay{position:absolute;pointer-events:none;" +
+  "background:rgba(0,0,0,0.10);border-radius:2px;}";
 document.head.appendChild(hlStyle);
+
+// 해석 패널이 열렸을 때만 문장 hover 리포팅 활성화.
+let hoverEnabled = false;
 
 function send(type, payload = {}) {
   parent.postMessage({ source: IFRAME_SOURCE, type, ...payload }, "*");
@@ -150,6 +156,64 @@ function renderHighlightsForPage(pageNum) {
 function renderAllHighlights() {
   for (const el of container.querySelectorAll(".highlight-overlay")) el.remove();
   for (let i = 1; i <= pageWrappers.length; i++) renderHighlightsForPage(i);
+}
+
+// ── 원문↔해석 문장 교차 하이라이트 ────────────────────────────────────────────
+function clearLinkedOverlays() {
+  for (const el of container.querySelectorAll(".linked-overlay")) el.remove();
+}
+
+// text-layer 텍스트 노드를 DOM 순서로 누적해 전역 offset → {node, local} 위치 매핑.
+function locateOffset(layer, offset) {
+  const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+  let acc = 0;
+  let node;
+  while ((node = walker.nextNode())) {
+    const len = node.nodeValue.length;
+    if (offset <= acc + len) return { node, local: offset - acc };
+    acc += len;
+  }
+  return null;
+}
+
+// 역방향: text-layer 내 {node, local} → 전역 offset.
+function globalOffset(layer, node, local) {
+  const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+  let acc = 0;
+  let n;
+  while ((n = walker.nextNode())) {
+    if (n === node) return acc + local;
+    acc += n.nodeValue.length;
+  }
+  return -1;
+}
+
+function highlightSentence(pageNum, startOffset, endOffset) {
+  clearLinkedOverlays();
+  const wrapper = pageWrappers[(pageNum || 1) - 1];
+  const layer = wrapper ? wrapper.querySelector(".text-layer") : null;
+  if (!layer) return;
+  const startPos = locateOffset(layer, startOffset);
+  const endPos = locateOffset(layer, endOffset);
+  if (!startPos || !endPos) return;
+  const range = document.createRange();
+  try {
+    range.setStart(startPos.node, startPos.local);
+    range.setEnd(endPos.node, endPos.local);
+  } catch (_) {
+    return;
+  }
+  const wr = wrapper.getBoundingClientRect();
+  for (const r of range.getClientRects()) {
+    if (r.width <= 0 || r.height <= 0) continue;
+    const div = document.createElement("div");
+    div.className = "linked-overlay";
+    div.style.left = ((r.left - wr.left) / wr.width) * 100 + "%";
+    div.style.top = ((r.top - wr.top) / wr.height) * 100 + "%";
+    div.style.width = (r.width / wr.width) * 100 + "%";
+    div.style.height = (r.height / wr.height) * 100 + "%";
+    wrapper.appendChild(div);
+  }
 }
 
 function setEmpty(text) {
@@ -411,6 +475,41 @@ document.addEventListener("selectionchange", () => {
   });
 });
 
+// PDF 본문 hover → 해석 패널에 대응 문장 알림(해석 패널 열림일 때만).
+let lastHoverOffset = -1;
+let lastHoverPage = -1;
+container.addEventListener("mousemove", (e) => {
+  if (!hoverEnabled) return;
+  const wrapperEl = e.target.closest ? e.target.closest(".page-wrapper") : null;
+  if (!wrapperEl) return;
+  const layer = wrapperEl.querySelector(".text-layer");
+  if (!layer) return;
+  let caret = null;
+  if (document.caretRangeFromPoint) {
+    caret = document.caretRangeFromPoint(e.clientX, e.clientY);
+  } else if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (p) {
+      caret = document.createRange();
+      caret.setStart(p.offsetNode, p.offset);
+    }
+  }
+  if (!caret || !layer.contains(caret.startContainer)) return;
+  const offset = globalOffset(layer, caret.startContainer, caret.startOffset);
+  if (offset < 0) return;
+  const pageNum = Number(wrapperEl.dataset.pageNum);
+  if (offset === lastHoverOffset && pageNum === lastHoverPage) return;
+  lastHoverOffset = offset;
+  lastHoverPage = pageNum;
+  send("SENTENCE_HOVER", { page: pageNum, offset });
+});
+container.addEventListener("mouseleave", () => {
+  if (!hoverEnabled) return;
+  lastHoverOffset = -1;
+  lastHoverPage = -1;
+  send("SENTENCE_HOVER", { page: null, offset: null });
+});
+
 window.addEventListener("message", async (event) => {
   const msg = event.data;
   if (!msg || msg.source !== HOST_SOURCE) return;
@@ -443,7 +542,17 @@ window.addEventListener("message", async (event) => {
       break;
     }
     case "TOGGLE_TRANSLATION":
-      // Translation overlay is rendered host-side; iframe stub.
+      hoverEnabled = !!msg.enabled;
+      if (!hoverEnabled) {
+        clearLinkedOverlays();
+        send("SENTENCE_HOVER", { page: null, offset: null });
+      }
+      break;
+    case "HIGHLIGHT_SENTENCE":
+      highlightSentence(msg.page, msg.startOffset, msg.endOffset);
+      break;
+    case "CLEAR_SENTENCE_HIGHLIGHT":
+      clearLinkedOverlays();
       break;
     case "REQUEST_PAGE_TEXT": {
       const wrapper = pageWrappers[(msg.page || 1) - 1];

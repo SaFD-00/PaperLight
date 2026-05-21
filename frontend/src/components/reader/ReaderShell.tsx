@@ -19,7 +19,7 @@ export function ReaderShell({ paperId }: { paperId: string }) {
       <div className="flex h-full">
         {sidebarOpen && <Sidebar />}
         <Center paperId={paperId} />
-        {translationOpen && <TranslationSidePanel />}
+        {translationOpen && <TranslationSidePanel paperId={paperId} />}
         {aiPanelOpen && <RightPanel paperId={paperId} />}
       </div>
       <FloatingSelectionMenu paperId={paperId} />

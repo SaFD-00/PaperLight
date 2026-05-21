@@ -31,6 +31,8 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const requestOutline = useReader((s) => s.requestOutline);
   const outlineRequest = useReader((s) => s.outlineRequest);
   const thumbnailsRequest = useReader((s) => s.thumbnailsRequest);
+  const setHoveredSentence = useReader((s) => s.setHoveredSentence);
+  const linkedHighlight = useReader((s) => s.linkedHighlight);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
   const zoom = useReader((s) => s.zoom);
@@ -128,6 +130,13 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
         case "THUMBNAIL":
           setThumbnail(data.page, data.dataUrl);
           break;
+        case "SENTENCE_HOVER":
+          setHoveredSentence(
+            data.page != null && data.offset != null
+              ? { page: data.page, offset: data.offset }
+              : null,
+          );
+          break;
       }
     }
     window.addEventListener("message", onMessage);
@@ -141,6 +150,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     setOutline,
     setThumbnail,
     requestOutline,
+    setHoveredSentence,
   ]);
 
   // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
@@ -149,6 +159,28 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "REQUEST_PAGE_TEXT", page: currentPage });
   }, [translationEnabled, currentPage]);
+
+  // 해석 패널 열림 상태를 iframe에 알려 본문 hover 리포팅을 켜고 끈다.
+  useEffect(() => {
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "TOGGLE_TRANSLATION", enabled: translationEnabled });
+  }, [translationEnabled, status]);
+
+  // 해석 패널 문장 hover → PDF 대응 원문 하이라이트.
+  useEffect(() => {
+    if (!iframeReadyRef.current) return;
+    if (linkedHighlight) {
+      postToIframe({
+        source: HOST_SOURCE,
+        type: "HIGHLIGHT_SENTENCE",
+        page: linkedHighlight.page,
+        startOffset: linkedHighlight.startOffset,
+        endOffset: linkedHighlight.endOffset,
+      });
+    } else {
+      postToIframe({ source: HOST_SOURCE, type: "CLEAR_SENTENCE_HIGHLIGHT" });
+    }
+  }, [linkedHighlight]);
 
   // 줌 변경 시 iframe 재렌더 요청 (초기 ready 시점에는 기본 배율이라 생략).
   useEffect(() => {

@@ -60,6 +60,10 @@ interface ReaderState {
   /** Sidebar → PdfViewer: request outline / thumbnails (nonce re-fires). */
   outlineRequest: { nonce: number } | null;
   thumbnailsRequest: { nonce: number } | null;
+  /** 해석 패널 → PDF: 대응 원문 문장을 연회색으로 하이라이트. */
+  linkedHighlight: { page: number; startOffset: number; endOffset: number; nonce: number } | null;
+  /** PDF → 해석 패널: 본문 hover 위치(해당 한국어 문장 강조용). */
+  hoveredSentence: { page: number; offset: number } | null;
   setSelection: (s: SelectionInfo | null) => void;
   triggerExplain: (sel: ExplainSelection) => void;
   clearExplain: () => void;
@@ -76,6 +80,8 @@ interface ReaderState {
   setThumbnail: (page: number, dataUrl: string) => void;
   requestOutline: () => void;
   requestThumbnails: () => void;
+  setLinkedHighlight: (h: { page: number; startOffset: number; endOffset: number } | null) => void;
+  setHoveredSentence: (h: { page: number; offset: number } | null) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   setCurrentPage: (page: number) => void;
@@ -108,6 +114,8 @@ export const useReader = create<ReaderState>((set) => ({
   panelRequest: null,
   outlineRequest: null,
   thumbnailsRequest: null,
+  linkedHighlight: null,
+  hoveredSentence: null,
   setSelection: (s) => set({ selection: s }),
   triggerExplain: (sel) => {
     capture("explain_requested", { length: sel.text.length });
@@ -131,6 +139,9 @@ export const useReader = create<ReaderState>((set) => ({
     set((state) => ({ thumbnails: { ...state.thumbnails, [page]: dataUrl } })),
   requestOutline: () => set({ outlineRequest: { nonce: Date.now() } }),
   requestThumbnails: () => set({ thumbnailsRequest: { nonce: Date.now() } }),
+  setLinkedHighlight: (h) =>
+    set({ linkedHighlight: h ? { ...h, nonce: Date.now() } : null }),
+  setHoveredSentence: (h) => set({ hoveredSentence: h }),
   zoomIn: () => set((state) => ({ zoom: Math.min(ZOOM_MAX, state.zoom + ZOOM_STEP) })),
   zoomOut: () => set((state) => ({ zoom: Math.max(ZOOM_MIN, state.zoom - ZOOM_STEP) })),
   setCurrentPage: (page) => set({ currentPage: page }),

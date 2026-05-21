@@ -63,3 +63,39 @@ async def test_translate_streams_tokens(
 async def test_translate_rejects_empty(client: AsyncClient) -> None:
     resp = await client.post("/api/translate", json={"text": ""})
     assert resp.status_code == 422
+
+
+async def test_translate_aligned_streams_pairs(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_stream(
+        self: object,
+        messages: list[dict[str, str]],
+        model: str,
+    ) -> AsyncIterator[str]:
+        yield "1\t첫 번째 문장.\n"
+        yield "2\t두 번째 문장.\n"
+
+    monkeypatch.setattr(
+        "paperlight.providers.gemini_provider.GeminiProvider.stream_chat",
+        fake_stream,
+    )
+
+    async with client.stream(
+        "POST",
+        "/api/translate",
+        json={"sentences": ["First sentence.", "Second sentence."], "aligned": True},
+    ) as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        body = b""
+        async for chunk in resp.aiter_bytes():
+            body += chunk
+    text = body.decode()
+    assert '"pair"' in text
+    assert '"i": 0' in text
+    assert '"i": 1' in text
+    assert "첫 번째 문장." in text
+    assert "두 번째 문장." in text
+    assert "[DONE]" in text
