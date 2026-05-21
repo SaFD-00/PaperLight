@@ -233,7 +233,9 @@
 
 ### F-14. **Figure / Table Description (P0)**
 > v2.2 정의 유지. Ingestion 시 자동 생성. 단축키 `G`로 토글.
-> **인라인 비전 설명 (v3.1)**: 본문 번역은 Figure/Table을 제외하고(본문만), Figure/Table은 각각 **개별적으로** 설명을 본다. 리더가 캡션을 감지해 도표 위 "설명" 버튼을 띄우고, 클릭 시 해당 영역을 crop한 이미지 + 캡션/본문 텍스트를 비전 모델(figure→gpt-5, table→gemini-2.5-pro)에 함께 보내 `POST /api/explain/figure`로 스트리밍 설명(그림/표 분석 팝오버). on-demand + 캐시. 영역은 캡션 앵커 휴리스틱(정밀 bbox는 marker-pdf 후속), pregen의 텍스트 reasoning 사전생성은 그대로 유지.
+> **인라인 비전 설명 (v3.1)**: 본문 번역은 Figure/Table을 제외하고(본문만), Figure/Table은 각각 **개별적으로** 설명을 본다. 리더가 도표 위 "설명" 버튼을 띄우고, 클릭 시 해당 영역을 crop한 이미지 + 캡션/본문 텍스트를 비전 모델(figure→gpt-5, table→gemini-2.5-pro)에 함께 보내 `POST /api/explain/figure`로 스트리밍 설명(그림/표 분석 팝오버). on-demand + 캐시.
+> **후속 채팅 (v3.2)**: 첫 설명 후 후속 질문 칩 + 미니 채팅으로 이어서 묻는다(매 턴 이미지 재첨부, history 누적, 종료 시 후속 질문 3개 자동 생성).
+> **정밀 bbox + pregen 비전 (v3.2)**: 도표 영역은 `config/ingestion.yaml`의 `parser: marker`면 marker-pdf 정밀 bbox(`GET /api/papers/{id}/figures`), 기본 `pymupdf`면 캡션 앵커 휴리스틱(과잉 crop 허용)으로 폴백. marker bbox가 있으면 pregen 사전생성도 영역을 렌더해 **비전**으로 figure/table을 미리 설명(없으면 텍스트 reasoning 폴백).
 
 ### F-15. **Paragraph-level Description (P0)**
 > v2.3 정의 유지. Ingestion 시 자동 생성. 단축키 `P` (토글) / `H` (Inline Hint) / `I` (Importance Highlight) / `K` (Quick Skim).

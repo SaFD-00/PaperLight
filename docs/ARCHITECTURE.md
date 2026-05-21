@@ -81,7 +81,7 @@ PaperLight/
       │ 3. enqueue Redis job
       ▼
 [Ingestion worker]
-      │ 4. marker-pdf 파싱 (text + bbox + figures)
+      │ 4. PDF 파싱 (pymupdf 기본 / config=marker면 figure·table bbox 추출)
       │ 5. chunker (≈512 tokens)
       │ 6. bge-m3 임베딩 (Qwen, 동일 클러스터)
       ▼
@@ -138,26 +138,28 @@ PaperLight/
 
 > 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
 
-### 3.2c Reader: Figure/Table 인라인 비전 설명 (F-04/F-14)
+### 3.2c Reader: Figure/Table 인라인 비전 설명 + 후속 채팅 (F-04/F-14)
 
-본문 번역에서 제외된 Figure/Table은 각각 **개별적으로** 비전 분석해 인라인 팝오버로 본다.
+본문 번역에서 제외된 Figure/Table은 각각 **개별적으로** 비전 분석해 인라인 팝오버로 보고, 후속 질문으로 이어서 대화한다.
 
 ```
-[iframe] 페이지 paint 후 detectFigureAnchors: getTextContent geometry + parseCaptionLabel로
-      │ 캡션 위치·종류·라벨 수집 → 이미지 영역 추정(Figure=캡션 위, Table=캡션 아래,
-      │ 좁은 캡션은 컬럼 휴리스틱) → 캡션 위 "설명" 버튼 오버레이(정규화 % 위치, 줌 무관)
+[iframe] 페이지 paint 시 REQUEST_FIGURES(page) → [host] marker bbox를 RENDER_FIGURES(page,figures)로
+      │ 응답. figures 있으면 정밀 bbox 버튼, 없으면 detectFigureAnchors 휴리스틱 폴백
+      │ (캡션 앵커: Figure=캡션 위, Table=캡션 아래, ±42% 밴드 — 과잉 crop 허용)
       ▼ (버튼 클릭)
 [iframe] cropRegion: page-canvas에서 region을 잘라 PNG dataURL → FIGURE_EXPLAIN(page, kind,
       │ label, captionText, imageDataUrl, rect) 전송
       ▼
 [host] iframe rect 보정 → FigureExplainPopover: POST /api/explain/figure
-      │ {kind, image(dataURL), label, captionText, paperId, page}
+      │ {kind, image(dataURL), label, captionText, question, history, paperId, page}
+      │ 첫 설명 자동 스트림 → 후속 질문 칩 + 미니 채팅(매 턴 이미지 재첨부, history 누적)
       ▼
 [backend] figure_description(gpt-5 vision) / table_description(gemini-2.5-pro) task로
-      │ [text + image] 멀티모달 메시지 스트리밍, 이미지 해시 캐시 키(on-demand+캐시)
+      │ [text + image] 멀티모달 스트리밍 → 종료 후 generate_followups로 후속 질문 3개(SSE meta)
+      │ 이미지·질문·히스토리 해시 캐시 키(on-demand+캐시)
 ```
 
-> 영역은 캡션 앵커 휴리스틱(±42% 밴드)이라 과잉 crop 허용(비전 모델이 여백 흡수). 정밀 bbox는 marker-pdf 후속. pregen의 figure/table 사전생성(텍스트 reasoning)은 그대로 유지 — 인라인 설명은 별도 on-demand 경로.
+> 영역 bbox 소스 2가지: `config/ingestion.yaml`의 `parser: marker`면 marker-pdf 정밀 bbox(`GET /api/papers/{id}/figures`, Cache `figure_layout`에 저장), 기본 `pymupdf`면 프론트 캡션 앵커 휴리스틱(과잉 crop). pregen의 figure/table 사전생성도 marker bbox가 있으면 해당 영역을 `get_pixmap(clip)`으로 렌더해 **비전**으로 생성(없으면 텍스트 폴백). 인라인 팝오버는 별도 on-demand 멀티턴 경로.
 
 ### 3.3 Tab 상태 동기화
 
@@ -197,10 +199,12 @@ Host React  ───► iframe.contentWindow.postMessage({ type, payload })
 - `REQUEST_OUTLINE` · `REQUEST_THUMBNAILS` (좌측 사이드바)
 - `RENDER_TRANSLATION` (page, pairs[{i,tgt,bodyStart,bodyEnd}], replace) / `CLEAR_TRANSLATION` (page?) — 페이지별 번역 컬럼
 - `SET_TRANSLATION_FONT` (family sans|serif, scale) — 번역 컬럼 글꼴·크기
+- `RENDER_FIGURES` (page, figures[{kind,label,bbox,captionText}]) — 백엔드 marker bbox 주입(빈 배열이면 휴리스틱 폴백)
 
 **iframe → Host 메시지 타입**:
 - `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text=본문)
 - `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl)
+- `REQUEST_FIGURES` (page) — 페이지 paint 시 백엔드 figure bbox 요청(번역 lazy 패턴 미러)
 - `FIGURE_EXPLAIN` (page, kind, label, captionText, imageDataUrl, rect) — Figure/Table 설명 버튼 클릭(crop 이미지)
 - `READY` / `ERROR`
 
@@ -239,7 +243,7 @@ class LLMProvider(Protocol):
 - Table description → `gemini/gemini-2.5-pro` (F-14 fallback)
 - 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial)
 
-**멀티모달 content**: 메시지 `content`는 `str`(텍스트, 기존 그대로) 또는 parts 배열 `[{type:text}, {type:image, mime, data}]`(`providers/content.py`)을 받는다. gemini는 `inline_data`, openai/openrouter는 `image_url`(data URL)로 변환, stub은 이미지 무시. Figure/Table 인라인 설명(`/api/explain/figure`, §3.2c)이 [캡션·본문 텍스트 + crop 이미지]를 비전 모델에 함께 전달하는 경로.
+**멀티모달 content**: 메시지 `content`는 `str`(텍스트, 기존 그대로) 또는 parts 배열 `[{type:text}, {type:image, mime, data}]`(`providers/content.py`)을 받는다. gemini는 `inline_data`, openai/openrouter는 `image_url`(data URL)로 변환, stub은 이미지 무시. 두 비전 경로가 이를 쓴다: ① Figure/Table 인라인 설명(`/api/explain/figure`, §3.2c) — 프론트 crop 이미지 + 캡션·본문 + 멀티턴 history. ② pregen 사전생성(`agents/pregen.py`) — marker bbox가 있으면 `ingestion/render.py`의 `get_pixmap(clip)`로 영역을 렌더해 비전으로 figure/table을 미리 설명(없으면 텍스트 폴백, prompt_version v2).
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).
 

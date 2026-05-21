@@ -2,7 +2,7 @@
 
 > "PDF 뷰어 안에서 모든 AI 기능이 끝나는" 논문 읽기 도구. 보고, 듣고, 정리하고, 발견한다.
 
-PaperLight is an AI-powered paper reader that combines a PDF viewer with **body-only per-page translation** (figures/tables excluded), explanation, multi-layer summaries, AI chat, **2-host AI podcasts (à la NotebookLM)**, **per-figure/table inline vision descriptions** (crop image + context → vision model), paragraph-level insight, and a **tabbed Zotero-style library** — all in one place.
+PaperLight is an AI-powered paper reader that combines a PDF viewer with **body-only per-page translation** (figures/tables excluded), explanation, multi-layer summaries, AI chat, **2-host AI podcasts (à la NotebookLM)**, **per-figure/table inline vision descriptions with follow-up chat** (crop image + context → vision model, optional marker-pdf precise bbox), paragraph-level insight, and a **tabbed Zotero-style library** — all in one place.
 
 See [docs/PRD.md](docs/PRD.md) for the full Product Requirements (**v3.0**) and [docs/DESIGN.md](docs/DESIGN.md) for design tokens, wireframes, and reference index.
 
