@@ -32,9 +32,9 @@ PaperLight/
 │   │   ├── app/                     # 페이지 라우팅 (Library, Reader/[paperId])
 │   │   ├── components/
 │   │   │   ├── shell/               # TabBar, TopToolbar, SettingsMenu
-│   │   │   ├── reader/              # ReaderShell, PdfViewer, FloatingSelectionMenu, TranslationPane
+│   │   │   ├── reader/              # ReaderShell, PdfViewer, Sidebar(TOC/페이지), FloatingSelectionMenu, TranslationSidePanel, SelectionExplain/TranslatePopover
 │   │   │   ├── library/             # 4-pane: Tree, List, Detail, TagCloud
-│   │   │   └── panels/              # ExplanationPanel, ChatPanel, SummaryPanel
+│   │   │   └── panels/              # ChatPanel, SummaryPanel, InsightsPanel, TranslationPane … (+ common/Markdown)
 │   │   ├── stores/                  # Zustand: tabs, settings, library, reader
 │   │   ├── lib/                     # api/, pdf/, selection/, theme/, i18n/
 │   │   ├── styles/                  # tokens.css (DESIGN §3), globals.css
@@ -100,7 +100,7 @@ PaperLight/
 [Reader UI 활성화]
 ```
 
-### 3.2 Reader: 텍스트 선택 → Explanation
+### 3.2 Reader: 텍스트 선택 → Explanation (인라인 팝오버)
 
 ```
 [Shadow DOM iframe (pdf.js viewer)]
@@ -108,14 +108,27 @@ PaperLight/
       ▼
 [Host React (Reader page)]
       │ 2. FloatingSelectionMenu 표시 (선택 위 8px, 200ms hover)
-      │ 3. 사용자 "💡 Explain" 클릭
+      │ 3. 사용자 "💡 Explain" 클릭 → triggerExplain({text, hostRect})
       ▼
 [POST /api/explain (SSE)]
       │ 4. 본문 chunk lookup (Qdrant nearest + paper_id 필터)
-      │ 5. LangGraph "explain" agent — Qwen 호출, 변수표·LaTeX 인용 생성
+      │ 5. LangGraph "explain" agent — LLM 호출, 변수표·LaTeX 인용 생성
       ▼
-[ExplanationPanel — 우측 패널 스트리밍]
-      │ 6. 본문 근거 클릭 → host로 jump 명령 → iframe scrollTo + 0.5초 펄스
+[SelectionExplainPopover — 선택 문장 바로 옆 인라인 스트리밍(markdown)]
+```
+
+> **레이아웃**: ReaderShell은 `Sidebar | Center(PDF) | TranslationSidePanel | RightPanel(AI 탭)` flex 행. 해석 패널(번역)은 AI 탭과 별개의 독립 패널이며, 좌측 사이드바·해석·AI 패널을 각각 열고/닫는다(상단 툴바 토글). 좌측 사이드바는 TOC↔페이지(썸네일) 전환 + 클릭 이동.
+
+### 3.2b Reader: 원문↔해석 문장 동치 교차 하이라이트 (F-02)
+
+```
+[해석 패널] pageText를 문장 분리(오프셋 보존) → POST /api/translate(aligned)
+      │ {pair:{i,tgt}} SSE 증분 → 한국어 문장 렌더
+      │ 한국어 문장 hover → linkedHighlight → HIGHLIGHT_SENTENCE
+      ▼
+[iframe] offset→Range 매핑 → PDF 원문에 연회색 오버레이
+      ▲
+      │ 본문 hover → SENTENCE_HOVER(offset) → 대응 한국어 문장 강조 (양방향)
 ```
 
 ### 3.3 Tab 상태 동기화
@@ -150,15 +163,16 @@ Host React  ───► iframe.contentWindow.postMessage({ type, payload })
 ```
 
 **Host → iframe 메시지 타입**:
-- `LOAD_PDF` (paperId, pdf_r2_key signed URL)
-- `JUMP_TO` (page, bbox)
-- `SET_ZOOM` (scale)
-- `HIGHLIGHT_REGION` (page, bbox, color, ttl)
-- `TOGGLE_TRANSLATION` (lang)
+- `LOAD_PDF` (signed URL) · `JUMP_TO` (page) · `SET_ZOOM` (scale)
+- `RENDER_HIGHLIGHTS` / `REMOVE_HIGHLIGHT` (저장 하이라이트 오버레이)
+- `TOGGLE_TRANSLATION` (enabled — 본문 hover 리포팅 on/off) · `REQUEST_PAGE_TEXT` (page)
+- `REQUEST_OUTLINE` · `REQUEST_THUMBNAILS` (좌측 사이드바)
+- `HIGHLIGHT_SENTENCE` (page, startOffset, endOffset) / `CLEAR_SENTENCE_HIGHLIGHT` (교차 하이라이트)
 
 **iframe → Host 메시지 타입**:
-- `SELECTION_CHANGE` (text, bbox, page)
-- `PAGE_VISIBLE` (page, progress_pct)
+- `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text)
+- `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl)
+- `SENTENCE_HOVER` (page, offset — 본문 hover → 해석 패널 강조)
 - `READY` / `ERROR`
 
 ### 4.3 보안
