@@ -130,6 +130,72 @@ async def test_pregen_missing_paper_noop(db: None, monkeypatch: pytest.MonkeyPat
     await pregen_paper("nope")  # must not raise
 
 
+async def test_pregen_figure_uses_vision_when_bbox_present(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "stub")
+    await _seed([("c1", "We introduce a method. See Figure 1 for the architecture.")])
+    # figure_layout bbox 존재 + PDF 로드 가능하게 스텁 → 비전 경로(이미지 메시지) 사용
+    await cache.save_figure_layout(
+        PID,
+        [
+            {
+                "page": 1,
+                "kind": "figure",
+                "label": "Figure 1",
+                "bbox": {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5},
+                "captionText": "Architecture",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "paperlight.agents.pregen.get_object_store",
+        lambda: type("S", (), {"get_pdf": lambda self, key: b"%PDF-1.4 fake"})(),
+    )
+    monkeypatch.setattr(
+        "paperlight.agents.pregen.render_region",
+        lambda data, page, bbox, **kw: "aGVsbG8=",
+    )
+    captured: dict[str, object] = {}
+    real = cache.stream_with_cache
+
+    def spy(task: str, messages: list[dict[str, object]], **kw: object) -> AsyncIterator[str]:
+        if task == "figure_description":
+            captured["messages"] = messages
+        return real(task, messages, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("paperlight.agents.pregen.stream_with_cache", spy)
+    await pregen_paper(PID)
+
+    assert await _get(_key("figure_description", "c1", pregen.FIGURE_PROMPT_VERSION)) is not None
+    msgs = captured["messages"]
+    assert isinstance(msgs, list)
+    user = msgs[-1]
+    assert isinstance(user["content"], list)  # type: ignore[index]
+    assert any(part.get("type") == "image" for part in user["content"])  # type: ignore[index]
+
+
+async def test_pregen_figure_text_fallback_without_bbox(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "stub")
+    await _seed([("c1", "See Figure 1 for details.")])
+    captured: dict[str, object] = {}
+    real = cache.stream_with_cache
+
+    def spy(task: str, messages: list[dict[str, object]], **kw: object) -> AsyncIterator[str]:
+        if task == "figure_description":
+            captured["messages"] = messages
+        return real(task, messages, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("paperlight.agents.pregen.stream_with_cache", spy)
+    await pregen_paper(PID)  # figure_layout 없음 → 텍스트 폴백(이미지 없음)
+
+    msgs = captured["messages"]
+    assert isinstance(msgs, list)
+    assert isinstance(msgs[-1]["content"], str)  # type: ignore[index]
+
+
 async def test_pregen_task_failure_isolated(db: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "stub")
     await _seed([("c1", "Body text.")])

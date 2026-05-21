@@ -6,6 +6,7 @@ config 게이팅(env override 우선순위), pymupdf figure 회귀, marker 미�
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import os
 import tempfile
@@ -17,6 +18,7 @@ import pytest_asyncio
 
 from paperlight.ingestion.config import get_parser
 from paperlight.ingestion.parser import parse_pdf
+from paperlight.ingestion.render import render_region
 from paperlight.providers.cache import load_figure_layout, save_figure_layout
 from paperlight.storage.db import init_db, reset_engine
 
@@ -49,6 +51,12 @@ def test_marker_without_dependency_falls_back(monkeypatch: pytest.MonkeyPatch) -
     pages = parse_pdf(_blank_pdf())
     assert pages
     assert all(p.figures == () for p in pages)
+
+
+def test_render_region_returns_png() -> None:
+    b64 = render_region(_blank_pdf(), 1, {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5})
+    png = base64.b64decode(b64)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"  # PNG 시그니처
 
 
 @pytest_asyncio.fixture
