@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import AsyncIterator
+from typing import Any
+
+from paperlight.providers.content import to_text
 
 
 class StubProvider:
@@ -12,11 +15,11 @@ class StubProvider:
 
     async def stream_chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
     ) -> AsyncIterator[str]:
         user = next(
-            (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+            (to_text(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
             "",
         )
         digest = hashlib.sha256(user.encode("utf-8")).hexdigest()[:8]

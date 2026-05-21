@@ -74,7 +74,7 @@ def primary_model(task: str) -> str:
 
 async def _stream_candidates(
     task: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     holder: dict[str, str],
 ) -> AsyncIterator[str]:
     """Run the provider chain; record the model that actually yields in holder."""
@@ -115,7 +115,7 @@ async def _stream_candidates(
 
 async def stream_task(
     task: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
 ) -> AsyncIterator[str]:
     """Stream a task through its provider chain, traced via Langfuse when enabled.
 

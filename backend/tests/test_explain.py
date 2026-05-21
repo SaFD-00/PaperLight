@@ -82,3 +82,33 @@ async def test_explain_missing_key_emits_error_event(
 async def test_explain_rejects_empty(client: AsyncClient) -> None:
     resp = await client.post("/api/explain", json={"text": ""})
     assert resp.status_code == 422
+
+
+async def test_explain_figure_streams_tokens(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # stub 경로: 이미지 part가 포함된 멀티모달 메시지가 크래시 없이 스트리밍되는지 확인.
+    monkeypatch.setenv("LLM_PROVIDER", "stub")
+    payload = {
+        "kind": "figure",
+        "image": "data:image/png;base64,aGVsbG8=",
+        "label": "Figure 1",
+        "captionText": "Overview of results",
+        "paperId": "p1",
+        "page": 2,
+    }
+    async with client.stream("POST", "/api/explain/figure", json=payload) as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        body = b""
+        async for chunk in resp.aiter_bytes():
+            body += chunk
+    text = body.decode()
+    assert "[stub:" in text
+    assert "[DONE]" in text
+
+
+async def test_explain_figure_rejects_empty_image(client: AsyncClient) -> None:
+    resp = await client.post("/api/explain/figure", json={"kind": "figure", "image": ""})
+    assert resp.status_code == 422

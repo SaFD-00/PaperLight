@@ -12,6 +12,7 @@ import hashlib
 import os
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 
 from paperlight.models.cache import Cache
 from paperlight.providers.router import primary_model, stream_task
@@ -87,7 +88,7 @@ async def read_cached(
 
 async def stream_with_cache(
     task: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     *,
     text: str,
     prompt_version: str,

@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 from httpx_sse import aconnect_sse
+
+from paperlight.providers.content import openai_messages
 
 BASE_URL = "https://api.openai.com/v1"
 
@@ -20,14 +23,14 @@ class OpenAIProvider:
 
     async def stream_chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
     ) -> AsyncIterator[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "content-type": "application/json",
         }
-        payload = {"model": model, "messages": messages, "stream": True}
+        payload = {"model": model, "messages": openai_messages(messages), "stream": True}
         timeout = httpx.Timeout(60.0, read=None)
         async with (
             httpx.AsyncClient(timeout=timeout) as client,

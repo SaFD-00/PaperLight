@@ -10,6 +10,8 @@ from typing import Any
 import httpx
 from httpx_sse import aconnect_sse
 
+from paperlight.providers.content import to_gemini_parts, to_text
+
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 
@@ -23,19 +25,19 @@ class GeminiProvider:
 
     async def stream_chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
     ) -> AsyncIterator[str]:
         system_parts: list[dict[str, str]] = []
         contents: list[dict[str, Any]] = []
         for message in messages:
-            text = message.get("content", "")
+            content = message.get("content", "")
             role = message.get("role")
             if role == "system":
-                system_parts.append({"text": text})
+                system_parts.append({"text": to_text(content)})
             else:
                 gemini_role = "model" if role == "assistant" else "user"
-                contents.append({"role": gemini_role, "parts": [{"text": text}]})
+                contents.append({"role": gemini_role, "parts": to_gemini_parts(content)})
         payload: dict[str, Any] = {"contents": contents}
         if system_parts:
             payload["system_instruction"] = {"parts": system_parts}

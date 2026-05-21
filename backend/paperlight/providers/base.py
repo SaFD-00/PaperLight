@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 from contextvars import ContextVar
-from typing import Protocol
+from typing import Any, Protocol
 
 # Optional per-request sink for streaming reasoning ("thinking") deltas. The chat
 # endpoint sets it so a reasoning model's thoughts can be surfaced live instead of
@@ -19,7 +19,7 @@ class LLMProvider(Protocol):
 
     def stream_chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
     ) -> AsyncIterator[str]:
         """Return an async iterator of content tokens (async-generator method)."""
