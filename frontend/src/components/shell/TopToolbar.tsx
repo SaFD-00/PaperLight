@@ -58,6 +58,11 @@ export function TopToolbar() {
 
   const translationEnabled = useReader((s) => s.translationEnabled);
   const toggleTranslation = useReader((s) => s.toggleTranslation);
+  const zoom = useReader((s) => s.zoom);
+  const zoomIn = useReader((s) => s.zoomIn);
+  const zoomOut = useReader((s) => s.zoomOut);
+  const currentPage = useReader((s) => s.currentPage);
+  const totalPages = useReader((s) => s.totalPages);
 
   const authUser = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
@@ -78,19 +83,23 @@ export function TopToolbar() {
       </div>
 
       <div className="flex items-center gap-3 text-text-secondary">
-        <span className="font-mono text-xs">3 / 45</span>
+        <span className="font-mono text-xs">
+          {totalPages > 0 ? `${currentPage} / ${totalPages}` : "– / –"}
+        </span>
         <div className="flex items-center rounded-md border border-border-subtle bg-bg-base">
           <button
             type="button"
             aria-label="축소"
+            onClick={zoomOut}
             className="grid h-7 w-7 place-items-center hover:text-text-primary"
           >
             <Minus size={14} />
           </button>
-          <span className="px-1 font-mono text-xs">100%</span>
+          <span className="px-1 font-mono text-xs">{zoom}%</span>
           <button
             type="button"
             aria-label="확대"
+            onClick={zoomIn}
             className="grid h-7 w-7 place-items-center hover:text-text-primary"
           >
             <Plus size={14} />

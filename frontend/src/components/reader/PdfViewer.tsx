@@ -16,22 +16,27 @@ export interface PdfViewerProps {
   paperId: string;
 }
 
+/** zoom 100% 가 대응하는 iframe(viewer.js)의 기본 배율. */
+const BASE_SCALE = 1.25;
+
 export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const setSelection = useReader((s) => s.setSelection);
   const setCurrentPage = useReader((s) => s.setCurrentPage);
+  const setTotalPages = useReader((s) => s.setTotalPages);
   const setPageText = useReader((s) => s.setPageText);
   const requestPanel = useReader((s) => s.requestPanel);
   const translationEnabled = useReader((s) => s.translationEnabled);
   const currentPage = useReader((s) => s.currentPage);
+  const zoom = useReader((s) => s.zoom);
   const jumpRequest = useReader((s) => s.jumpRequest);
   const highlights = useMarkup((s) => s.highlights);
   const fetchHighlights = useMarkup((s) => s.fetchHighlights);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
+  const prevZoomRef = useRef(zoom);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [pages, setPages] = useState<{ visible: number; total: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   function postToIframe(msg: HostToIframeMessage) {
@@ -68,7 +73,8 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
           }
           if (data.numPages != null) {
             setStatus("ready");
-            setPages({ visible: 1, total: data.numPages });
+            setTotalPages(data.numPages);
+            setCurrentPage(1);
             setErrorMsg(null);
             return;
           }
@@ -80,7 +86,6 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
           }
           break;
         case "PAGE_VISIBLE":
-          setPages((prev) => (prev ? { ...prev, visible: data.page } : prev));
           setCurrentPage(data.page);
           break;
         case "PAGE_TEXT":
@@ -115,7 +120,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setSelection, setCurrentPage, setPageText, requestPanel]);
+  }, [setSelection, setCurrentPage, setTotalPages, setPageText, requestPanel]);
 
   // Translation 토글이 ON되면 현재 페이지 텍스트 요청.
   useEffect(() => {
@@ -123,6 +128,14 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "REQUEST_PAGE_TEXT", page: currentPage });
   }, [translationEnabled, currentPage]);
+
+  // 줌 변경 시 iframe 재렌더 요청 (초기 ready 시점에는 기본 배율이라 생략).
+  useEffect(() => {
+    if (status !== "ready") return;
+    if (prevZoomRef.current === zoom) return;
+    prevZoomRef.current = zoom;
+    postToIframe({ source: HOST_SOURCE, type: "SET_ZOOM", scale: (zoom / 100) * BASE_SCALE });
+  }, [zoom, status]);
 
   // Citation 클릭 → 해당 페이지로 점프 (F-03).
   useEffect(() => {
@@ -155,7 +168,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   useEffect(() => {
     if (!pdfUrl) {
       setStatus("idle");
-      setPages(null);
+      setTotalPages(0);
       return;
     }
     setStatus("loading");
@@ -164,7 +177,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
       return;
     }
     postToIframe({ source: HOST_SOURCE, type: "LOAD_PDF", url: pdfUrl });
-  }, [pdfUrl]);
+  }, [pdfUrl, setTotalPages]);
 
   return (
     <div className="relative h-full w-full bg-bg-muted">
@@ -186,11 +199,6 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
           <div className="rounded-full bg-danger px-3 py-1 text-xs text-white shadow">
             PDF 로드 실패: {errorMsg ?? "unknown"}
           </div>
-        </div>
-      )}
-      {status === "ready" && pages && (
-        <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-bg-surface px-2 py-1 text-xs text-text-secondary shadow">
-          {pages.visible} / {pages.total}
         </div>
       )}
     </div>

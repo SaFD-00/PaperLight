@@ -29,7 +29,11 @@ interface ReaderState {
   askText: string | null;
   translateSelection: TranslateSelection | null;
   translationEnabled: boolean;
+  /** 본문 확대율(%) — 100 = 기본 배율. */
+  zoom: number;
   currentPage: number;
+  /** PDF 전체 페이지 수 (미로드 시 0). */
+  totalPages: number;
   pageText: Record<number, string>;
   /** Citation jump signal — nonce forces re-fire even when page repeats. */
   jumpRequest: { page: number; nonce: number } | null;
@@ -44,11 +48,18 @@ interface ReaderState {
   clearTranslateSelection: () => void;
   toggleTranslation: () => void;
   setTranslation: (enabled: boolean) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   setCurrentPage: (page: number) => void;
+  setTotalPages: (total: number) => void;
   setPageText: (page: number, text: string) => void;
   requestJump: (page: number) => void;
   requestPanel: (panel: string) => void;
 }
+
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 250;
+const ZOOM_STEP = 10;
 
 export const useReader = create<ReaderState>((set) => ({
   selection: null,
@@ -56,7 +67,9 @@ export const useReader = create<ReaderState>((set) => ({
   askText: null,
   translateSelection: null,
   translationEnabled: false,
+  zoom: 100,
   currentPage: 1,
+  totalPages: 0,
   pageText: {},
   jumpRequest: null,
   panelRequest: null,
@@ -75,7 +88,10 @@ export const useReader = create<ReaderState>((set) => ({
   clearTranslateSelection: () => set({ translateSelection: null }),
   toggleTranslation: () => set((state) => ({ translationEnabled: !state.translationEnabled })),
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
+  zoomIn: () => set((state) => ({ zoom: Math.min(ZOOM_MAX, state.zoom + ZOOM_STEP) })),
+  zoomOut: () => set((state) => ({ zoom: Math.max(ZOOM_MIN, state.zoom - ZOOM_STEP) })),
   setCurrentPage: (page) => set({ currentPage: page }),
+  setTotalPages: (total) => set({ totalPages: total }),
   setPageText: (page, text) =>
     set((state) => ({ pageText: { ...state.pageText, [page]: text } })),
   requestJump: (page) => set({ jumpRequest: { page, nonce: Date.now() } }),
