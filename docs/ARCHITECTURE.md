@@ -124,7 +124,7 @@ PaperLight/
 ```
 [host] PAGE_VISIBLE(page) → 미요청이면 REQUEST_PAGE_TEXT(page) (스크롤 따라 lazy)
       ▼
-[iframe] extractBodyText: Figure 캡션·표·수식·페이지번호 보수적 제거
+[iframe] extractBodyText: Figure 캡션(멀티라인·한국어 그림/표 포함)·표 수치·수식·페이지번호 보수적 제거
       │ + body↔원문 offset 매핑(segments, pageSegments에 저장) → PAGE_TEXT(page, bodyText)
       ▼
 [host] splitSentences(bodyText) → POST /api/translate(aligned)
@@ -137,6 +137,27 @@ PaperLight/
 ```
 
 > 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
+
+### 3.2c Reader: Figure/Table 인라인 비전 설명 (F-04/F-14)
+
+본문 번역에서 제외된 Figure/Table은 각각 **개별적으로** 비전 분석해 인라인 팝오버로 본다.
+
+```
+[iframe] 페이지 paint 후 detectFigureAnchors: getTextContent geometry + parseCaptionLabel로
+      │ 캡션 위치·종류·라벨 수집 → 이미지 영역 추정(Figure=캡션 위, Table=캡션 아래,
+      │ 좁은 캡션은 컬럼 휴리스틱) → 캡션 위 "설명" 버튼 오버레이(정규화 % 위치, 줌 무관)
+      ▼ (버튼 클릭)
+[iframe] cropRegion: page-canvas에서 region을 잘라 PNG dataURL → FIGURE_EXPLAIN(page, kind,
+      │ label, captionText, imageDataUrl, rect) 전송
+      ▼
+[host] iframe rect 보정 → FigureExplainPopover: POST /api/explain/figure
+      │ {kind, image(dataURL), label, captionText, paperId, page}
+      ▼
+[backend] figure_description(gpt-5 vision) / table_description(gemini-2.5-pro) task로
+      │ [text + image] 멀티모달 메시지 스트리밍, 이미지 해시 캐시 키(on-demand+캐시)
+```
+
+> 영역은 캡션 앵커 휴리스틱(±42% 밴드)이라 과잉 crop 허용(비전 모델이 여백 흡수). 정밀 bbox는 marker-pdf 후속. pregen의 figure/table 사전생성(텍스트 reasoning)은 그대로 유지 — 인라인 설명은 별도 on-demand 경로.
 
 ### 3.3 Tab 상태 동기화
 
@@ -180,6 +201,7 @@ Host React  ───► iframe.contentWindow.postMessage({ type, payload })
 **iframe → Host 메시지 타입**:
 - `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text=본문)
 - `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl)
+- `FIGURE_EXPLAIN` (page, kind, label, captionText, imageDataUrl, rect) — Figure/Table 설명 버튼 클릭(crop 이미지)
 - `READY` / `ERROR`
 
 > 교차 하이라이트는 원문·번역이 모두 iframe 안에 있으므로 iframe 내부에서 처리한다(이전 `HIGHLIGHT_SENTENCE`/`SENTENCE_HOVER` host 왕복 제거).
@@ -216,6 +238,8 @@ class LLMProvider(Protocol):
 - Figure description (Vision) → `openai/gpt-5` (F-14)
 - Table description → `gemini/gemini-2.5-pro` (F-14 fallback)
 - 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial)
+
+**멀티모달 content**: 메시지 `content`는 `str`(텍스트, 기존 그대로) 또는 parts 배열 `[{type:text}, {type:image, mime, data}]`(`providers/content.py`)을 받는다. gemini는 `inline_data`, openai/openrouter는 `image_url`(data URL)로 변환, stub은 이미지 무시. Figure/Table 인라인 설명(`/api/explain/figure`, §3.2c)이 [캡션·본문 텍스트 + crop 이미지]를 비전 모델에 함께 전달하는 경로.
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).
 
