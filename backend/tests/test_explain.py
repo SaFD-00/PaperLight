@@ -112,3 +112,33 @@ async def test_explain_figure_streams_tokens(
 async def test_explain_figure_rejects_empty_image(client: AsyncClient) -> None:
     resp = await client.post("/api/explain/figure", json={"kind": "figure", "image": ""})
     assert resp.status_code == 422
+
+
+async def test_explain_figure_multiturn_emits_followups(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 후속 질문(history 포함) 멀티턴이 크래시 없이 스트리밍되고 followups meta를 발송하는지.
+    monkeypatch.setenv("LLM_PROVIDER", "stub")
+    payload = {
+        "kind": "figure",
+        "image": "data:image/png;base64,aGVsbG8=",
+        "label": "Figure 1",
+        "captionText": "Overview of results",
+        "question": "x축이 의미하는 게 뭐야?",
+        "history": [
+            {"role": "user", "content": "Figure 1을 설명해줘"},
+            {"role": "assistant", "content": "이 그림은 결과 개요입니다."},
+        ],
+        "paperId": "p1",
+        "page": 2,
+    }
+    async with client.stream("POST", "/api/explain/figure", json=payload) as resp:
+        assert resp.status_code == 200
+        body = b""
+        async for chunk in resp.aiter_bytes():
+            body += chunk
+    text = body.decode()
+    assert "[stub:" in text
+    assert "followups" in text
+    assert "[DONE]" in text

@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from paperlight.agents.chat import generate_followups
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
@@ -21,6 +22,8 @@ router = APIRouter(prefix="/api/explain", tags=["explain"])
 EXPLAIN_PROMPT_VERSION = "explain-v1"
 FIGURE_PROMPT_VERSION = "figure-v2"
 TABLE_PROMPT_VERSION = "table-v2"
+
+_FIGURE_HISTORY_TURNS = 6
 
 SYSTEM_PROMPT = (
     "당신은 학술 논문 설명 도우미입니다. "
@@ -55,6 +58,8 @@ class FigureExplainRequest(BaseModel):
     label: str = ""
     captionText: str = ""
     context: str = ""
+    question: str = ""  # 후속 질문(빈 값=첫 설명 턴)
+    history: list[dict[str, str]] = Field(default_factory=list)  # 이전 텍스트 turns
     paperId: str | None = None
     page: int | None = None
 
@@ -112,24 +117,34 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
     task = "table_description" if is_table else "figure_description"
     version = TABLE_PROMPT_VERSION if is_table else FIGURE_PROMPT_VERSION
 
-    prompt = f"{req.label or req.kind} 캡션:\n{req.captionText or '(없음)'}"
-    if req.context:
-        prompt += f"\n\n주변 본문:\n{req.context}"
-    prompt += f"\n\n위 {('표' if is_table else '그림')}를 설명해주세요."
+    if req.question.strip():
+        user_text = req.question
+    else:
+        user_text = f"{req.label or req.kind} 캡션:\n{req.captionText or '(없음)'}"
+        if req.context:
+            user_text += f"\n\n주변 본문:\n{req.context}"
+        user_text += f"\n\n위 {('표' if is_table else '그림')}를 설명해주세요."
 
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": system},
+    history = req.history[-_FIGURE_HISTORY_TURNS:]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *history]
+    # 매 턴 이미지를 재첨부해 비전 모델이 그림 세부를 계속 참조하게 한다.
+    messages.append(
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt},
+                {"type": "text", "text": user_text},
                 {"type": "image", "mime": mime, "data": b64},
             ],
-        },
-    ]
-    # 이미지 해시를 캐시 키에 포함해 같은 figure 재요청을 재사용한다.
+        }
+    )
+    # 이미지 해시 + 질문 + 히스토리를 캐시 키에 포함(같은 figure 재요청 재사용 + 멀티턴 정확성).
     image_hash = hashlib.sha256(b64.encode("utf-8")).hexdigest()[:16]
-    cache_text = f"{req.kind}|{req.label}|{image_hash}"
+    q_hash = hashlib.sha256(req.question.encode("utf-8")).hexdigest()[:12]
+    hist_raw = "|".join(f"{m.get('role')}:{m.get('content')}" for m in history)
+    hist_hash = hashlib.sha256(hist_raw.encode("utf-8")).hexdigest()[:12]
+    cache_text = f"{req.kind}|{req.label}|{image_hash}|{q_hash}|{hist_hash}"
+
+    answer: list[str] = []
     try:
         async for token in stream_with_cache(
             task,
@@ -138,10 +153,17 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
             paper_id=req.paperId,
             prompt_version=version,
         ):
+            answer.append(token)
             yield _format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         capture_exception(err)
         yield _format_sse({"error": str(err)})
+        yield "data: [DONE]\n\n"
+        return
+
+    followups = await generate_followups(req.question or req.label or req.kind, "".join(answer))
+    if followups:
+        yield _format_sse({"followups": followups})
     yield "data: [DONE]\n\n"
 
 
