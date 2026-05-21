@@ -117,19 +117,26 @@ PaperLight/
 [SelectionExplainPopover — 선택 문장 바로 옆 인라인 스트리밍(markdown)]
 ```
 
-> **레이아웃**: ReaderShell은 `Sidebar | Center(PDF) | TranslationSidePanel | RightPanel(AI 탭)` flex 행. 해석 패널(번역)은 AI 탭과 별개의 독립 패널이며, 좌측 사이드바·해석·AI 패널을 각각 열고/닫는다(상단 툴바 토글). 좌측 사이드바는 TOC↔페이지(썸네일) 전환 + 클릭 이동.
+> **레이아웃**: ReaderShell은 `Sidebar | Center(PDF) | RightPanel(AI 탭)` flex 행. 해석(번역)은 **별도 사이드 패널이 아니라 PDF 연속 스크롤 안에서 각 페이지 오른쪽에 나란히 붙는 컬럼**(viewer.js `.page-row = [.page-wrapper | .page-translation]`)이며, 상단 툴바 [T] 토글로 컬럼을 켜고/끈다. 좌측 사이드바·AI 패널은 각각 토글. 좌측 사이드바는 TOC↔페이지(썸네일) 전환 + 클릭 이동.
 
-### 3.2b Reader: 원문↔해석 문장 동치 교차 하이라이트 (F-02)
+### 3.2b Reader: 페이지별 번역 컬럼 + 원문↔해석 교차 하이라이트 (F-02)
 
 ```
-[해석 패널] pageText를 문장 분리(오프셋 보존) → POST /api/translate(aligned)
-      │ {pair:{i,tgt}} SSE 증분 → 한국어 문장 렌더
-      │ 한국어 문장 hover → linkedHighlight → HIGHLIGHT_SENTENCE
+[host] PAGE_VISIBLE(page) → 미요청이면 REQUEST_PAGE_TEXT(page) (스크롤 따라 lazy)
       ▼
-[iframe] offset→Range 매핑 → PDF 원문에 연회색 오버레이
-      ▲
-      │ 본문 hover → SENTENCE_HOVER(offset) → 대응 한국어 문장 강조 (양방향)
+[iframe] extractBodyText: Figure 캡션·표·수식·페이지번호 보수적 제거
+      │ + body↔원문 offset 매핑(segments, pageSegments에 저장) → PAGE_TEXT(page, bodyText)
+      ▼
+[host] splitSentences(bodyText) → POST /api/translate(aligned)
+      │ {pair:{i,tgt}} SSE 증분 → RENDER_TRANSLATION(page, [{i,tgt,bodyStart,bodyEnd}], replace)
+      │ 페이지별 캐시(재방문/토글 즉시), 논문 전환 시 reset+CLEAR_TRANSLATION
+      ▼
+[iframe] 해당 페이지 .page-translation 컬럼에 문장 span 증분 렌더
+      │ bodyStart/bodyEnd → mapBodyRange(segments) → 원문 전역 offset
+      │ 번역 span hover → 원문 연회색 오버레이 / 원문 hover → 번역 span 강조 (양방향, iframe 내부)
 ```
+
+> 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
 
 ### 3.3 Tab 상태 동기화
 
@@ -165,15 +172,17 @@ Host React  ───► iframe.contentWindow.postMessage({ type, payload })
 **Host → iframe 메시지 타입**:
 - `LOAD_PDF` (signed URL) · `JUMP_TO` (page) · `SET_ZOOM` (scale)
 - `RENDER_HIGHLIGHTS` / `REMOVE_HIGHLIGHT` (저장 하이라이트 오버레이)
-- `TOGGLE_TRANSLATION` (enabled — 본문 hover 리포팅 on/off) · `REQUEST_PAGE_TEXT` (page)
+- `TOGGLE_TRANSLATION` (enabled — 번역 컬럼 표시/숨김 + 본문 hover on/off) · `REQUEST_PAGE_TEXT` (page — 본문만 반환)
 - `REQUEST_OUTLINE` · `REQUEST_THUMBNAILS` (좌측 사이드바)
-- `HIGHLIGHT_SENTENCE` (page, startOffset, endOffset) / `CLEAR_SENTENCE_HIGHLIGHT` (교차 하이라이트)
+- `RENDER_TRANSLATION` (page, pairs[{i,tgt,bodyStart,bodyEnd}], replace) / `CLEAR_TRANSLATION` (page?) — 페이지별 번역 컬럼
+- `SET_TRANSLATION_FONT` (family sans|serif, scale) — 번역 컬럼 글꼴·크기
 
 **iframe → Host 메시지 타입**:
-- `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text)
+- `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text=본문)
 - `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl)
-- `SENTENCE_HOVER` (page, offset — 본문 hover → 해석 패널 강조)
 - `READY` / `ERROR`
+
+> 교차 하이라이트는 원문·번역이 모두 iframe 안에 있으므로 iframe 내부에서 처리한다(이전 `HIGHLIGHT_SENTENCE`/`SENTENCE_HOVER` host 왕복 제거).
 
 ### 4.3 보안
 - 호스트는 `event.source === iframeRef.current?.contentWindow` 검증 후에만 메시지 수용.

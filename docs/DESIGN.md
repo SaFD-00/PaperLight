@@ -250,6 +250,10 @@
 
 수식 = KaTeX default + `--font-mono` 14px.
 
+**번역 글꼴 (F-02 페이지별 번역 컬럼)**: 번역 컬럼은 산세리프(Pretendard) / 세리프(Noto Serif KR, 본명조) 중 선택(설정에 영속). 컬럼은 iframe 안이라 viewer.css `@font-face`로 자체 호스팅하며 host가 `SET_TRANSLATION_FONT`로 전달.
+
+**리더 글꼴 크기 (F-02)**: `--reader-font-scale`(0.8–1.4, 기본 1.0)을 `html` 폰트 크기에 곱해 번역 컬럼 + 리더 UI 텍스트를 함께 조절(PDF 원문 줌과는 독립). 리더 라우트에서만 적용되어 Library는 무영향. 설정 위치: 우상단 설정(⋯) 메뉴.
+
 ### 3.3 Spacing (4의 배수)
 ```css
 --space-1: 4px;
