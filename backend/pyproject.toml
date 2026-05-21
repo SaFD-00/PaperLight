@@ -38,8 +38,18 @@ ingest = [
     "fastembed>=0.8.0",
 ]
 # marker-pdf(정밀 figure/table bbox)는 torch+레이아웃 모델(수 GB)이고 pillow 핀이
-# fastembed와 충돌해 여기에 넣지 않는다. config/ingestion.yaml의 parser=marker로
-# 켤 때 별도 설치: `uv pip install marker-pdf`. 미설치 시 parser가 자동 폴백한다.
+# fastembed와 충돌하므로 [tool.uv] conflicts로 분리한다. config/ingestion.yaml의
+# parser=marker로 켤 때 `uv sync --extra marker`(또는 `uv pip install marker-pdf`).
+# 미설치 시 parser가 자동 폴백한다.
+marker = [
+    "marker-pdf>=1.0.0",
+]
+
+[tool.uv]
+# marker(pillow<11)와 ingest/fastembed(pillow>=12, py3.14)는 동시 설치 불가 → 상호배타.
+conflicts = [
+    [{ extra = "ingest" }, { extra = "marker" }],
+]
 
 [build-system]
 requires = ["hatchling"]
