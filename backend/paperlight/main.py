@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -34,11 +35,24 @@ from paperlight.storage.db import init_db
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
+def _seed_samples_enabled() -> bool:
+    # Demo pilot papers (sample-1/sample-2) are seeded only in dev or when opted
+    # in, so a production DB is never polluted by the bundled fixtures.
+    if os.environ.get("APP_ENV", "development") == "development":
+        return True
+    return os.environ.get("PAPERLIGHT_SEED_SAMPLES") == "1"
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     load_dotenv(_ENV_FILE)
     init_sentry()
     await init_db()
+    if _seed_samples_enabled():
+        # Background so the heavy first-time ingest/pre-gen never blocks startup.
+        from paperlight.ingestion.seed import seed_samples
+
+        asyncio.create_task(seed_samples())
     yield
     shutdown_langfuse()
 
