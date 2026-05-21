@@ -284,6 +284,8 @@ class TTSProvider(Protocol):
 
 **로컬 빠른 실행 모드(Docker 불필요)**: `.env`에서 `DATABASE_URL`·`QDRANT_URL`·`S3_ENDPOINT` 3개만 주석 처리하면 sqlite(`db.py` 기본) + LocalObjectStore(`object_store.py:get_object_store`) + 인메모리 Qdrant(`vector.py`)로 폴백한다. API 키는 그대로 로드돼 AI는 동작. 풀 인프라는 3줄 주석 해제 후 `docker-compose up -d`.
 
+**파일럿 샘플 논문 시드(데모)**: FE 라이브러리는 `sample-1`/`sample-2`(`fixtures/pilot-papers`)를 데모 카드로 노출하지만, 백엔드 `papers`에 행이 없으면 우측 AI 패널이 `/api/papers/sample-1/...`을 호출해 **404 → 빨간 에러**가 난다. 백엔드는 `lifespan` startup에서 `ingestion/seed.py:seed_samples`를 백그라운드(`asyncio.create_task`)로 돌려 두 파일럿을 `anonymous` 소유로 ingest + pregen해 둔다 → Summary/Insights/Chat이 import 없이 동작. **env 게이팅**: `APP_ENV=development` 또는 `PAPERLIGHT_SEED_SAMPLES=1`일 때만(프로덕션 DB 미오염). **idempotent**: chunks가 있으면 full ingest를 건너뛰되, 인메모리 Qdrant는 재시작 시 비므로 벡터만 재-upsert해 Chat retrieval을 복구한다(pregen 산출물은 `caches` TTL ∞로 영속 → 두 번째 startup부터 LLM 재호출 없이 캐시 히트). **Chat 검색 품질**: 기본 `INGEST_EMBEDDER=stub`은 결정적 랜덤 벡터라 의미 검색이 안 돼 Chat이 "근거 없음"으로 답할 수 있다. 의미 기반 RAG가 필요하면 `uv sync --extra ingest` 후 `INGEST_EMBEDDER=fastembed`(bge-m3)로 전환하고 재시드한다.
+
 ### 7.3 Observability
 - **Sentry** — 에러 (FE + BE)
 - **PostHog** — 제품 이벤트, KPI ([PRD §3](./PRD.md))
