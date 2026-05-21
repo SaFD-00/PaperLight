@@ -296,6 +296,7 @@
 ### 5.4 Right AI Panel ⭐ v3.0 디테일 강화
 
 #### 5.4.1 상단 탭 (6개 아이콘 Rail)
+- 라벨 없이 아이콘만 노출 → 각 아이콘 호버 시 한 문장 기능 설명 tooltip (`aria-label` + `title`).
 - 📖 **Summary** — TL;DR / 3줄 / Section / 키워드 / Figures & Tables 인덱스
 - 📝 **Paragraph Insights** — F-15 모드 4종 + Critical 필터
 - 🎧 **Podcast** — 생성 / 플레이어

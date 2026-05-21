@@ -34,17 +34,17 @@ type PanelId =
   | "bookmarks"
   | "starred";
 
-const PANEL_TABS: { id: PanelId; label: string; icon: typeof BookOpen }[] = [
-  { id: "explain", label: "Explanation", icon: Lightbulb },
-  { id: "translate", label: "Translation", icon: Languages },
-  { id: "summary", label: "Summary", icon: BookOpen },
-  { id: "insights", label: "Insights", icon: Sparkles },
-  { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "references", label: "References", icon: Quote },
-  { id: "notes", label: "Notes", icon: FileText },
-  { id: "podcast", label: "Podcast", icon: Headphones },
-  { id: "bookmarks", label: "Bookmarks", icon: Bookmark },
-  { id: "starred", label: "Starred", icon: Star },
+const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookOpen }[] = [
+  { id: "explain", label: "Explanation", hint: "선택한 텍스트를 쉽게 풀어 설명합니다", icon: Lightbulb },
+  { id: "translate", label: "Translation", hint: "현재 페이지를 한국어로 번역합니다", icon: Languages },
+  { id: "summary", label: "Summary", hint: "논문 전체를 요약해 보여줍니다", icon: BookOpen },
+  { id: "insights", label: "Insights", hint: "논문의 핵심 통찰을 정리합니다", icon: Sparkles },
+  { id: "chat", label: "Chat", hint: "논문 내용에 대해 질문하고 대화합니다", icon: MessageSquare },
+  { id: "references", label: "References", hint: "참고문헌 목록을 보여줍니다", icon: Quote },
+  { id: "notes", label: "Notes", hint: "하이라이트와 메모를 모아 봅니다", icon: FileText },
+  { id: "podcast", label: "Podcast", hint: "논문을 오디오 팟캐스트로 만듭니다", icon: Headphones },
+  { id: "bookmarks", label: "Bookmarks", hint: "북마크한 위치를 모아 봅니다", icon: Bookmark },
+  { id: "starred", label: "Starred", hint: "즐겨찾기한 항목을 모아 봅니다", icon: Star },
 ];
 
 export function RightPanel({ paperId }: { paperId: string }) {
@@ -84,6 +84,7 @@ export function RightPanel({ paperId }: { paperId: string }) {
               key={t.id}
               type="button"
               aria-label={t.label}
+              title={t.hint}
               onClick={() => setActive(t.id)}
               className={
                 isActive

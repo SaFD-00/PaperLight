@@ -313,6 +313,7 @@ Library 4-pane / Reader / Right Panel 전체에 동일 톤 적용.
 ### 5.1 Hover
 - 일반 버튼: `100ms ease-out`, 배경색 변경.
 - 칩: 배경 `--brand-primary-soft` + border subtle.
+- 아이콘 only 버튼: 호버 시 `title` 툴팁으로 기능을 한 문장으로 안내 (예: 우측 패널 Icon-Rail).
 
 ### 5.2 Click
 - `80ms scale(0.98)` 마이크로 반응.
