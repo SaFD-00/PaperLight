@@ -112,3 +112,43 @@ async def stream_with_cache(
     full = "".join(buffer)
     if full.strip():
         await _write(key, task, paper_id, full, model, ttl)
+
+
+# Figure/Table layout(bbox)은 구조화 JSON이라 _read/_write(문자열 전용)를 우회하고
+# Cache row를 직접 read/write한다. paper당 단일 row(content_id=paper_id, 영구 ttl=0).
+FIGURE_LAYOUT_TASK = "figure_layout"
+FIGURE_LAYOUT_VERSION = "layout-v1"
+
+
+def _figure_layout_key(paper_id: str) -> str:
+    return cache_key(FIGURE_LAYOUT_TASK, paper_id, paper_id, "layout", FIGURE_LAYOUT_VERSION)
+
+
+async def save_figure_layout(paper_id: str, figures: list[dict[str, Any]]) -> None:
+    key = _figure_layout_key(paper_id)
+    payload = {"figures": figures}
+    async with session_scope() as session:
+        existing = await session.get(Cache, key)
+        if existing is not None:
+            existing.response = payload
+            existing.expires_at = None
+        else:
+            session.add(
+                Cache(
+                    key=key,
+                    task=FIGURE_LAYOUT_TASK,
+                    paper_id=paper_id,
+                    response=payload,
+                    expires_at=None,
+                )
+            )
+
+
+async def load_figure_layout(paper_id: str) -> list[dict[str, Any]]:
+    key = _figure_layout_key(paper_id)
+    async with session_scope() as session:
+        row = await session.get(Cache, key)
+        if row is None:
+            return []
+        figures = row.response.get("figures")
+        return figures if isinstance(figures, list) else []

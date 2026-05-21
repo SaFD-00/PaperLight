@@ -36,7 +36,7 @@ from paperlight.ingestion.pipeline import ingest_paper
 from paperlight.models.cache import Cache
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
-from paperlight.providers.cache import cache_key, read_cached
+from paperlight.providers.cache import cache_key, load_figure_layout, read_cached
 from paperlight.providers.router import primary_model
 from paperlight.storage.db import get_session, get_session_factory
 from paperlight.storage.object_store import (
@@ -222,6 +222,13 @@ async def ingestion_progress(
 
 def _pgkey(task: str, paper_id: str, chunk_id: str, version: str) -> str:
     return cache_key(task, paper_id, chunk_id, primary_model(task), version)
+
+
+@router.get("/{paper_id}/figures")
+async def get_figures(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
+    """Figure/Table bbox layout(정밀 marker 모드에서만 채워짐). 없으면 빈 리스트."""
+    await _get_owned(session, paper_id, user_id)
+    return {"figures": await load_figure_layout(paper_id)}
 
 
 @router.get("/{paper_id}/summary")

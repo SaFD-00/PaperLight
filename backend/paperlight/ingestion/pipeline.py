@@ -18,6 +18,7 @@ from paperlight.ingestion.embedder import embed
 from paperlight.ingestion.parser import parse_pdf
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
+from paperlight.providers.cache import save_figure_layout
 from paperlight.storage.db import get_session_factory
 from paperlight.storage.object_store import get_object_store, pdf_key
 from paperlight.storage.vector import get_vector_store
@@ -41,6 +42,20 @@ async def ingest_paper(paper_id: str) -> None:
         data = await asyncio.to_thread(get_object_store().get_pdf, pdf_key(paper_id))
         pages = await asyncio.to_thread(parse_pdf, data)
         chunk_datas = chunk_pages(pages)
+
+        figures = [
+            {
+                "page": p.page_num,
+                "kind": fig.kind,
+                "label": fig.label,
+                "bbox": fig.bbox,
+                "captionText": fig.caption_text,
+            }
+            for p in pages
+            for fig in p.figures
+        ]
+        if figures:
+            await save_figure_layout(paper_id, figures)
 
         factory = get_session_factory()
         points_meta: list[tuple[str, str, int]] = []

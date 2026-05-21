@@ -1,0 +1,6 @@
+# Ingestion config — S9. Loaded by paperlight.ingestion.config.
+# parser: PDF 파서 선택.
+#   pymupdf — 경량 텍스트 추출(기본). figure/table bbox 없음(프론트 휴리스틱).
+#   marker  — marker-pdf로 정밀 figure/table bbox 추출(torch+모델 수 GB, 무거움).
+# 우선순위: env INGEST_PARSER > 이 파일 > "pymupdf".
+parser: pymupdf
