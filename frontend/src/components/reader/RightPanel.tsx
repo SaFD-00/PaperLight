@@ -5,7 +5,6 @@ import {
   BookOpen,
   FileText,
   Headphones,
-  Languages,
   Lightbulb,
   MessageSquare,
   Quote,
@@ -19,12 +18,10 @@ import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
 import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
-import { TranslationPane } from "@/components/panels/TranslationPane";
 import { useReader } from "@/stores/reader";
 
 type PanelId =
   | "explain"
-  | "translate"
   | "summary"
   | "insights"
   | "chat"
@@ -36,7 +33,6 @@ type PanelId =
 
 const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookOpen }[] = [
   { id: "explain", label: "Explanation", hint: "선택한 텍스트를 쉽게 풀어 설명합니다", icon: Lightbulb },
-  { id: "translate", label: "Translation", hint: "현재 페이지를 한국어로 번역합니다", icon: Languages },
   { id: "summary", label: "Summary", hint: "논문 전체를 요약해 보여줍니다", icon: BookOpen },
   { id: "insights", label: "Insights", hint: "논문의 핵심 통찰을 정리합니다", icon: Sparkles },
   { id: "chat", label: "Chat", hint: "논문 내용에 대해 질문하고 대화합니다", icon: MessageSquare },
@@ -52,7 +48,6 @@ export function RightPanel({ paperId }: { paperId: string }) {
   const explainText = useReader((s) => s.explainText);
   const askText = useReader((s) => s.askText);
   const panelRequest = useReader((s) => s.panelRequest);
-  const translationEnabled = useReader((s) => s.translationEnabled);
 
   useEffect(() => {
     if (explainText) setActive("explain");
@@ -65,10 +60,6 @@ export function RightPanel({ paperId }: { paperId: string }) {
   useEffect(() => {
     if (panelRequest) setActive(panelRequest.panel as PanelId);
   }, [panelRequest]);
-
-  useEffect(() => {
-    if (translationEnabled) setActive("translate");
-  }, [translationEnabled]);
 
   return (
     <aside
@@ -99,14 +90,12 @@ export function RightPanel({ paperId }: { paperId: string }) {
       </div>
       <div className="flex-1 overflow-hidden">
         {active === "explain" && <ExplanationPanel />}
-        {active === "translate" && <TranslationPane />}
         {active === "summary" && <SummaryPanel paperId={paperId} />}
         {active === "insights" && <InsightsPanel paperId={paperId} />}
         {active === "chat" && <ChatPanel paperId={paperId} />}
         {active === "references" && <ReferencesPanel paperId={paperId} />}
         {active === "notes" && <NotesPanel paperId={paperId} />}
         {active !== "explain" &&
-          active !== "translate" &&
           active !== "summary" &&
           active !== "insights" &&
           active !== "chat" &&

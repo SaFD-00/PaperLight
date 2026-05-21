@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Minus,
+  PanelRight,
   Play,
   Plus,
   Search,
@@ -58,6 +59,9 @@ export function TopToolbar() {
 
   const translationEnabled = useReader((s) => s.translationEnabled);
   const toggleTranslation = useReader((s) => s.toggleTranslation);
+  const aiPanelOpen = useReader((s) => s.aiPanelOpen);
+  const toggleAiPanel = useReader((s) => s.toggleAiPanel);
+  const toggleSidebar = useReader((s) => s.toggleSidebar);
   const zoom = useReader((s) => s.zoom);
   const zoomIn = useReader((s) => s.zoomIn);
   const zoomOut = useReader((s) => s.zoomOut);
@@ -71,7 +75,7 @@ export function TopToolbar() {
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-3">
       <div className="flex items-center gap-1">
-        <IconButton label="목차 토글">
+        <IconButton label="목차 토글" onClick={toggleSidebar}>
           <ChevronLeft size={16} />
         </IconButton>
         <IconButton label="썸네일">
@@ -150,6 +154,21 @@ export function TopToolbar() {
         <IconButton label="명령 팔레트 (⌘K)">
           <Search size={14} />
         </IconButton>
+        <button
+          type="button"
+          aria-label="AI 패널 토글"
+          aria-pressed={aiPanelOpen}
+          onClick={toggleAiPanel}
+          title="AI 패널 토글"
+          className={clsx(
+            "grid h-8 w-8 place-items-center rounded-md transition-colors",
+            aiPanelOpen
+              ? "bg-bg-muted text-text-primary"
+              : "text-text-secondary hover:bg-bg-muted hover:text-text-primary"
+          )}
+        >
+          <PanelRight size={14} />
+        </button>
         <SettingsMenu />
         {isLoggedIn ? (
           <IconButton

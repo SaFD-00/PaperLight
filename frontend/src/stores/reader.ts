@@ -28,7 +28,12 @@ interface ReaderState {
   explainText: string | null;
   askText: string | null;
   translateSelection: TranslateSelection | null;
+  /** 해석 패널(우측, AI 패널과 별개) 열림 여부. 상단 [T] 토글과 연동. */
   translationEnabled: boolean;
+  /** AI 탭 패널(우측) 열림 여부. */
+  aiPanelOpen: boolean;
+  /** 좌측 사이드바(TOC/페이지) 열림 여부. */
+  sidebarOpen: boolean;
   /** 본문 확대율(%) — 100 = 기본 배율. */
   zoom: number;
   currentPage: number;
@@ -48,6 +53,8 @@ interface ReaderState {
   clearTranslateSelection: () => void;
   toggleTranslation: () => void;
   setTranslation: (enabled: boolean) => void;
+  toggleAiPanel: () => void;
+  toggleSidebar: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   setCurrentPage: (page: number) => void;
@@ -67,6 +74,8 @@ export const useReader = create<ReaderState>((set) => ({
   askText: null,
   translateSelection: null,
   translationEnabled: false,
+  aiPanelOpen: true,
+  sidebarOpen: true,
   zoom: 100,
   currentPage: 1,
   totalPages: 0,
@@ -88,6 +97,8 @@ export const useReader = create<ReaderState>((set) => ({
   clearTranslateSelection: () => set({ translateSelection: null }),
   toggleTranslation: () => set((state) => ({ translationEnabled: !state.translationEnabled })),
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
+  toggleAiPanel: () => set((state) => ({ aiPanelOpen: !state.aiPanelOpen })),
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   zoomIn: () => set((state) => ({ zoom: Math.min(ZOOM_MAX, state.zoom + ZOOM_STEP) })),
   zoomOut: () => set((state) => ({ zoom: Math.max(ZOOM_MIN, state.zoom - ZOOM_STEP) })),
   setCurrentPage: (page) => set({ currentPage: page }),
