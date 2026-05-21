@@ -44,7 +44,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 def _cors_origins() -> list[str]:
-    raw = os.environ.get("PAPERLIGHT_CORS_ORIGINS", "http://localhost:3000")
+    # 로컬 dev 는 localhost·127.0.0.1 둘 다 흔하다(Next.js dev 가 양쪽 주소를 띄움).
+    # 둘 중 하나만 허용하면 다른 쪽 origin 의 preflight 가 400 으로 막혀 POST 가 차단된다.
+    raw = os.environ.get(
+        "PAPERLIGHT_CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
