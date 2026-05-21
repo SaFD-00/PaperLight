@@ -10,6 +10,7 @@ import {
 import { createShadowIframe, type ShadowIframeHandle } from "@/lib/pdf/shadow-iframe";
 import { useMarkup } from "@/stores/markup";
 import { useReader } from "@/stores/reader";
+import { useSettings } from "@/stores/settings";
 
 export interface PdfViewerProps {
   pdfUrl: string | null;
@@ -39,6 +40,8 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const jumpRequest = useReader((s) => s.jumpRequest);
   const highlights = useMarkup((s) => s.highlights);
   const fetchHighlights = useMarkup((s) => s.fetchHighlights);
+  const translationFontFamily = useSettings((s) => s.translationFontFamily);
+  const readerFontScale = useSettings((s) => s.readerFontScale);
   const handleRef = useRef<ShadowIframeHandle | null>(null);
   const iframeReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -181,6 +184,17 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
       postToIframe({ source: HOST_SOURCE, type: "CLEAR_SENTENCE_HIGHLIGHT" });
     }
   }, [linkedHighlight]);
+
+  // 번역 컬럼 글꼴(종류·크기)을 iframe에 전달 (iframe은 host CSS 변수를 못 봄).
+  useEffect(() => {
+    if (!iframeReadyRef.current) return;
+    postToIframe({
+      source: HOST_SOURCE,
+      type: "SET_TRANSLATION_FONT",
+      family: translationFontFamily,
+      scale: readerFontScale,
+    });
+  }, [translationFontFamily, readerFontScale, status]);
 
   // 줌 변경 시 iframe 재렌더 요청 (초기 ready 시점에는 기본 배율이라 생략).
   useEffect(() => {

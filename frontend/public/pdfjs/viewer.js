@@ -548,6 +548,20 @@ window.addEventListener("message", async (event) => {
         send("SENTENCE_HOVER", { page: null, offset: null });
       }
       break;
+    case "SET_TRANSLATION_FONT": {
+      const sans =
+        '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      const serif = '"Noto Serif KR", Georgia, "Times New Roman", serif';
+      document.documentElement.style.setProperty(
+        "--translation-font-family",
+        msg.family === "serif" ? serif : sans,
+      );
+      document.documentElement.style.setProperty(
+        "--translation-font-scale",
+        String(msg.scale || 1),
+      );
+      break;
+    }
     case "HIGHLIGHT_SENTENCE":
       highlightSentence(msg.page, msg.startOffset, msg.endOffset);
       break;

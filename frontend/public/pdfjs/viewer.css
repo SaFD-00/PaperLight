@@ -1,3 +1,17 @@
+/* 번역 컬럼 폰트 — iframe은 host next/font 변수를 못 보므로 동일 woff2를 직접 호스팅. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
+  font-weight: 45 920;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Serif KR";
+  src: url("/fonts/NotoSerifKR-subset.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
@@ -7,6 +21,10 @@ html, body {
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   overflow: hidden;
+  /* 번역 컬럼 폰트(host가 SET_TRANSLATION_FONT로 갱신). */
+  --translation-font-family:
+    "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --translation-font-scale: 1;
 }
 #pages {
   height: 100%;

@@ -50,7 +50,13 @@ export type HostToIframeMessage =
       startOffset: number;
       endOffset: number;
     }
-  | { source: typeof HOST_SOURCE; type: "CLEAR_SENTENCE_HIGHLIGHT" };
+  | { source: typeof HOST_SOURCE; type: "CLEAR_SENTENCE_HIGHLIGHT" }
+  | {
+      source: typeof HOST_SOURCE;
+      type: "SET_TRANSLATION_FONT";
+      family: "sans" | "serif";
+      scale: number;
+    };
 
 export type IframeToHostMessage =
   | {
