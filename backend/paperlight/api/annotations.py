@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from paperlight.api.papers import _get_owned
+from paperlight.api._ownership import get_owned_highlight, get_owned_paper
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.highlight import Highlight
 from paperlight.models.note import Note
@@ -56,18 +56,9 @@ def _highlight_dict(h: Highlight) -> dict[str, Any]:
     }
 
 
-async def _owned_highlight(session: AsyncSession, hid: str, user_id: str) -> Highlight:
-    h = await session.get(Highlight, hid)
-    if h is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "highlight not found")
-    if h.user_id != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "highlight belongs to another user")
-    return h
-
-
 @router.get("/papers/{pid}/highlights")
 async def list_highlights(pid: str, session: SessionDep, user_id: UserDep) -> list[dict[str, Any]]:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     result = await session.execute(
         select(Highlight)
         .where(Highlight.paper_id == pid, Highlight.user_id == user_id)
@@ -80,7 +71,7 @@ async def list_highlights(pid: str, session: SessionDep, user_id: UserDep) -> li
 async def create_highlight(
     pid: str, body: HighlightBody, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     h = Highlight(
         id=str(uuid4()),
         user_id=user_id,
@@ -99,7 +90,7 @@ async def create_highlight(
 
 @router.delete("/highlights/{hid}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_highlight(hid: str, session: SessionDep, user_id: UserDep) -> None:
-    h = await _owned_highlight(session, hid, user_id)
+    h = await get_owned_highlight(session, hid, user_id)
     await session.delete(h)
     await session.commit()
 
@@ -131,7 +122,7 @@ async def _get_or_create_note(session: AsyncSession, pid: str, user_id: str) -> 
 
 @router.get("/papers/{pid}/note")
 async def get_note(pid: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     note = await _get_or_create_note(session, pid, user_id)
     return _note_dict(note)
 
@@ -140,7 +131,7 @@ async def get_note(pid: str, session: SessionDep, user_id: UserDep) -> dict[str,
 async def save_note(
     pid: str, body: NoteBody, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     note = await _get_or_create_note(session, pid, user_id)
     note.markdown_text = body.markdownText
     note.s3_backup_key = note_key(note.id)
@@ -189,7 +180,7 @@ async def export_annotations(
 ) -> PlainTextResponse:
     if fmt not in EXPORT_FORMATS:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unknown format")
-    paper = await _get_owned(session, pid, user_id)
+    paper = await get_owned_paper(session, pid, user_id)
     highlights = list(
         (
             await session.execute(

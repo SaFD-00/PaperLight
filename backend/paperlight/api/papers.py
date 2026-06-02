@@ -29,6 +29,7 @@ from paperlight.agents.pregen import (
     TABLE_PROMPT_VERSION,
 )
 from paperlight.agents.references import get_references
+from paperlight.api._ownership import get_owned_paper
 from paperlight.api._sse import format_sse
 from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
@@ -72,15 +73,6 @@ def _paper_dict(p: Paper) -> dict[str, Any]:
         "createdAt": p.created_at,
         "updatedAt": p.updated_at,
     }
-
-
-async def _get_owned(session: AsyncSession, paper_id: str, user_id: str) -> Paper:
-    paper = await session.get(Paper, paper_id)
-    if paper is None or paper.soft_deleted_at is not None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "paper not found")
-    if paper.user_id != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "paper belongs to another user")
-    return paper
 
 
 @router.get("")
@@ -160,14 +152,14 @@ async def import_paper(
 
 @router.get("/{paper_id}")
 async def get_paper(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
-    return _paper_dict(await _get_owned(session, paper_id, user_id))
+    return _paper_dict(await get_owned_paper(session, paper_id, user_id))
 
 
 @router.get("/{paper_id}/pdf-url")
 async def pdf_presigned_url(
     paper_id: str, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     url = get_object_store().presigned_get(pdf_key(paper_id))
     return {"url": url, "ttlSeconds": DEFAULT_TTL_SECONDS}
 
@@ -191,7 +183,7 @@ async def pdf_stream(
 async def ingestion_progress(
     paper_id: str, session: SessionDep, user_id: UserDep
 ) -> StreamingResponse:
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
 
     async def _gen() -> AsyncIterator[str]:
         factory = get_session_factory()
@@ -223,13 +215,13 @@ def _pgkey(task: str, paper_id: str, chunk_id: str, version: str) -> str:
 @router.get("/{paper_id}/figures")
 async def get_figures(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
     """Figure/Table bbox layout(정밀 marker 모드에서만 채워짐). 없으면 빈 리스트."""
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     return {"figures": await load_figure_layout(paper_id)}
 
 
 @router.get("/{paper_id}/summary")
 async def get_summary(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     text = await read_cached(
         "summary",
         paper_id=paper_id,
@@ -242,7 +234,7 @@ async def get_summary(paper_id: str, session: SessionDep, user_id: UserDep) -> d
 @router.get("/{paper_id}/insights")
 async def get_insights(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
     """Read-only assembly of pre-gen artifacts (F-15 + F-14 + auto-highlight) from cache."""
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     chunks = list(
         (await session.execute(select(Chunk).where(Chunk.paper_id == paper_id).order_by(Chunk.idx)))
         .scalars()
@@ -301,5 +293,5 @@ async def get_paper_references(
     paper_id: str, session: SessionDep, user_id: UserDep
 ) -> list[dict[str, Any]]:
     """F-05 — extracted + externally enriched bibliography (memoized)."""
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     return await get_references(paper_id)

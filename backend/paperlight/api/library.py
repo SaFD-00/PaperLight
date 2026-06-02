@@ -17,7 +17,8 @@ from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from paperlight.agents import bib
-from paperlight.api.papers import _get_owned, _paper_dict
+from paperlight.api._ownership import get_owned_collection, get_owned_paper
+from paperlight.api.papers import _paper_dict
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chunk import Chunk
 from paperlight.models.collection import Collection
@@ -79,15 +80,6 @@ async def _paper_payload(session: AsyncSession, paper: Paper) -> dict[str, Any]:
     return base
 
 
-async def _owned_collection(session: AsyncSession, cid: str, user_id: str) -> Collection:
-    col = await session.get(Collection, cid)
-    if col is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "collection not found")
-    if col.user_id != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "collection belongs to another user")
-    return col
-
-
 async def _collection_dict(session: AsyncSession, col: Collection) -> dict[str, Any]:
     count = await session.scalar(
         select(func.count()).select_from(LibraryItem).where(LibraryItem.collection_id == col.id)
@@ -132,7 +124,7 @@ async def create_collection(
     body: CollectionCreate, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
     if body.parentId is not None:
-        await _owned_collection(session, body.parentId, user_id)
+        await get_owned_collection(session, body.parentId, user_id)
     pos_q = select(func.max(Collection.position)).where(Collection.user_id == user_id)
     pos_q = (
         pos_q.where(Collection.parent_id.is_(None))
@@ -157,14 +149,14 @@ async def create_collection(
 async def update_collection(
     cid: str, body: CollectionPatch, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    col = await _owned_collection(session, cid, user_id)
+    col = await get_owned_collection(session, cid, user_id)
     fields = body.model_fields_set
     if "parentId" in fields:
         new_parent = body.parentId
         if new_parent is not None:
             if new_parent == cid:
                 raise HTTPException(422, "collection cannot be its own parent")
-            await _owned_collection(session, new_parent, user_id)
+            await get_owned_collection(session, new_parent, user_id)
             ancestor: str | None = new_parent
             seen: set[str] = set()
             while ancestor is not None and ancestor not in seen:
@@ -187,7 +179,7 @@ async def update_collection(
 
 @router.delete("/collections/{cid}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_collection(cid: str, session: SessionDep, user_id: UserDep) -> None:
-    col = await _owned_collection(session, cid, user_id)
+    col = await get_owned_collection(session, cid, user_id)
     if col.is_special:
         raise HTTPException(422, "cannot delete special collection")
     all_cols = (
@@ -249,7 +241,7 @@ async def list_library_papers(
                 )
             )
         elif collection_id:
-            col = await _owned_collection(session, collection_id, user_id)
+            col = await get_owned_collection(session, collection_id, user_id)
             stmt = stmt.where(
                 Paper.id.in_(
                     select(LibraryItem.paper_id).where(LibraryItem.collection_id == col.id)
@@ -302,9 +294,9 @@ class MembershipBody(BaseModel):
 async def add_papers_to_collection(
     cid: str, body: MembershipBody, session: SessionDep, user_id: UserDep
 ) -> None:
-    await _owned_collection(session, cid, user_id)
+    await get_owned_collection(session, cid, user_id)
     for pid in body.paperIds:
-        await _get_owned(session, pid, user_id)
+        await get_owned_paper(session, pid, user_id)
         existing = await session.get(LibraryItem, {"paper_id": pid, "collection_id": cid})
         if existing is None:
             session.add(LibraryItem(paper_id=pid, collection_id=cid))
@@ -315,7 +307,7 @@ async def add_papers_to_collection(
 async def remove_paper_from_collection(
     cid: str, pid: str, session: SessionDep, user_id: UserDep
 ) -> None:
-    await _owned_collection(session, cid, user_id)
+    await get_owned_collection(session, cid, user_id)
     await session.execute(
         delete(LibraryItem).where(LibraryItem.collection_id == cid, LibraryItem.paper_id == pid)
     )
@@ -377,7 +369,7 @@ class TagBody(BaseModel):
 async def add_paper_tag(
     pid: str, body: TagBody, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     tag = await _get_or_create_tag(session, user_id, body.name, body.color)
     if await session.get(PaperTag, {"paper_id": pid, "tag_id": tag.id}) is None:
         session.add(PaperTag(paper_id=pid, tag_id=tag.id))
@@ -387,19 +379,9 @@ async def add_paper_tag(
 
 @router.delete("/papers/{pid}/tags/{tid}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_paper_tag(pid: str, tid: str, session: SessionDep, user_id: UserDep) -> None:
-    await _get_owned(session, pid, user_id)
+    await get_owned_paper(session, pid, user_id)
     await session.execute(delete(PaperTag).where(PaperTag.paper_id == pid, PaperTag.tag_id == tid))
     await session.commit()
-
-
-async def _owned_paper_any(session: AsyncSession, pid: str, user_id: str) -> Paper:
-    """Like _get_owned but allows soft-deleted rows (needed for restore)."""
-    paper = await session.get(Paper, pid)
-    if paper is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "paper not found")
-    if paper.user_id != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "paper belongs to another user")
-    return paper
 
 
 async def _set_starred(session: AsyncSession, user_id: str, pid: str, starred: bool) -> None:
@@ -425,7 +407,7 @@ class PaperPatch(BaseModel):
 async def patch_paper(
     pid: str, body: PaperPatch, session: SessionDep, user_id: UserDep
 ) -> dict[str, Any]:
-    paper = await _owned_paper_any(session, pid, user_id)
+    paper = await get_owned_paper(session, pid, user_id, allow_deleted=True)
     if body.status is not None:
         paper.status = body.status
     if body.trashed is not None:
@@ -456,7 +438,7 @@ async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> 
     target_collection = None
     if body.action == "move":
         assert body.value is not None
-        target_collection = await _owned_collection(session, body.value, user_id)
+        target_collection = await get_owned_collection(session, body.value, user_id)
 
     affected = 0
     for pid in body.paperIds:
@@ -545,7 +527,7 @@ async def export_references(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown format: {body.format}")
     refs: list[bib.ParsedRef] = []
     for pid in body.paperIds:
-        paper = await _get_owned(session, pid, user_id)
+        paper = await get_owned_paper(session, pid, user_id)
         refs.append(
             bib.ParsedRef(
                 title=paper.title,

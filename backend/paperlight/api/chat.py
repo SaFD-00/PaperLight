@@ -29,8 +29,8 @@ from paperlight.agents.chat import (
     retrieve,
 )
 from paperlight.agents.context import SUMMARY_PROMPT_VERSION
+from paperlight.api._ownership import get_owned_paper
 from paperlight.api._sse import format_sse
-from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
 from paperlight.observability.context import paper_id_var
@@ -177,7 +177,7 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
 
 @router.post("")
 async def chat(req: ChatRequest, session: SessionDep, user_id: UserDep) -> StreamingResponse:
-    await _get_owned(session, req.paperId, user_id)
+    await get_owned_paper(session, req.paperId, user_id)
     return StreamingResponse(
         _stream(req.paperId, user_id, req.question),
         media_type="text/event-stream",
@@ -187,7 +187,7 @@ async def chat(req: ChatRequest, session: SessionDep, user_id: UserDep) -> Strea
 
 @router.get("/{paper_id}")
 async def chat_history(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
-    await _get_owned(session, paper_id, user_id)
+    await get_owned_paper(session, paper_id, user_id)
     cs = (
         (
             await session.execute(
