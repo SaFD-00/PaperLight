@@ -63,7 +63,7 @@ pnpm typecheck    # tsc --noEmit (emit 없음, 검사만)
 - `backend/paperlight/storage/` — Postgres·Qdrant·R2 어댑터. 라우터·에이전트는 이 계층을 통해서만 저장소 접근.
 - `frontend/src/components/{shell,reader,library,panels}/` — 셸/Reader/Library/AI 패널.
 - `frontend/src/stores/` — Zustand. Tab 상태는 (FE Zustand ↔ BE Tab API ↔ Postgres)로 동기화 (last-write-wins).
-- `config/*.yaml` — agent 라우팅(`agents.yaml`, router가 로드하는 단일 소스), 하이퍼파라미터/프로바이더/프롬프트/용어집(`hyperparameters.yaml`·`providers.yaml`·`prompts/`·`glossary/` — 현재 미배선 스펙). **코드 변경 없이 핫리로드** 가능하게 유지.
+- `config/*.yaml` — agent 라우팅 + 생성 하이퍼파라미터(`agents.yaml`, router가 로드하는 단일 소스: model·reasoning_effort·temperature·top_p·max_tokens). 프롬프트/용어집(`prompts/`·`glossary/`)은 아직 미배선 스펙. provider base_url/timeout과 옛 `hyperparameters.yaml`은 코드/agents.yaml로 흡수되어 별도 파일 없음. **코드 변경 없이 핫리로드** 가능하게 유지.
 
 ### 비자명한 핵심 패턴
 

@@ -131,3 +131,22 @@ async def test_openrouter_omits_reasoning_when_unset(
 ) -> None:
     payload = await _run_openrouter(monkeypatch)
     assert "reasoning" not in payload
+
+
+async def test_openrouter_includes_sampling_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = await _run_openrouter(
+        monkeypatch, temperature=0.1, top_p=0.9, max_tokens=4000
+    )
+    assert payload["temperature"] == 0.1
+    assert payload["top_p"] == 0.9
+    assert payload["max_tokens"] == 4000
+
+
+async def test_openrouter_omits_sampling_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = await _run_openrouter(monkeypatch)
+    assert "temperature" not in payload
+    assert "max_tokens" not in payload

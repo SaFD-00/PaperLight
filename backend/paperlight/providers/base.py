@@ -23,10 +23,15 @@ class LLMProvider(Protocol):
         model: str,
         *,
         reasoning_effort: str | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         """Return an async iterator of content tokens (async-generator method).
 
         reasoning_effort (none|low|medium|high) requests a model's thinking budget;
-        only OpenRouter consumes it today, others accept-and-ignore.
+        only OpenRouter consumes it today, others accept-and-ignore. temperature/top_p/
+        max_tokens are the per-agent sampling params from config/agents.yaml; the stub
+        ignores them.
         """
         ...

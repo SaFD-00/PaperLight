@@ -29,6 +29,9 @@ class GeminiProvider:
         model: str,
         *,
         reasoning_effort: str | None = None,  # noqa: ARG002 — accepted for protocol parity
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         system_parts: list[dict[str, str]] = []
         contents: list[dict[str, Any]] = []
@@ -43,6 +46,15 @@ class GeminiProvider:
         payload: dict[str, Any] = {"contents": contents}
         if system_parts:
             payload["system_instruction"] = {"parts": system_parts}
+        gen_config: dict[str, Any] = {}
+        if temperature is not None:
+            gen_config["temperature"] = temperature
+        if top_p is not None:
+            gen_config["topP"] = top_p
+        if max_tokens is not None:
+            gen_config["maxOutputTokens"] = max_tokens
+        if gen_config:
+            payload["generationConfig"] = gen_config
 
         headers = {"content-type": "application/json"}
         params = {"alt": "sse", "key": self.api_key}

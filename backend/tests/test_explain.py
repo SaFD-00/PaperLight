@@ -41,6 +41,7 @@ async def test_explain_streams_tokens(
         model: str,
         *,
         reasoning_effort: str | None = None,
+        **kwargs: object,
     ) -> AsyncIterator[str]:
         yield "Hello "
         yield "world"

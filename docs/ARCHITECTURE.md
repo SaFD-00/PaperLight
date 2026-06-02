@@ -243,6 +243,8 @@ class LLMProvider(Protocol):
 - 팟캐스트 창작 → `openrouter/qwen/qwen3.6-plus`(`reasoning_effort: high`)
 - 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial, 라우터 미사용)
 
+생성 하이퍼파라미터(`temperature`·`top_p`·`max_tokens`)도 같은 `config/agents.yaml`에서 agent별로 정의돼 `router.hyperparameters()`가 읽어 전달한다. 단 **`reasoning_effort != none`인 agent는 temperature/top_p를 보내지 않는다**(thinking 모델은 sampling을 무시/거부하고 greedy 디코딩은 추론 품질을 떨어뜨림) — `max_tokens`만 전달. provider base_url/timeout은 코드 하드코딩(별도 `providers.yaml` 없음).
+
 **멀티모달 content**: 메시지 `content`는 `str`(텍스트, 기존 그대로) 또는 parts 배열 `[{type:text}, {type:image, mime, data}]`(`providers/content.py`)을 받는다. gemini는 `inline_data`, openai/openrouter는 `image_url`(data URL)로 변환, stub은 이미지 무시. 두 비전 경로가 이를 쓴다: ① Figure/Table 인라인 설명(`/api/explain/figure`, §3.2c) — 프론트 crop 이미지 + 캡션·본문 + 멀티턴 history. ② pregen 사전생성(`agents/pregen.py`) — marker bbox가 있으면 `ingestion/render.py`의 `get_pixmap(clip)`로 영역을 렌더해 비전으로 figure/table을 미리 설명(없으면 텍스트 폴백, prompt_version v2).
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).

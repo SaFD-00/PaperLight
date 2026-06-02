@@ -1,17 +1,26 @@
-# LLM agent routing — PRD §7.5.4. Loaded by paperlight.providers.router.
-# 각 agent를 OpenRouter Qwen3.6 패밀리(plus/flash/35b-a3b) + reasoning_effort(none|low|medium|high)로 라우팅.
+# LLM agent routing + generation hyperparameters — PRD §7.5.4/§7.5.5.
+# Loaded by paperlight.providers.router. 각 agent를 OpenRouter Qwen3.6 패밀리(plus/flash/35b-a3b)로
+# 라우팅하고 reasoning_effort(none|low|medium|high)·temperature·top_p·max_tokens를 함께 배선.
+# 미지정 항목은 default에서 상속. (provider base_url/timeout은 provider 코드에 하드코딩.)
+# 주의: reasoning_effort != none 이면 temperature/top_p는 전송하지 않음(thinking 모델이 무시/거부).
+#       → 해당 agent의 temperature 값은 향후 effort=none 전환 시에만 적용되는 스펙값.
 version: "2026.06.03"
 
 default:
   provider: openrouter
   model: qwen/qwen3.6-35b-a3b
   reasoning_effort: medium
+  temperature: 0.3
+  top_p: 0.9
+  max_tokens: 2048
 
 agents:
   summary:
     provider: openrouter
     model: qwen/qwen3.6-35b-a3b
     reasoning_effort: medium
+    temperature: 0.2
+    max_tokens: 3000
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-plus }
 
@@ -19,6 +28,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-35b-a3b
     reasoning_effort: medium
+    temperature: 0.4
+    max_tokens: 2048
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-plus }
 
@@ -26,6 +37,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-35b-a3b
     reasoning_effort: medium
+    temperature: 0.2
+    max_tokens: 1500
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-flash }
 
@@ -33,6 +46,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: none
+    temperature: 0.1
+    max_tokens: 4000
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
@@ -40,6 +55,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-plus
     reasoning_effort: medium
+    temperature: 0.2
+    max_tokens: 1500
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
@@ -47,6 +64,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-plus
     reasoning_effort: medium
+    temperature: 0.2
+    max_tokens: 1500
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
@@ -54,16 +73,22 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: none
+    temperature: 0.2
+    max_tokens: 400
 
   paragraph_importance:      # F-15 — classifier
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: none
+    temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
+    max_tokens: 100
 
   podcast_outline:
     provider: openrouter
     model: qwen/qwen3.6-plus
     reasoning_effort: high
+    temperature: 0.6
+    max_tokens: 2000
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
@@ -71,6 +96,8 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-plus
     reasoning_effort: high
+    temperature: 0.7
+    max_tokens: 8000
     fallback:
       - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
@@ -78,26 +105,36 @@ agents:
     provider: openrouter
     model: qwen/qwen3.6-35b-a3b
     reasoning_effort: medium
+    temperature: 0.3
+    max_tokens: 1500
 
   critique:
     provider: openrouter
     model: qwen/qwen3.6-35b-a3b
     reasoning_effort: medium
+    temperature: 0.3
+    max_tokens: 1500
 
   classifier:
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: none
+    temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
+    max_tokens: 100
 
   highlight:
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: low
+    temperature: 0.2
+    max_tokens: 1000
 
   domain_classifier:         # 논문 도메인 분류 (글로서리 선택용)
     provider: openrouter
     model: qwen/qwen3.6-flash
     reasoning_effort: none
+    temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
+    max_tokens: 100
 
 # 아래 섹션은 라우터 미사용(보존). embedding은 ingestion.embedder가 담당.
 embedding:

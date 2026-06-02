@@ -19,6 +19,9 @@ class StubProvider:
         model: str,
         *,
         reasoning_effort: str | None = None,  # noqa: ARG002 — accepted for protocol parity
+        temperature: float | None = None,  # noqa: ARG002 — accepted for protocol parity
+        top_p: float | None = None,  # noqa: ARG002 — accepted for protocol parity
+        max_tokens: int | None = None,  # noqa: ARG002 — accepted for protocol parity
     ) -> AsyncIterator[str]:
         user = next(
             (to_text(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),

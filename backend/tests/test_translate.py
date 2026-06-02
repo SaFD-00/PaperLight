@@ -41,6 +41,7 @@ async def test_translate_streams_tokens(
         model: str,
         *,
         reasoning_effort: str | None = None,
+        **kwargs: object,
     ) -> AsyncIterator[str]:
         yield "안녕"
         yield "하세요"
@@ -77,6 +78,7 @@ async def test_translate_aligned_streams_pairs(
         model: str,
         *,
         reasoning_effort: str | None = None,
+        **kwargs: object,
     ) -> AsyncIterator[str]:
         yield "1\t첫 번째 문장.\n"
         yield "2\t두 번째 문장.\n"

@@ -83,6 +83,25 @@ def reasoning_effort(task: str) -> str | None:
     return None if effort is None else str(effort)
 
 
+def hyperparameters(task: str) -> dict[str, Any]:
+    """Generation params for an agent (per-agent over default).
+
+    Reasoning agents (reasoning_effort != "none") omit temperature/top_p: thinking
+    models ignore or reject sampling params (e.g. greedy decoding degrades reasoning),
+    so only max_tokens is sent. Non-reasoning agents send all three.
+    """
+    default = load_agents_config().get("default") or {}
+    entry = _entry(task)
+    reasoning_on = (reasoning_effort(task) or "none") != "none"
+    keys = ("max_tokens",) if reasoning_on else ("temperature", "top_p", "max_tokens")
+    params: dict[str, Any] = {}
+    for key in keys:
+        value = entry.get(key, default.get(key))
+        if value is not None:
+            params[key] = value
+    return params
+
+
 async def _stream_candidates(
     task: str,
     messages: list[dict[str, Any]],
@@ -90,10 +109,11 @@ async def _stream_candidates(
 ) -> AsyncIterator[str]:
     """Run the provider chain; record the model that actually yields in holder."""
     effort = reasoning_effort(task)
+    params = hyperparameters(task)
     if os.environ.get("LLM_PROVIDER") == "stub":
         holder["model"] = primary_model(task)
         async for token in StubProvider().stream_chat(
-            messages, holder["model"], reasoning_effort=effort
+            messages, holder["model"], reasoning_effort=effort, **params
         ):
             yield token
         return
@@ -110,7 +130,9 @@ async def _stream_candidates(
             continue
         yielded = False
         try:
-            async for token in provider.stream_chat(messages, model, reasoning_effort=effort):
+            async for token in provider.stream_chat(
+                messages, model, reasoning_effort=effort, **params
+            ):
                 if not yielded:
                     holder["model"] = model
                 yielded = True

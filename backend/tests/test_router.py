@@ -36,6 +36,17 @@ def test_reasoning_effort_per_agent_and_default() -> None:
     assert router.reasoning_effort("does-not-exist") == "medium"
 
 
+def test_hyperparameters_gated_by_reasoning() -> None:
+    # reasoning agent (effort=medium) → temperature/top_p omitted, only max_tokens.
+    assert router.hyperparameters("summary") == {"max_tokens": 3000}
+    # non-reasoning agent (effort=none) → full sampling params (top_p from default).
+    assert router.hyperparameters("translation") == {
+        "temperature": 0.1,
+        "top_p": 0.9,
+        "max_tokens": 4000,
+    }
+
+
 async def _collect(task: str, messages: list[dict[str, str]]) -> str:
     out = ""
     async for token in router.stream_task(task, messages):
@@ -75,11 +86,13 @@ async def test_stream_task_falls_back_past_failing_model(
         model: str,
         *,
         reasoning_effort: str | None = None,
+        **kwargs: object,
     ):
         if model == "qwen/qwen3.6-plus":
             raise RuntimeError("primary model down before first token")
         captured["model"] = model
         captured["reasoning_effort"] = reasoning_effort
+        captured["max_tokens"] = str(kwargs.get("max_tokens"))
         yield "ok"
 
     monkeypatch.setattr(
@@ -90,3 +103,4 @@ async def test_stream_task_falls_back_past_failing_model(
     assert out == "ok"
     assert captured["model"] == "qwen/qwen3.6-35b-a3b"  # the openrouter fallback model
     assert captured["reasoning_effort"] == "medium"  # figure_description effort
+    assert captured["max_tokens"] == "1500"  # figure_description hyperparameter

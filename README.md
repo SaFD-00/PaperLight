@@ -43,7 +43,7 @@ See [docs/PRD.md](docs/PRD.md) for the full Product Requirements (**v3.0**) and 
 PaperLight/
 ├── frontend/         # Next.js app
 ├── backend/          # FastAPI + LangGraph
-├── config/           # Hot-reloadable YAML (models, prompts, glossary)
+├── config/           # Hot-reloadable YAML (agents routing+hyperparams, prompts, glossary)
 ├── docs/             # PRD.md + DESIGN.md
 ├── docker-compose.yml
 └── .github/workflows/ci.yml

@@ -17,6 +17,9 @@ class AgentRoute(BaseModel):
     provider: str
     model: str
     reasoning_effort: str | None = None
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
     fallback: list[dict] = []
 
 

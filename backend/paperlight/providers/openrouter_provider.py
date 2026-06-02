@@ -28,6 +28,9 @@ class OpenRouterProvider:
         model: str,
         *,
         reasoning_effort: str | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -42,6 +45,12 @@ class OpenRouterProvider:
         }
         if reasoning_effort:
             payload["reasoning"] = {"effort": reasoning_effort}
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         timeout = httpx.Timeout(60.0, read=None)
         async with (
             httpx.AsyncClient(timeout=timeout) as client,
