@@ -292,6 +292,7 @@ class TTSProvider(Protocol):
   - References → **30일** — ingestion pregen(`get_references`), 만료 후 lazy 재생성
   - Explanation / Translation → 24시간 — on-demand(pregen 제외, 임의 선택/페이지 의존)
   - Chat → 캐시 안 함 (대화 컨텍스트 의존)
+- **전체 논문 맥락 주입**(`agents/context.py`): per-element 태스크 프롬프트에 (a) `summary` 캐시 + (c) RAG 관련 청크를 "[논문 맥락]" 블록으로 주입한다. 맥락은 `(paper_id, query_text)`의 **결정적 함수**(요약=paper_id 종속, RAG=둘 다 종속, 모두 캐시 키에 이미 포함)라 캐시 키 정합성을 깨지 않으며, 프롬프트 포맷 변경은 **prompt_version bump**(explain v2 / figure·table v3 / paragraph v2 / chat v2 / translate v2)로만 무효화한다. 번역은 충실성 위해 요약만(용어 참고)·system-only 주입으로 정렬 1:1을 보존.
 
 ---
 
