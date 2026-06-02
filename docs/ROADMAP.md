@@ -33,7 +33,7 @@
 | T0 | 디자인 토큰·폰트·테마 셋업 | — | `frontend/src/styles/tokens.css`, `frontend/src/app/layout.tsx`, `frontend/src/lib/theme.ts` | **P0** | ✅ |
 | T1 | Tab Bar 컴포넌트 + Tab 상태 (Zustand) | T0 | `frontend/src/components/shell/TabBar.tsx`, `frontend/src/stores/tabs.ts` | **P0** | ✅ |
 | T2 | 3-Column Reader Shell | T0, T1 | `frontend/src/components/reader/ReaderShell.tsx`, `frontend/src/components/reader/{Sidebar,Center,RightPanel}.tsx` | **P0** | ✅ |
-| T3 | Top Toolbar (5-토글 placeholder + 페이지 컨트롤) | T0 | `frontend/src/components/shell/TopToolbar.tsx` | **P0** | ✅ |
+| T3 | Top Toolbar (5-토글 placeholder + 페이지 컨트롤 + 페이지 내 검색🔍/⌘F→SearchBar) | T0 | `frontend/src/components/shell/TopToolbar.tsx`, `frontend/src/components/reader/SearchBar.tsx` | **P0** | ✅ |
 | T4 | pdf.js Shadow DOM iframe wrapper (F-01) | T2 | `frontend/src/components/reader/PdfViewer.tsx`, `frontend/public/pdfjs/`, `frontend/src/lib/pdf/shadow-iframe.ts` | **P0** | ✅ |
 | T5 | Tab API 최소 구현 (단일 사용자, 로컬 SQLite) | — | `backend/paperlight/api/tabs.py`, `backend/paperlight/storage/db.py`, `backend/paperlight/models/tab.py` | **P0** | ✅ |
 | T6 | Floating Selection Menu (F-04 트리거) | T4 | `frontend/src/components/reader/FloatingSelectionMenu.tsx`, `frontend/src/stores/reader.ts` | P0 | ✅ |
