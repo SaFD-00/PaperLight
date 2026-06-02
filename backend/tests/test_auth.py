@@ -141,3 +141,74 @@ async def test_tabs_isolated_per_login(client: AsyncClient) -> None:
     resp = await client.get("/api/tabs")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+async def test_login_google_unconfigured_503(
+    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    monkeypatch.delenv("GOOGLE_OAUTH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_OAUTH_CLIENT_SECRET", raising=False)
+    resp = await client.get("/api/auth/login/google")
+    assert resp.status_code == 503
+
+
+async def test_login_google_configured_returns_authurl(
+    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")
+    resp = await client.get("/api/auth/login/google")
+    assert resp.status_code == 200
+    auth_url = resp.json()["authUrl"]
+    assert "accounts.google.com" in auth_url
+    assert "client_id=cid-123" in auth_url
+    assert "state=" in auth_url
+    # CSRF state 쿠키가 설정되어야 함
+    from paperlight.auth.google import STATE_COOKIE_NAME
+
+    assert STATE_COOKIE_NAME in resp.cookies
+
+
+async def test_google_callback_state_mismatch_400(
+    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")
+    # state 쿠키 없이 콜백 호출 → 400
+    resp = await client.get("/api/auth/google/callback?code=abc&state=nope")
+    assert resp.status_code == 400
+
+
+async def test_google_callback_creates_user_and_sets_session(
+    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")
+
+    # 실제 Google 호출은 막고 identity 를 주입
+    from paperlight.auth.google import GoogleIdentity
+
+    async def _fake_exchange(_cfg: object, _code: str) -> GoogleIdentity:
+        return GoogleIdentity(sub="google-sub-1", email="gmail-user@example.com")
+
+    import paperlight.api.auth as auth_api
+
+    monkeypatch.setattr(auth_api, "exchange_code", _fake_exchange)
+
+    # 먼저 login 으로 state 쿠키 확보
+    login = await client.get("/api/auth/login/google")
+    import urllib.parse as _u
+
+    state = _u.parse_qs(_u.urlparse(login.json()["authUrl"]).query)["state"][0]
+
+    resp = await client.get(
+        f"/api/auth/google/callback?code=abc&state={state}", follow_redirects=False
+    )
+    assert resp.status_code == 302
+    assert ACCESS_COOKIE_NAME in resp.cookies
+    assert REFRESH_COOKIE_NAME in resp.cookies
+
+    # 발급된 세션으로 /me 조회 → 가입된 gmail 사용자
+    me = await client.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["email"] == "gmail-user@example.com"

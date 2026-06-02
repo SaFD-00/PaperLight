@@ -12,6 +12,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,16 @@ from paperlight.auth import (
     set_auth_cookies,
 )
 from paperlight.auth.dependencies import get_user_id
+from paperlight.auth.google import (
+    STATE_COOKIE_NAME,
+    STATE_COOKIE_PATH,
+    STATE_TTL_SECONDS,
+    GoogleOAuthError,
+    build_auth_url,
+    exchange_code,
+    google_config,
+    post_login_redirect,
+)
 from paperlight.models import Session as SessionRow
 from paperlight.models import User
 from paperlight.storage.db import DEFAULT_USER_ID, get_session
@@ -107,23 +118,73 @@ async def mock_login(
     return _user_dict(user)
 
 
+def _is_production() -> bool:
+    return os.environ.get("APP_ENV", "development") == "production"
+
+
 @router.get("/login/google")
-async def login_google() -> dict[str, str]:
-    has_creds = bool(
-        os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
-        and os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
-    )
-    if has_creds:
-        # Real Google OAuth flow not yet implemented; credentials present but
-        # the integration code lands in a follow-up PR.
+async def login_google(response: Response) -> dict[str, str]:
+    """authUrl 발급 + CSRF state 쿠키 설정. 미구성이면 503(프론트가 안내)."""
+    cfg = google_config()
+    if cfg is None:
         raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "real Google OAuth flow not yet implemented",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Google OAuth not configured — use POST /api/auth/dev/mock-login",
         )
-    raise HTTPException(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
-        "Google OAuth not configured — use POST /api/auth/dev/mock-login",
+    state = str(uuid.uuid4())
+    response.set_cookie(
+        key=STATE_COOKIE_NAME,
+        value=state,
+        max_age=STATE_TTL_SECONDS,
+        httponly=True,
+        secure=_is_production(),
+        samesite="lax",
+        path=STATE_COOKIE_PATH,
     )
+    return {"authUrl": build_auth_url(cfg, state)}
+
+
+@router.get("/google/callback")
+async def google_callback(
+    code: str,
+    state: str,
+    session: SessionDep,
+    oauth_state: Annotated[str | None, Cookie(alias=STATE_COOKIE_NAME)] = None,
+) -> RedirectResponse:
+    """Google redirect → code 교환 → 사용자 upsert → 세션 발급 → 프론트로 리다이렉트."""
+    cfg = google_config()
+    if cfg is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google OAuth not configured")
+    if not oauth_state or oauth_state != state:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid oauth state")
+
+    try:
+        identity = await exchange_code(cfg, code)
+    except GoogleOAuthError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"google oauth failed: {exc}") from exc
+
+    # google_sub 우선 매칭 → 없으면 email 로 기존 계정 연결 → 둘 다 없으면 신규.
+    user = (
+        await session.execute(select(User).where(User.google_sub == identity.sub))
+    ).scalars().first()
+    if user is None:
+        user = (
+            await session.execute(select(User).where(User.email == identity.email))
+        ).scalars().first()
+        if user is not None:
+            user.google_sub = identity.sub
+        else:
+            user = User(id=str(uuid.uuid4()), email=identity.email, google_sub=identity.sub)
+            session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+    redirect = RedirectResponse(post_login_redirect(), status_code=status.HTTP_302_FOUND)
+    await _issue_session(redirect, session, user.id)
+    redirect.delete_cookie(
+        key=STATE_COOKIE_NAME, path=STATE_COOKIE_PATH, secure=_is_production(), samesite="lax"
+    )
+    return redirect
 
 
 @router.post("/refresh")
