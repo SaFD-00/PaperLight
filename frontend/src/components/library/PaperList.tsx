@@ -134,7 +134,7 @@ export function PaperList({
         ))}
       </div>
 
-      <ul className="flex-1 overflow-auto">
+      <ul aria-label="논문 목록" className="flex-1 overflow-auto">
         {papers.length === 0 ? (
           <li className="p-6 text-sm text-text-muted">논문이 없습니다.</li>
         ) : (

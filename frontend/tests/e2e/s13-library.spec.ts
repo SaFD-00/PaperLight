@@ -73,12 +73,13 @@ test.describe("Phase 1 S13 — library 4-pane", () => {
     await expect(tree.getByRole("button", { name: "Starred" })).toBeVisible();
     await expect(tree.getByRole("button", { name: /GUI Agents/ })).toBeVisible();
 
-    // 기본 리스트(My Library) — 파일럿 + mocked paper
-    await expect(page.getByText("Diffusion Models")).toBeVisible();
+    // 기본 리스트(My Library) — 파일럿 + mocked paper. 탭바 중복 회피 위해 목록으로 스코프.
+    const list = page.getByRole("list", { name: "논문 목록" });
+    await expect(list.getByText("Diffusion Models")).toBeVisible();
 
     // 컬렉션 클릭 → 리스트 갱신
     await tree.getByRole("button", { name: /GUI Agents/ }).click();
-    await expect(page.getByText("GUI World Model")).toBeVisible();
+    await expect(list.getByText("GUI World Model")).toBeVisible();
   });
 
   test("논문 선택 → 디테일 패널 + 멀티선택 Bulk", async ({ page }) => {

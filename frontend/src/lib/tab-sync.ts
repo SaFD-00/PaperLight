@@ -3,9 +3,17 @@
  * Phase 0: 단일 사용자, 실패는 silent (BE 미기동이어도 FE는 동작).
  */
 import { apiUrl, isBrowser } from "@/lib/api";
+import { useAuth } from "@/stores/auth";
 import type { Tab } from "@/stores/tabs";
 
 type TabWire = Tab & { updatedAt: number };
+
+/** 로그인 사용자만 서버 동기. 게스트는 공유 anonymous 유저 오염 방지를 위해 sync 생략. */
+function syncEnabled(): boolean {
+  if (!isBrowser()) return false;
+  const u = useAuth.getState().user;
+  return !!u && !u.anonymous;
+}
 
 function toWire(tab: Tab): TabWire {
   return { ...tab, updatedAt: Date.now() };
@@ -16,7 +24,7 @@ function silentFail(_err: unknown): void {
 }
 
 export async function pushTabUpsert(tab: Tab): Promise<void> {
-  if (!isBrowser()) return;
+  if (!syncEnabled()) return;
   try {
     await fetch(apiUrl("/api/tabs"), {
       method: "POST",
@@ -33,7 +41,7 @@ export async function pushTabPatch(
   id: string,
   patch: Partial<Pick<Tab, "title" | "position" | "pinned" | "lastActiveAt" | "paperId">>,
 ): Promise<void> {
-  if (!isBrowser()) return;
+  if (!syncEnabled()) return;
   try {
     await fetch(apiUrl(`/api/tabs/${encodeURIComponent(id)}`), {
       method: "PATCH",
@@ -47,7 +55,7 @@ export async function pushTabPatch(
 }
 
 export async function pushTabDelete(id: string): Promise<void> {
-  if (!isBrowser()) return;
+  if (!syncEnabled()) return;
   try {
     await fetch(apiUrl(`/api/tabs/${encodeURIComponent(id)}`), {
       method: "DELETE",

@@ -69,6 +69,18 @@ export const useTabs = create<TabsState>((set, get) => ({
     const now = Date.now();
     const state = get();
 
+    // 같은 논문이 이미 열려 있으면 새 탭을 만들지 않고 활성화(멱등).
+    // hydrate 경합·StrictMode 이중 호출로 인한 탭 중복을 근본적으로 차단.
+    const existing = state.tabs.find((t) => t.paperId === paperId);
+    if (existing) {
+      set({
+        activeId: existing.id,
+        tabs: state.tabs.map((t) => (t.id === existing.id ? { ...t, lastActiveAt: now } : t)),
+      });
+      if (existing.id !== LIBRARY_TAB_ID) void pushTabPatch(existing.id, { lastActiveAt: now });
+      return existing.id;
+    }
+
     let workingTabs = state.tabs;
     if (workingTabs.length >= MAX_TABS) {
       const evictable = workingTabs
@@ -119,7 +131,8 @@ export const useTabs = create<TabsState>((set, get) => ({
       activeId: id,
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, lastActiveAt: now } : t)),
     });
-    void pushTabPatch(id, { lastActiveAt: now });
+    // library 탭은 클라이언트 seed 전용이라 서버에 존재하지 않음 → PATCH 시 404. sync 생략.
+    if (id !== LIBRARY_TAB_ID) void pushTabPatch(id, { lastActiveAt: now });
   },
 
   reorderTab: (id, newPosition) => {
@@ -145,7 +158,19 @@ export const useTabs = create<TabsState>((set, get) => ({
   hydrate: (serverTabs) => {
     if (serverTabs.length === 0) return;
     const hasLibrary = serverTabs.some((t) => t.isLibrary);
-    const tabs = hasLibrary ? serverTabs : [...seed().tabs, ...serverTabs];
+    const merged = hasLibrary ? serverTabs : [...seed().tabs, ...serverTabs];
+    // 동일 paperId 탭 중복 제거(가장 최근 활성 탭 유지) — 과거 세션이 남긴 중복 탭 정리.
+    const byPaper = new Map<string, Tab>();
+    const tabs: Tab[] = [];
+    for (const t of merged) {
+      if (t.paperId == null) {
+        tabs.push(t);
+        continue;
+      }
+      const prev = byPaper.get(t.paperId);
+      if (!prev || t.lastActiveAt > prev.lastActiveAt) byPaper.set(t.paperId, t);
+    }
+    tabs.push(...byPaper.values());
     const active = tabs.find((t) => t.isLibrary)?.id ?? LIBRARY_TAB_ID;
     set({ tabs: reflowPositions(tabs), activeId: active });
   },

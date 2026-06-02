@@ -16,9 +16,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const refreshMe = useAuth((s) => s.refreshMe);
 
   useEffect(() => {
-    void refreshMe();
-    void fetchTabs().then((tabs) => {
-      if (tabs) hydrate(tabs);
+    // 탭 복원은 로그인 사용자 전용. 익명(게스트)은 공유 anonymous 유저로 동기화하면
+    // 게스트끼리 서로의 탭을 보게 되므로 in-memory(세션 한정)로만 둔다.
+    void refreshMe().then(() => {
+      const u = useAuth.getState().user;
+      if (u && !u.anonymous) {
+        void fetchTabs().then((tabs) => {
+          if (tabs) hydrate(tabs);
+        });
+      }
     });
   }, [hydrate, refreshMe]);
 
