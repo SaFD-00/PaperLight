@@ -21,9 +21,10 @@ import {
   Zap,
 } from "lucide-react";
 import { SettingsMenu } from "@/components/shell/SettingsMenu";
+import { cycle, DENSITY_CYCLE, THEME_CYCLE } from "@/lib/cycle";
 import { useAuth } from "@/stores/auth";
 import { useCommand } from "@/stores/command";
-import { type Density, type Theme, useSettings } from "@/stores/settings";
+import { useSettings } from "@/stores/settings";
 import { useReader } from "@/stores/reader";
 
 type ToggleId = "auto-hl" | "image-desc" | "paragraph" | "skim" | "translate";
@@ -36,13 +37,6 @@ const TOGGLES: { id: ToggleId; label: string; short: string; icon: typeof Wand2 
   { id: "translate", label: "자동 번역 (T)", short: "T", icon: Globe },
 ];
 
-const THEME_CYCLE: Theme[] = ["auto", "light", "dark"];
-const DENSITY_CYCLE: Density[] = ["compact", "cozy", "spacious"];
-
-function cycle<T>(arr: T[], current: T): T {
-  const idx = arr.indexOf(current);
-  return arr[(idx + 1) % arr.length];
-}
 
 export function TopToolbar() {
   const [active, setActive] = useState<Record<ToggleId, boolean>>({

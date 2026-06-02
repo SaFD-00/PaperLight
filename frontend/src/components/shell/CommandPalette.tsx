@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { cycle, DENSITY_CYCLE, THEME_CYCLE } from "@/lib/cycle";
 import { useCommand } from "@/stores/command";
-import { type Density, type Theme, useSettings } from "@/stores/settings";
+import { useSettings } from "@/stores/settings";
 import { useTabs } from "@/stores/tabs";
 
 interface PaperLite {
@@ -29,13 +30,6 @@ interface Command {
   hint?: string;
   icon: typeof Home;
   run: () => void;
-}
-
-const THEME_CYCLE: Theme[] = ["auto", "light", "dark"];
-const DENSITY_CYCLE: Density[] = ["compact", "cozy", "spacious"];
-
-function cycle<T>(arr: T[], current: T): T {
-  return arr[(arr.indexOf(current) + 1) % arr.length];
 }
 
 export function CommandPalette() {
