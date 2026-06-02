@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import AsyncIterator
 from typing import Any
@@ -13,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, model_validator
 
 from paperlight.agents.context import SUMMARY_PROMPT_VERSION
+from paperlight.api._sse import format_sse
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import read_cached, stream_with_cache
@@ -78,10 +78,6 @@ class TranslateRequest(BaseModel):
         raise ValueError("text 또는 sentences가 필요합니다")
 
 
-def _format_sse(event: dict[str, Any]) -> str:
-    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-
 async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIterator[str]:
     if paper_id:
         paper_id_var.set(paper_id)
@@ -104,10 +100,10 @@ async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIte
             paper_id=paper_id,
             prompt_version=TRANSLATE_PROMPT_VERSION,
         ):
-            yield _format_sse({"token": token})
+            yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         capture_exception(err)
-        yield _format_sse({"error": str(err)})
+        yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
 
@@ -157,13 +153,13 @@ async def _stream_aligned(
                 line, buffer = buffer.split("\n", 1)
                 ev = _parse_pair(line, len(sentences), emitted)
                 if ev:
-                    yield _format_sse(ev)
+                    yield format_sse(ev)
         ev = _parse_pair(buffer, len(sentences), emitted)
         if ev:
-            yield _format_sse(ev)
+            yield format_sse(ev)
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         capture_exception(err)
-        yield _format_sse({"error": str(err)})
+        yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
 

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
@@ -14,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from paperlight.agents.chat import generate_followups
 from paperlight.agents.context import GROUND_GUARD, apply_context, build_paper_context
+from paperlight.api._sse import format_sse
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
@@ -65,10 +65,6 @@ class FigureExplainRequest(BaseModel):
     page: int | None = None
 
 
-def _format_sse(event: dict[str, Any]) -> str:
-    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-
 async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
     if paper_id:
         paper_id_var.set(paper_id)
@@ -84,10 +80,10 @@ async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
             paper_id=paper_id,
             prompt_version=EXPLAIN_PROMPT_VERSION,
         ):
-            yield _format_sse({"token": token})
+            yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         capture_exception(err)
-        yield _format_sse({"error": str(err)})
+        yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
 
@@ -164,16 +160,16 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
             prompt_version=version,
         ):
             answer.append(token)
-            yield _format_sse({"token": token})
+            yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
         capture_exception(err)
-        yield _format_sse({"error": str(err)})
+        yield format_sse({"error": str(err)})
         yield "data: [DONE]\n\n"
         return
 
     followups = await generate_followups(req.question or req.label or req.kind, "".join(answer))
     if followups:
-        yield _format_sse({"followups": followups})
+        yield format_sse({"followups": followups})
     yield "data: [DONE]\n\n"
 
 

@@ -8,7 +8,6 @@ camelCase wire format (FE Zustand 1:1).
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -30,6 +29,7 @@ from paperlight.agents.pregen import (
     TABLE_PROMPT_VERSION,
 )
 from paperlight.agents.references import get_references
+from paperlight.api._sse import format_sse
 from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
 from paperlight.ingestion.pipeline import ingest_paper
@@ -72,10 +72,6 @@ def _paper_dict(p: Paper) -> dict[str, Any]:
         "createdAt": p.created_at,
         "updatedAt": p.updated_at,
     }
-
-
-def _format_sse(event: dict[str, Any]) -> str:
-    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
 async def _get_owned(session: AsyncSession, paper_id: str, user_id: str) -> Paper:
@@ -203,10 +199,10 @@ async def ingestion_progress(
             async with factory() as poll:
                 paper = await poll.get(Paper, paper_id)
                 if paper is None:
-                    yield _format_sse({"error": "paper not found"})
+                    yield format_sse({"error": "paper not found"})
                     yield "data: [DONE]\n\n"
                     return
-                yield _format_sse({"status": paper.ingestion_status})
+                yield format_sse({"status": paper.ingestion_status})
                 if paper.ingestion_status in ("ready", "failed"):
                     yield "data: [DONE]\n\n"
                     return

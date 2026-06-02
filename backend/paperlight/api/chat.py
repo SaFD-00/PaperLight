@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import uuid4
@@ -30,6 +29,7 @@ from paperlight.agents.chat import (
     retrieve,
 )
 from paperlight.agents.context import SUMMARY_PROMPT_VERSION
+from paperlight.api._sse import format_sse
 from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
@@ -49,10 +49,6 @@ UserDep = Annotated[str, Depends(get_user_id)]
 class ChatRequest(BaseModel):
     paperId: str
     question: str = Field(..., min_length=1)
-
-
-def _format_sse(event: dict[str, Any]) -> str:
-    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
 async def _get_or_create_session(session: AsyncSession, paper_id: str, user_id: str) -> ChatSession:
@@ -140,12 +136,12 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
             kind, value = item
             if kind == "token":
                 parts.append(value)
-                yield _format_sse({"token": value})
+                yield format_sse({"token": value})
             elif kind == "reasoning":
-                yield _format_sse({"reasoning": value})
+                yield format_sse({"reasoning": value})
             else:  # error
                 errored = True
-                yield _format_sse({"error": value})
+                yield format_sse({"error": value})
     finally:
         producer.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -173,9 +169,9 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
         if cs_row is not None:
             cs_row.updated_at = now_ms()
 
-    yield _format_sse({"citations": citations})
+    yield format_sse({"citations": citations})
     followups = await generate_followups(question, full)
-    yield _format_sse({"followups": followups})
+    yield format_sse({"followups": followups})
     yield "data: [DONE]\n\n"
 
 
