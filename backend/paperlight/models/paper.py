@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import JSON, BigInteger, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class Paper(Base):
@@ -29,6 +24,6 @@ class Paper(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="to_read")
     progress_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     ingestion_status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
-    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
+    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
     soft_deleted_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

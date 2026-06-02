@@ -42,15 +42,12 @@ from paperlight.auth.google import (
 from paperlight.models import Session as SessionRow
 from paperlight.models import User
 from paperlight.storage.db import DEFAULT_USER_ID, get_session
+from paperlight.utils.time import now_ms
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserDep = Annotated[str, Depends(get_user_id)]
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 def _now_s() -> int:
@@ -217,11 +214,11 @@ async def refresh(
         await session.execute(
             update(SessionRow)
             .where(SessionRow.family_id == row.family_id, SessionRow.revoked_at.is_(None))
-            .values(revoked_at=_now_ms())
+            .values(revoked_at=now_ms())
         )
         await session.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "refresh reuse detected")
-    row.revoked_at = _now_ms()
+    row.revoked_at = now_ms()
     await session.commit()
     await _issue_session(response, session, sub, family_id=family)
     return {"status": "ok"}
@@ -240,7 +237,7 @@ async def logout(
             if isinstance(jti, str):
                 row = await session.get(SessionRow, jti)
                 if row is not None and row.revoked_at is None:
-                    row.revoked_at = _now_ms()
+                    row.revoked_at = now_ms()
                     await session.commit()
         except JWTError:
             pass

@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import BigInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class User(Base):
@@ -23,5 +18,5 @@ class User(Base):
     default_content_language: Mapped[str] = mapped_column(String, nullable=False, default="ko")
     density: Mapped[str] = mapped_column(String, nullable=False, default="cozy")
     theme: Mapped[str] = mapped_column(String, nullable=False, default="auto")
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
     soft_deleted_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

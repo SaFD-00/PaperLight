@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import JSON, BigInteger, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class ChatSession(Base):
@@ -22,8 +17,8 @@ class ChatSession(Base):
         String, ForeignKey("papers.id"), nullable=False, index=True
     )
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
-    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
+    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
 
 
 class ChatMessage(Base):
@@ -38,4 +33,4 @@ class ChatMessage(Base):
     citations: Mapped[list[dict[str, object]] | None] = mapped_column(
         JSON, nullable=True
     )  # [{chunkId, page}]
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)

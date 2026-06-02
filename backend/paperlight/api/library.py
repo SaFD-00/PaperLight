@@ -7,7 +7,6 @@ user-scoped via shared `get_user_id`. camelCase wire format (FE Zustand 1:1).
 
 from __future__ import annotations
 
-import time
 from typing import Annotated, Any
 from uuid import uuid4
 
@@ -27,6 +26,7 @@ from paperlight.models.paper import Paper
 from paperlight.models.paper_tag import PaperTag
 from paperlight.models.tag import Tag
 from paperlight.storage.db import get_session
+from paperlight.utils.time import now_ms
 
 router = APIRouter(prefix="/api/library", tags=["library"])
 
@@ -38,10 +38,6 @@ SENTINEL_STARRED = "__starred__"
 SENTINEL_UNREAD = "__unread__"
 SENTINEL_RECENT = "__recent__"
 SENTINEL_TRASH = "__trash__"
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 async def _get_special(session: AsyncSession, user_id: str, kind: str) -> Collection | None:
@@ -184,7 +180,7 @@ async def update_collection(
         col.color = body.color
     if body.position is not None:
         col.position = body.position
-    col.updated_at = _now_ms()
+    col.updated_at = now_ms()
     await session.commit()
     return await _collection_dict(session, col)
 
@@ -433,10 +429,10 @@ async def patch_paper(
     if body.status is not None:
         paper.status = body.status
     if body.trashed is not None:
-        paper.soft_deleted_at = _now_ms() if body.trashed else None
+        paper.soft_deleted_at = now_ms() if body.trashed else None
     if body.starred is not None:
         await _set_starred(session, user_id, pid, body.starred)
-    paper.updated_at = _now_ms()
+    paper.updated_at = now_ms()
     await session.commit()
     return await _paper_payload(session, paper)
 
@@ -469,9 +465,9 @@ async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> 
             continue
         if body.action == "status":
             paper.status = body.value or paper.status
-            paper.updated_at = _now_ms()
+            paper.updated_at = now_ms()
         elif body.action == "trash":
-            paper.soft_deleted_at = _now_ms()
+            paper.soft_deleted_at = now_ms()
         elif body.action == "restore":
             paper.soft_deleted_at = None
         elif body.action == "addTag":

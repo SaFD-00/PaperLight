@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class Collection(Base):
@@ -27,5 +22,5 @@ class Collection(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_special: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     special_kind: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
-    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
+    updated_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)

@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import JSON, BigInteger, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class Highlight(Base):
@@ -28,4 +23,4 @@ class Highlight(Base):
     category: Mapped[str] = mapped_column(String, nullable=False, default="user_custom")
     color: Mapped[str | None] = mapped_column(String, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False, default="user")
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)

@@ -7,7 +7,6 @@ camelCase 필드는 FE Zustand store wire format과 1:1 일치시키기 위함.
 
 from __future__ import annotations
 
-import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models import Tab
 from paperlight.storage.db import get_session
+from paperlight.utils.time import now_ms
 
 router = APIRouter(prefix="/api/tabs", tags=["tabs"])
 
@@ -46,12 +46,8 @@ class TabPatch(BaseModel):
     updatedAt: int | None = None
 
 
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
-
 def _to_orm(payload: TabPayload, user_id: str) -> Tab:
-    updated = payload.updatedAt or _now_ms()
+    updated = payload.updatedAt or now_ms()
     return Tab(
         id=payload.id,
         user_id=user_id,
@@ -81,7 +77,7 @@ async def upsert_tab(
     existing = await session.get(Tab, payload.id)
     if existing is not None and existing.user_id != user_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "tab belongs to another user")
-    incoming_updated = payload.updatedAt or _now_ms()
+    incoming_updated = payload.updatedAt or now_ms()
     if existing is not None:
         # last-write-wins
         if existing.updated_at >= incoming_updated:
@@ -114,7 +110,7 @@ async def patch_tab(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "tab not found")
     if existing.user_id != user_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "tab belongs to another user")
-    incoming_updated = patch.updatedAt or _now_ms()
+    incoming_updated = patch.updatedAt or now_ms()
     if existing.updated_at >= incoming_updated:
         return existing.to_dict()
     if patch.paperId is not None:

@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import time
-
 from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperlight.storage.db import Base
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from paperlight.utils.time import now_ms
 
 
 class Session(Base):
@@ -24,5 +19,5 @@ class Session(Base):
     family_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     expires_at: Mapped[int] = mapped_column(BigInteger, nullable=False)
     revoked_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
-    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=_now_ms)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=now_ms)
     user_agent: Mapped[str | None] = mapped_column(String, nullable=True)

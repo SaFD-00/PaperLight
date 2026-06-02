@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import uuid4
@@ -39,6 +38,7 @@ from paperlight.observability.sentry import capture_exception
 from paperlight.providers.base import reasoning_sink
 from paperlight.providers.cache import read_cached, stream_with_cache
 from paperlight.storage.db import get_session, session_scope
+from paperlight.utils.time import now_ms
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -53,10 +53,6 @@ class ChatRequest(BaseModel):
 
 def _format_sse(event: dict[str, Any]) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 async def _get_or_create_session(session: AsyncSession, paper_id: str, user_id: str) -> ChatSession:
@@ -175,7 +171,7 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
         )
         cs_row = await session.get(ChatSession, session_id)
         if cs_row is not None:
-            cs_row.updated_at = _now_ms()
+            cs_row.updated_at = now_ms()
 
     yield _format_sse({"citations": citations})
     followups = await generate_followups(question, full)
