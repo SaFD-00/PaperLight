@@ -1,4 +1,4 @@
-"""Task → provider/model routing (PRD §7.5.4 models.yaml). See also stream_task."""
+"""Agent → provider/model routing (PRD §7.5.4 config/agents.yaml). See also stream_task."""
 
 from __future__ import annotations
 
@@ -18,7 +18,9 @@ from paperlight.providers.openai_provider import OpenAIProvider
 from paperlight.providers.openrouter_provider import OpenRouterProvider
 from paperlight.providers.stub_provider import StubProvider
 
-_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "models.yaml"
+# Repo-root config/ is the single source of truth (router.py → parents[3] == repo root).
+# NOTE: when containerizing the backend, ensure the build context includes repo-root config/.
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "agents.yaml"
 
 PROVIDER_REGISTRY: dict[str, Callable[[], LLMProvider]] = {
     "openrouter": OpenRouterProvider,
@@ -29,7 +31,7 @@ PROVIDER_REGISTRY: dict[str, Callable[[], LLMProvider]] = {
 
 
 def _config_path() -> Path:
-    override = os.environ.get("PAPERLIGHT_MODELS_CONFIG")
+    override = os.environ.get("PAPERLIGHT_AGENTS_CONFIG")
     return Path(override) if override else _DEFAULT_CONFIG_PATH
 
 
@@ -38,22 +40,22 @@ def _load(path: str) -> dict[str, Any]:
     with Path(path).open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     if not isinstance(data, dict):
-        raise RuntimeError(f"models.yaml must be a mapping: {path}")
+        raise RuntimeError(f"agents.yaml must be a mapping: {path}")
     return data
 
 
-def load_models_config() -> dict[str, Any]:
+def load_agents_config() -> dict[str, Any]:
     return _load(str(_config_path()))
 
 
 def _entry(task: str) -> dict[str, Any]:
-    cfg = load_models_config()
-    tasks = cfg.get("tasks") or {}
-    entry = tasks.get(task)
+    cfg = load_agents_config()
+    agents = cfg.get("agents") or {}
+    entry = agents.get(task)
     if entry is None:
         entry = cfg["default"]
     if not isinstance(entry, dict):
-        raise RuntimeError(f"invalid models.yaml entry for task {task!r}")
+        raise RuntimeError(f"invalid agents.yaml entry for task {task!r}")
     return entry
 
 
@@ -72,15 +74,27 @@ def primary_model(task: str) -> str:
     return model
 
 
+def reasoning_effort(task: str) -> str | None:
+    """Reasoning effort (none|low|medium|high) for an agent; falls back to default."""
+    effort = _entry(task).get("reasoning_effort")
+    if effort is None:
+        default = load_agents_config().get("default") or {}
+        effort = default.get("reasoning_effort")
+    return None if effort is None else str(effort)
+
+
 async def _stream_candidates(
     task: str,
     messages: list[dict[str, Any]],
     holder: dict[str, str],
 ) -> AsyncIterator[str]:
     """Run the provider chain; record the model that actually yields in holder."""
+    effort = reasoning_effort(task)
     if os.environ.get("LLM_PROVIDER") == "stub":
         holder["model"] = primary_model(task)
-        async for token in StubProvider().stream_chat(messages, holder["model"]):
+        async for token in StubProvider().stream_chat(
+            messages, holder["model"], reasoning_effort=effort
+        ):
             yield token
         return
 
@@ -96,7 +110,7 @@ async def _stream_candidates(
             continue
         yielded = False
         try:
-            async for token in provider.stream_chat(messages, model):
+            async for token in provider.stream_chat(messages, model, reasoning_effort=effort):
                 if not yielded:
                     holder["model"] = model
                 yielded = True

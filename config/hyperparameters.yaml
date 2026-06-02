@@ -1,12 +1,13 @@
-# Per-task generation hyperparameters — PRD §7.5
-# TODO: tune empirically; current values are placeholders.
+# Per-agent generation hyperparameters — PRD §7.5.5.
+# 현재 미배선 스펙(라우터가 아직 로드하지 않음). agent 분류는 config/agents.yaml과 동일.
+# TODO: 값 경험적 튜닝 + router.stream_task 배선.
 
 defaults:
   temperature: 0.3
   top_p: 0.9
   max_tokens: 2048
 
-tasks:
+agents:
   summary:
     temperature: 0.2
     max_tokens: 3000
@@ -31,6 +32,24 @@ tasks:
   paragraph_importance:
     temperature: 0.0
     max_tokens: 100
+  podcast_outline:
+    temperature: 0.6
+    max_tokens: 2000
   podcast_script:
     temperature: 0.7
     max_tokens: 8000
+  podcast_critique:
+    temperature: 0.3
+    max_tokens: 1500
+  critique:
+    temperature: 0.3
+    max_tokens: 1500
+  classifier:
+    temperature: 0.0
+    max_tokens: 100
+  highlight:
+    temperature: 0.2
+    max_tokens: 1000
+  domain_classifier:
+    temperature: 0.0
+    max_tokens: 100

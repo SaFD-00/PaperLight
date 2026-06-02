@@ -21,6 +21,12 @@ class LLMProvider(Protocol):
         self,
         messages: list[dict[str, Any]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
-        """Return an async iterator of content tokens (async-generator method)."""
+        """Return an async iterator of content tokens (async-generator method).
+
+        reasoning_effort (none|low|medium|high) requests a model's thinking budget;
+        only OpenRouter consumes it today, others accept-and-ignore.
+        """
         ...

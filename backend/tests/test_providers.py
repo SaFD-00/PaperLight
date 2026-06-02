@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
+import json
+from typing import Any
+
 import pytest
 
 from paperlight.providers.content import openai_messages, to_gemini_parts, to_text
 from paperlight.providers.gemini_provider import GeminiProvider
 from paperlight.providers.openai_provider import OpenAIProvider
+from paperlight.providers.openrouter_provider import OpenRouterProvider
 from paperlight.providers.stub_provider import StubProvider
 
 
@@ -76,3 +81,53 @@ def test_gemini_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         GeminiProvider()
+
+
+class _FakeSSE:
+    def __init__(self, data: str) -> None:
+        self.data = data
+
+
+class _FakeEventSource:
+    async def aiter_sse(self) -> Any:
+        yield _FakeSSE(json.dumps({"choices": [{"delta": {"content": "hi"}}]}))
+        yield _FakeSSE("[DONE]")
+
+
+async def _run_openrouter(
+    monkeypatch: pytest.MonkeyPatch, **kwargs: Any
+) -> dict[str, Any]:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    captured: dict[str, Any] = {}
+
+    @contextlib.asynccontextmanager
+    async def fake_connect(
+        client: Any, method: str, url: str, *, headers: Any, json: Any
+    ) -> Any:
+        captured["payload"] = json
+        yield _FakeEventSource()
+
+    monkeypatch.setattr(
+        "paperlight.providers.openrouter_provider.aconnect_sse", fake_connect
+    )
+    out = ""
+    async for tok in OpenRouterProvider().stream_chat(
+        [{"role": "user", "content": "x"}], "qwen/qwen3.6-35b-a3b", **kwargs
+    ):
+        out += tok
+    assert out == "hi"
+    return captured["payload"]
+
+
+async def test_openrouter_includes_reasoning_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = await _run_openrouter(monkeypatch, reasoning_effort="high")
+    assert payload["reasoning"] == {"effort": "high"}
+
+
+async def test_openrouter_omits_reasoning_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = await _run_openrouter(monkeypatch)
+    assert "reasoning" not in payload

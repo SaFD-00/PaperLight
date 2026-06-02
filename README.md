@@ -31,8 +31,8 @@ See [docs/PRD.md](docs/PRD.md) for the full Product Requirements (**v3.0**) and 
 | Vector store | Qdrant Cloud (ap-northeast-1) |
 | Cache / queue | Redis Cloud |
 | Object storage | Cloudflare R2 (S3-compatible) |
-| **LLM (default)** | **OpenRouter — `qwen/qwen3.6-35b-a3b`** |
-| LLM (fallback) | OpenAI (GPT-5) / Gemini 2.5 / Anthropic via OpenRouter |
+| **LLM (default)** | **OpenRouter Qwen3.6 패밀리 (`plus`/`flash`/`35b-a3b`)** — 전 agent Qwen3.6, agent별 `reasoning_effort` (`config/agents.yaml`) |
+| LLM (fallback) | Qwen3.6 패밀리 내 모델 (`config/agents.yaml`의 agent별 fallback) |
 | TTS | OpenAI tts-1-hd (default) / ElevenLabs (fallback) |
 | Observability | Sentry + PostHog + Langfuse + OpenTelemetry |
 | Hosting | Vercel (FE) + Render/Railway (BE, Tokyo) |
@@ -58,7 +58,7 @@ docker compose up -d postgres qdrant redis minio
 # 2. Backend
 cd backend
 uv sync --extra dev
-uv run uvicorn paperlight.main:app --reload --port 8000
+uv run uvicorn paperlight.main:app --reload --reload-dir paperlight --port 8000
 
 # 3. Frontend (separate terminal)
 cd frontend

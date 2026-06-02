@@ -237,17 +237,17 @@ class LLMProvider(Protocol):
     async def embed(self, texts: list[str], model: str) -> list[list[float]]: ...
 ```
 
-**기본 라우팅** (Phase 0~1):
-- 일반 텍스트 추론 → `gemini/gemini-3.1-flash-lite` (Gemini API). qwen은 이전 기본 — 일부 fallback에 잔존
-- Figure description (Vision) → `openai/gpt-5` (F-14)
-- Table description → `gemini/gemini-2.5-pro` (F-14 fallback)
-- 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial)
+**기본 라우팅** (Phase 0~1) — 라우팅 설정은 레포 루트 `config/agents.yaml`(router가 로드), 전 agent OpenRouter Qwen3.6 + agent별 `reasoning_effort`:
+- 일반 텍스트 추론 → `openrouter/qwen/qwen3.6-35b-a3b` (경량 task는 `qwen3.6-flash`)
+- Figure/Table description (Vision) → `openrouter/qwen/qwen3.6-plus` (F-14)
+- 팟캐스트 창작 → `openrouter/qwen/qwen3.6-plus`(`reasoning_effort: high`)
+- 임베딩 → `bge-m3` (self-host) or `openai/text-embedding-3-large` (initial, 라우터 미사용)
 
 **멀티모달 content**: 메시지 `content`는 `str`(텍스트, 기존 그대로) 또는 parts 배열 `[{type:text}, {type:image, mime, data}]`(`providers/content.py`)을 받는다. gemini는 `inline_data`, openai/openrouter는 `image_url`(data URL)로 변환, stub은 이미지 무시. 두 비전 경로가 이를 쓴다: ① Figure/Table 인라인 설명(`/api/explain/figure`, §3.2c) — 프론트 crop 이미지 + 캡션·본문 + 멀티턴 history. ② pregen 사전생성(`agents/pregen.py`) — marker bbox가 있으면 `ingestion/render.py`의 `get_pixmap(clip)`로 영역을 렌더해 비전으로 figure/table을 미리 설명(없으면 텍스트 폴백, prompt_version v2).
 
 **Fallback 정책**: provider 5xx → 다음 provider 동일 모델군 → 최종 실패 시 사용자 알림 (PRD §7.5).
 
-**Reasoning 스트리밍**: OpenRouter `qwen` 계열은 추론(reasoning) 모델이라 사고 과정이 OpenRouter SSE의 `delta.reasoning`으로 먼저 흐르고 `delta.content`(최종 답변)는 그 뒤에 온다. 그대로 두면 추론 동안 사용자에게 빈 스트림만 보인다. Chat 경로는 요청 스코프 `reasoning_sink` contextvar(`providers/base.py`)로 reasoning 델타를 받아 `{"reasoning": ...}` SSE 이벤트로 라이브 전송한다(`api/chat.py`가 큐로 content·reasoning 머지). reasoning 은 캐시·영속화·Langfuse output 에 포함하지 않는다. **기본 모델을 `gemini-3.1-flash-lite`로 전환한 뒤로는 chat primary에 reasoning 델타가 없어 일반 content 스트림이며, reasoning_sink 경로는 OpenRouter reasoning 모델을 fallback 으로 탈 때만 활성된다.** Explain/Translate(단발 task)는 미적용.
+**Reasoning 스트리밍**: OpenRouter `qwen` 계열은 추론(reasoning) 모델이라 사고 과정이 OpenRouter SSE의 `delta.reasoning`으로 먼저 흐르고 `delta.content`(최종 답변)는 그 뒤에 온다. 그대로 두면 추론 동안 사용자에게 빈 스트림만 보인다. Chat 경로는 요청 스코프 `reasoning_sink` contextvar(`providers/base.py`)로 reasoning 델타를 받아 `{"reasoning": ...}` SSE 이벤트로 라이브 전송한다(`api/chat.py`가 큐로 content·reasoning 머지). reasoning 은 캐시·영속화·Langfuse output 에 포함하지 않는다. **전 agent가 Qwen3.6(OpenRouter reasoning 모델)이고 `config/agents.yaml`의 agent별 `reasoning_effort`가 OpenRouter 요청의 `reasoning.effort`로 전달되므로, chat primary에 reasoning 델타가 흐른다(effort `none`이면 사실상 일반 content 스트림).** Explain/Translate(단발 task)는 reasoning_sink 미적용.
 
 ### 5.2 TTSProvider
 

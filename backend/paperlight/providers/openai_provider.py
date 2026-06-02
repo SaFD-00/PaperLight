@@ -25,6 +25,8 @@ class OpenAIProvider:
         self,
         messages: list[dict[str, Any]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,  # noqa: ARG002 — accepted for protocol parity
     ) -> AsyncIterator[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",

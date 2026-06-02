@@ -27,6 +27,8 @@ class GeminiProvider:
         self,
         messages: list[dict[str, Any]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,  # noqa: ARG002 — accepted for protocol parity
     ) -> AsyncIterator[str]:
         system_parts: list[dict[str, str]] = []
         contents: list[dict[str, Any]] = []

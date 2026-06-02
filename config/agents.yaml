@@ -1,0 +1,125 @@
+# LLM agent routing — PRD §7.5.4. Loaded by paperlight.providers.router.
+# 각 agent를 OpenRouter Qwen3.6 패밀리(plus/flash/35b-a3b) + reasoning_effort(none|low|medium|high)로 라우팅.
+version: "2026.06.03"
+
+default:
+  provider: openrouter
+  model: qwen/qwen3.6-35b-a3b
+  reasoning_effort: medium
+
+agents:
+  summary:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    reasoning_effort: medium
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-plus }
+
+  chat:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    reasoning_effort: medium
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-plus }
+
+  explanation:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    reasoning_effort: medium
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
+
+  translation:
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: none
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  figure_description:        # F-14 — vision (qwen3.6-plus 멀티모달)
+    provider: openrouter
+    model: qwen/qwen3.6-plus
+    reasoning_effort: medium
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  table_description:         # F-14 — vision
+    provider: openrouter
+    model: qwen/qwen3.6-plus
+    reasoning_effort: medium
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  paragraph_description:     # F-15 — batch, cheap
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: none
+
+  paragraph_importance:      # F-15 — classifier
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: none
+
+  podcast_outline:
+    provider: openrouter
+    model: qwen/qwen3.6-plus
+    reasoning_effort: high
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  podcast_script:
+    provider: openrouter
+    model: qwen/qwen3.6-plus
+    reasoning_effort: high
+    fallback:
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+
+  podcast_critique:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    reasoning_effort: medium
+
+  critique:
+    provider: openrouter
+    model: qwen/qwen3.6-35b-a3b
+    reasoning_effort: medium
+
+  classifier:
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: none
+
+  highlight:
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: low
+
+  domain_classifier:         # 논문 도메인 분류 (글로서리 선택용)
+    provider: openrouter
+    model: qwen/qwen3.6-flash
+    reasoning_effort: none
+
+# 아래 섹션은 라우터 미사용(보존). embedding은 ingestion.embedder가 담당.
+embedding:
+  provider: openai
+  model: text-embedding-3-large
+  fallback:
+    - { provider: local, model: bge-m3 }   # DAU 5k 이후 self-host
+
+reranker:
+  provider: local
+  model: bge-reranker-v2-m3
+  fallback:
+    - { provider: cohere, model: rerank-multilingual-v3.0 }
+
+tts:
+  default_provider: openai
+  providers:
+    openai:
+      model: tts-1-hd
+      voice_a: alloy
+      voice_b: echo
+    elevenlabs:                # 한국어 품질 부족 시 fallback
+      voice_a_id_env: ELEVENLABS_VOICE_A_ID
+      voice_b_id_env: ELEVENLABS_VOICE_B_ID
+      model: eleven_multilingual_v2

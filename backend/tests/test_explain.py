@@ -20,7 +20,7 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
     os.close(fd)
     await reset_engine(f"sqlite+aiosqlite:///{path}")
     await init_db()
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     from paperlight.main import app
 
     transport = ASGITransport(app=app)
@@ -39,12 +39,14 @@ async def test_explain_streams_tokens(
         self: object,
         messages: list[dict[str, str]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
         yield "Hello "
         yield "world"
 
     monkeypatch.setattr(
-        "paperlight.providers.gemini_provider.GeminiProvider.stream_chat",
+        "paperlight.providers.openrouter_provider.OpenRouterProvider.stream_chat",
         fake_stream,
     )
 

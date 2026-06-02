@@ -1,1 +1,1 @@
-"""Config package — models.yaml routing table lives here."""
+"""Config package — ingestion.yaml lives here. Agent routing is in repo-root config/agents.yaml."""

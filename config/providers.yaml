@@ -1,5 +1,5 @@
-# LLM / TTS provider metadata — PRD §7.5
-# Keys come from .env (e.g., OPENAI_API_KEY). This file only holds non-secret config.
+# LLM / TTS provider metadata — PRD §7.5.6.
+# 현재 미배선 스펙(provider가 base_url/timeout을 아직 하드코딩). 키는 .env(OPENAI_API_KEY 등)에서, 여기엔 비밀 없음.
 
 providers:
   openai:

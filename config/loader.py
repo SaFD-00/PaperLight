@@ -13,11 +13,12 @@ from pydantic import BaseModel
 CONFIG_ROOT = Path(__file__).resolve().parent
 
 
-class ModelRoute(BaseModel):
+class AgentRoute(BaseModel):
     provider: str
     model: str
+    reasoning_effort: str | None = None
     fallback: list[dict] = []
 
 
-def load_models() -> dict:
-    return yaml.safe_load((CONFIG_ROOT / "models.yaml").read_text(encoding="utf-8"))
+def load_agents() -> dict:
+    return yaml.safe_load((CONFIG_ROOT / "agents.yaml").read_text(encoding="utf-8"))

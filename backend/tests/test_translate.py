@@ -20,7 +20,7 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
     os.close(fd)
     await reset_engine(f"sqlite+aiosqlite:///{path}")
     await init_db()
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     from paperlight.main import app
 
     transport = ASGITransport(app=app)
@@ -39,12 +39,14 @@ async def test_translate_streams_tokens(
         self: object,
         messages: list[dict[str, str]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
         yield "안녕"
         yield "하세요"
 
     monkeypatch.setattr(
-        "paperlight.providers.gemini_provider.GeminiProvider.stream_chat",
+        "paperlight.providers.openrouter_provider.OpenRouterProvider.stream_chat",
         fake_stream,
     )
 
@@ -73,12 +75,14 @@ async def test_translate_aligned_streams_pairs(
         self: object,
         messages: list[dict[str, str]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
         yield "1\t첫 번째 문장.\n"
         yield "2\t두 번째 문장.\n"
 
     monkeypatch.setattr(
-        "paperlight.providers.gemini_provider.GeminiProvider.stream_chat",
+        "paperlight.providers.openrouter_provider.OpenRouterProvider.stream_chat",
         fake_stream,
     )
 

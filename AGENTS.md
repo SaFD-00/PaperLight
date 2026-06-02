@@ -59,11 +59,11 @@ pnpm typecheck    # tsc --noEmit (emit 없음, 검사만)
 - `backend/paperlight/api/` — HTTP 어댑터 (SSE 스트리밍 다수). 비즈니스 로직 금지.
 - `backend/paperlight/agents/` — LangGraph 워크플로 (Chat·Ingest·Podcast 등). 한 기능 = 한 그래프.
 - `backend/paperlight/ingestion/` — PDF → chunk → embedding 파이프라인 (parser/chunker/embedder/pipeline).
-- `backend/paperlight/providers/` — LLM/TTS 외부 API **추상화**. Qwen3.6-35B 기본, GPT-5/Gemini/ElevenLabs fallback. 신규 provider는 동일 Protocol 구현.
+- `backend/paperlight/providers/` — LLM/TTS 외부 API **추상화**. 전 agent OpenRouter Qwen3.6 패밀리(`plus`/`flash`/`35b-a3b`) + agent별 `reasoning_effort`. 신규 provider는 동일 Protocol 구현(`stream_chat(..., *, reasoning_effort=None)`).
 - `backend/paperlight/storage/` — Postgres·Qdrant·R2 어댑터. 라우터·에이전트는 이 계층을 통해서만 저장소 접근.
 - `frontend/src/components/{shell,reader,library,panels}/` — 셸/Reader/Library/AI 패널.
 - `frontend/src/stores/` — Zustand. Tab 상태는 (FE Zustand ↔ BE Tab API ↔ Postgres)로 동기화 (last-write-wins).
-- `config/*.yaml` — 모델 매핑(`models.yaml`), 프롬프트(`prompts/`), 분야별 용어집(`glossary/`). **코드 변경 없이 핫리로드** 가능하게 유지.
+- `config/*.yaml` — agent 라우팅(`agents.yaml`, router가 로드하는 단일 소스), 하이퍼파라미터/프로바이더/프롬프트/용어집(`hyperparameters.yaml`·`providers.yaml`·`prompts/`·`glossary/` — 현재 미배선 스펙). **코드 변경 없이 핫리로드** 가능하게 유지.
 
 ### 비자명한 핵심 패턴
 
@@ -76,11 +76,11 @@ pnpm typecheck    # tsc --noEmit (emit 없음, 검사만)
 - Summary (다층) + F-10 Auto-Highlight + F-14 Figure/Table + F-15 Paragraph는 **자동 생성** — 결과는 `cache` 테이블에 영구 저장
 - F-13 Podcast만 **수동 생성** (비용 통제)
 
-**Provider 라우팅 기본값**
-- 일반 텍스트 추론 → `openrouter/qwen/qwen3.6-35b-a3b`
-- Figure description (Vision) → `openai/gpt-5`
-- Table description fallback → `gemini/gemini-2.5-pro`
-- 임베딩 → `bge-m3` (Phase 1+에 self-host)
+**Provider 라우팅 기본값** (전 agent Qwen3.6, `config/agents.yaml`)
+- 일반 텍스트 추론 → `openrouter/qwen/qwen3.6-35b-a3b` (경량 task `qwen3.6-flash`)
+- Figure/Table description (Vision) → `openrouter/qwen/qwen3.6-plus`
+- 팟캐스트 창작 → `openrouter/qwen/qwen3.6-plus` (`reasoning_effort: high`)
+- 임베딩 → `bge-m3` (Phase 1+에 self-host, 라우터 미사용)
 - 5xx → 동일 모델군의 다음 provider로 자동 fallback
 
 ## 파일럿 데이터

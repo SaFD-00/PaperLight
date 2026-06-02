@@ -26,6 +26,8 @@ class OpenRouterProvider:
         self,
         messages: list[dict[str, Any]],
         model: str,
+        *,
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -33,7 +35,13 @@ class OpenRouterProvider:
             "HTTP-Referer": "https://paperlight.app",
             "X-Title": "PaperLight",
         }
-        payload = {"model": model, "messages": openai_messages(messages), "stream": True}
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": openai_messages(messages),
+            "stream": True,
+        }
+        if reasoning_effort:
+            payload["reasoning"] = {"effort": reasoning_effort}
         timeout = httpx.Timeout(60.0, read=None)
         async with (
             httpx.AsyncClient(timeout=timeout) as client,
