@@ -7,6 +7,7 @@ import os
 import tempfile
 from collections.abc import AsyncIterator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -142,7 +143,7 @@ async def test_tabs_isolated_per_login(client: AsyncClient) -> None:
 
 
 async def test_login_google_unconfigured_503(
-    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("GOOGLE_OAUTH_CLIENT_ID", raising=False)
     monkeypatch.delenv("GOOGLE_OAUTH_CLIENT_SECRET", raising=False)
@@ -151,7 +152,7 @@ async def test_login_google_unconfigured_503(
 
 
 async def test_login_google_configured_returns_authurl(
-    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")
@@ -168,7 +169,7 @@ async def test_login_google_configured_returns_authurl(
 
 
 async def test_google_callback_state_mismatch_400(
-    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")
@@ -178,7 +179,7 @@ async def test_google_callback_state_mismatch_400(
 
 
 async def test_google_callback_creates_user_and_sets_session(
-    client: AsyncClient, monkeypatch: "pytest.MonkeyPatch"
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "cid-123")
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret-xyz")

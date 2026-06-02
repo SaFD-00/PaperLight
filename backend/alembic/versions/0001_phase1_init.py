@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "0001_phase1_init"
@@ -25,9 +26,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("email", sa.String(), nullable=False, unique=True),
         sa.Column("google_sub", sa.String(), nullable=True, unique=True),
-        sa.Column(
-            "default_content_language", sa.String(), nullable=False, server_default="ko"
-        ),
+        sa.Column("default_content_language", sa.String(), nullable=False, server_default="ko"),
         sa.Column("density", sa.String(), nullable=False, server_default="cozy"),
         sa.Column("theme", sa.String(), nullable=False, server_default="auto"),
         sa.Column("created_at", sa.BigInteger(), nullable=False),
@@ -47,9 +46,7 @@ def upgrade() -> None:
         sa.Column("pdf_r2_key", sa.String(), nullable=True),
         sa.Column("status", sa.String(), nullable=False, server_default="to_read"),
         sa.Column("progress_pct", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column(
-            "ingestion_status", sa.String(), nullable=False, server_default="pending"
-        ),
+        sa.Column("ingestion_status", sa.String(), nullable=False, server_default="pending"),
         sa.Column("created_at", sa.BigInteger(), nullable=False),
         sa.Column("updated_at", sa.BigInteger(), nullable=False),
         sa.Column("soft_deleted_at", sa.BigInteger(), nullable=True),
@@ -78,9 +75,7 @@ def upgrade() -> None:
     op.create_table(
         "library_items",
         sa.Column("paper_id", sa.String(), sa.ForeignKey("papers.id"), primary_key=True),
-        sa.Column(
-            "collection_id", sa.String(), sa.ForeignKey("collections.id"), primary_key=True
-        ),
+        sa.Column("collection_id", sa.String(), sa.ForeignKey("collections.id"), primary_key=True),
         sa.Column("added_at", sa.BigInteger(), nullable=False),
     )
 
@@ -104,9 +99,7 @@ def upgrade() -> None:
         "notes",
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False, index=True),
-        sa.Column(
-            "paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True
-        ),
+        sa.Column("paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True),
         sa.Column("markdown_text", sa.Text(), nullable=False, server_default=""),
         sa.Column("s3_backup_key", sa.String(), nullable=True),
         sa.Column("created_at", sa.BigInteger(), nullable=False),
@@ -117,9 +110,7 @@ def upgrade() -> None:
         "highlights",
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False, index=True),
-        sa.Column(
-            "paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True
-        ),
+        sa.Column("paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True),
         sa.Column("page", sa.Integer(), nullable=False),
         sa.Column("bbox", sa.JSON(), nullable=False),
         sa.Column("text", sa.Text(), nullable=False, server_default=""),
@@ -132,9 +123,7 @@ def upgrade() -> None:
     op.create_table(
         "podcasts",
         sa.Column("id", sa.String(), primary_key=True),
-        sa.Column(
-            "paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True
-        ),
+        sa.Column("paper_id", sa.String(), sa.ForeignKey("papers.id"), nullable=False, index=True),
         sa.Column("user_id", sa.String(), sa.ForeignKey("users.id"), nullable=False, index=True),
         sa.Column("options", sa.JSON(), nullable=False),
         sa.Column("status", sa.String(), nullable=False, server_default="pending"),
@@ -162,9 +151,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("position", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("pinned", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column(
-            "is_library", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("is_library", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("opened_at", sa.BigInteger(), nullable=False),
         sa.Column("last_active_at", sa.BigInteger(), nullable=False),
         sa.Column("updated_at", sa.BigInteger(), nullable=False),
