@@ -13,7 +13,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, delete, func, or_, select
+from sqlalchemy import Select, String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from paperlight.agents import bib
@@ -209,6 +209,40 @@ _SORT_COLUMNS = {
 }
 
 
+def _apply_search_filter(stmt: Select[tuple[Paper]], q: str, scope: str) -> Select[tuple[Paper]]:
+    """scope(title/author/tag/content)별 ilike 조건을 OR로 묶어 적용."""
+    scopes = {s for s in scope.split(",") if s}
+    like = f"%{q}%"
+    conds = []
+    if "title" in scopes:
+        conds.append(Paper.title.ilike(like))
+    if "author" in scopes:
+        conds.append(cast(Paper.authors, String).ilike(like))
+    if "tag" in scopes:
+        conds.append(
+            Paper.id.in_(
+                select(PaperTag.paper_id)
+                .join(Tag, Tag.id == PaperTag.tag_id)
+                .where(Tag.name.ilike(like))
+            )
+        )
+    if "content" in scopes:
+        conds.append(Paper.id.in_(select(Chunk.paper_id).where(Chunk.text.ilike(like))))
+    if conds:
+        stmt = stmt.where(or_(*conds))
+    return stmt
+
+
+def _apply_sort(
+    stmt: Select[tuple[Paper]], collection_id: str | None, sort: str, order: str
+) -> Select[tuple[Paper]]:
+    """최근(recent) 가상 컬렉션은 updated_at desc 고정, 그 외는 sort/order 적용."""
+    if collection_id == SENTINEL_RECENT:
+        return stmt.order_by(Paper.updated_at.desc())
+    sort_col = _SORT_COLUMNS.get(sort, Paper.created_at)
+    return stmt.order_by(sort_col.asc() if order == "asc" else sort_col.desc())
+
+
 @router.get("/papers")
 async def list_library_papers(
     session: SessionDep,
@@ -256,31 +290,9 @@ async def list_library_papers(
             stmt = stmt.where(Paper.id.in_(select(PaperTag.paper_id).where(PaperTag.tag_id == tid)))
 
     if q:
-        scopes = {s for s in scope.split(",") if s}
-        like = f"%{q}%"
-        conds = []
-        if "title" in scopes:
-            conds.append(Paper.title.ilike(like))
-        if "author" in scopes:
-            conds.append(cast(Paper.authors, String).ilike(like))
-        if "tag" in scopes:
-            conds.append(
-                Paper.id.in_(
-                    select(PaperTag.paper_id)
-                    .join(Tag, Tag.id == PaperTag.tag_id)
-                    .where(Tag.name.ilike(like))
-                )
-            )
-        if "content" in scopes:
-            conds.append(Paper.id.in_(select(Chunk.paper_id).where(Chunk.text.ilike(like))))
-        if conds:
-            stmt = stmt.where(or_(*conds))
+        stmt = _apply_search_filter(stmt, q, scope)
 
-    if collection_id == SENTINEL_RECENT:
-        stmt = stmt.order_by(Paper.updated_at.desc())
-    else:
-        sort_col = _SORT_COLUMNS.get(sort, Paper.created_at)
-        stmt = stmt.order_by(sort_col.asc() if order == "asc" else sort_col.desc())
+    stmt = _apply_sort(stmt, collection_id, sort, order)
 
     rows = (await session.execute(stmt)).scalars().all()
     return [await _paper_payload(session, p) for p in rows]
@@ -428,6 +440,47 @@ class BulkBody(BaseModel):
     value: str | None = None
 
 
+async def _apply_bulk_action(
+    session: AsyncSession,
+    paper: Paper,
+    body: BulkBody,
+    target_collection: Collection | None,
+    user_id: str,
+) -> None:
+    """단일 논문에 bulk action 적용(commit은 호출부에서 일괄)."""
+    if body.action == "status":
+        paper.status = body.value or paper.status
+        paper.updated_at = now_ms()
+    elif body.action == "trash":
+        paper.soft_deleted_at = now_ms()
+    elif body.action == "restore":
+        paper.soft_deleted_at = None
+    elif body.action == "addTag":
+        assert body.value is not None
+        tag = await _get_or_create_tag(session, user_id, body.value)
+        if await session.get(PaperTag, {"paper_id": paper.id, "tag_id": tag.id}) is None:
+            session.add(PaperTag(paper_id=paper.id, tag_id=tag.id))
+    elif body.action == "removeTag":
+        existing_tag = await session.scalar(
+            select(Tag).where(Tag.user_id == user_id, Tag.name == body.value)
+        )
+        if existing_tag is not None:
+            await session.execute(
+                delete(PaperTag).where(
+                    PaperTag.paper_id == paper.id, PaperTag.tag_id == existing_tag.id
+                )
+            )
+    elif body.action == "move":
+        assert target_collection is not None
+        if (
+            await session.get(
+                LibraryItem, {"paper_id": paper.id, "collection_id": target_collection.id}
+            )
+            is None
+        ):
+            session.add(LibraryItem(paper_id=paper.id, collection_id=target_collection.id))
+
+
 @router.post("/bulk")
 async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> dict[str, int]:
     if body.action not in _BULK_ACTIONS:
@@ -445,38 +498,7 @@ async def bulk_action(body: BulkBody, session: SessionDep, user_id: UserDep) -> 
         paper = await session.get(Paper, pid)
         if paper is None or paper.user_id != user_id:
             continue
-        if body.action == "status":
-            paper.status = body.value or paper.status
-            paper.updated_at = now_ms()
-        elif body.action == "trash":
-            paper.soft_deleted_at = now_ms()
-        elif body.action == "restore":
-            paper.soft_deleted_at = None
-        elif body.action == "addTag":
-            assert body.value is not None
-            tag = await _get_or_create_tag(session, user_id, body.value)
-            if await session.get(PaperTag, {"paper_id": pid, "tag_id": tag.id}) is None:
-                session.add(PaperTag(paper_id=pid, tag_id=tag.id))
-        elif body.action == "removeTag":
-            existing_tag = await session.scalar(
-                select(Tag).where(Tag.user_id == user_id, Tag.name == body.value)
-            )
-            if existing_tag is not None:
-                await session.execute(
-                    delete(PaperTag).where(
-                        PaperTag.paper_id == pid, PaperTag.tag_id == existing_tag.id
-                    )
-                )
-        elif body.action == "move":
-            assert target_collection is not None
-            if (
-                await session.get(
-                    LibraryItem,
-                    {"paper_id": pid, "collection_id": target_collection.id},
-                )
-                is None
-            ):
-                session.add(LibraryItem(paper_id=pid, collection_id=target_collection.id))
+        await _apply_bulk_action(session, paper, body, target_collection, user_id)
         affected += 1
     await session.commit()
     return {"affected": affected}
