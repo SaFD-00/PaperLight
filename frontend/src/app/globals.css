@@ -64,3 +64,39 @@ body {
   box-shadow: var(--shadow-focus);
   border-radius: var(--radius-sm);
 }
+
+/* ── Landing(초기 화면) 전용 모션 ──────────────────────────────
+ * 은은하게 떠다니는 그라데이션 오브 + 페이드인. 깔끔함 우선이라
+ * 과하지 않게(저속·저대비). reduced-motion 에서는 정지. */
+@keyframes pl-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -24px, 0) scale(1.06);
+  }
+}
+@keyframes pl-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.pl-orb {
+  animation: pl-float 14s var(--motion-ease) infinite;
+  will-change: transform;
+}
+.pl-rise {
+  animation: pl-rise 0.7s var(--motion-ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-orb,
+  .pl-rise {
+    animation: none;
+  }
+}
