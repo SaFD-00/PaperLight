@@ -48,6 +48,10 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
   const currentPage = useReader((s) => s.currentPage);
   const zoom = useReader((s) => s.zoom);
   const jumpRequest = useReader((s) => s.jumpRequest);
+  const findRequest = useReader((s) => s.findRequest);
+  const findStepRequest = useReader((s) => s.findStepRequest);
+  const setFindResult = useReader((s) => s.setFindResult);
+  const closeSearch = useReader((s) => s.closeSearch);
   const highlights = useMarkup((s) => s.highlights);
   const fetchHighlights = useMarkup((s) => s.fetchHighlights);
   const translationFontFamily = useSettings((s) => s.translationFontFamily);
@@ -227,6 +231,9 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
         case "THUMBNAIL":
           setThumbnail(data.page, data.dataUrl);
           break;
+        case "FIND_RESULT":
+          setFindResult(data.matchCount, data.current);
+          break;
       }
     }
     window.addEventListener("message", onMessage);
@@ -242,6 +249,7 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     triggerFigureExplain,
     translationEnabled,
     paperId,
+    setFindResult,
   ]);
 
   // 번역 ON & 보이는 페이지가 미요청이면 본문 텍스트 요청(스크롤 따라 lazy).
@@ -334,6 +342,25 @@ export function PdfViewer({ pdfUrl, paperId }: PdfViewerProps) {
     if (!iframeReadyRef.current) return;
     postToIframe({ source: HOST_SOURCE, type: "JUMP_TO", page: jumpRequest.page });
   }, [jumpRequest]);
+
+  // 페이지 내 검색: 검색어 변경 → iframe FIND, 이전·다음 → FIND_STEP.
+  useEffect(() => {
+    if (!findRequest) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "FIND", query: findRequest.query });
+  }, [findRequest]);
+
+  useEffect(() => {
+    if (!findStepRequest) return;
+    if (!iframeReadyRef.current) return;
+    postToIframe({ source: HOST_SOURCE, type: "FIND_STEP", dir: findStepRequest.dir });
+  }, [findStepRequest]);
+
+  // 논문 전환 시 검색 상태 초기화(오버레이는 loadPdf가 비움).
+  useEffect(() => {
+    closeSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paperId]);
 
   // Sidebar 요청 → iframe에 outline/thumbnail 요청 전달.
   useEffect(() => {

@@ -70,6 +70,16 @@ interface ReaderState {
   /** Sidebar → PdfViewer: request outline / thumbnails (nonce re-fires). */
   outlineRequest: { nonce: number } | null;
   thumbnailsRequest: { nonce: number } | null;
+  /** 페이지 내 검색 바 열림 여부. */
+  searchOpen: boolean;
+  /** 현재 검색어(입력 컨트롤 상태). */
+  searchQuery: string;
+  /** 전체 일치 개수 / 현재 일치(1-based, 0 = 없음). */
+  searchMatchCount: number;
+  searchCurrent: number;
+  /** SearchBar → PdfViewer: 검색 실행 / 이전·다음 이동(nonce re-fires). */
+  findRequest: { query: string; nonce: number } | null;
+  findStepRequest: { dir: 1 | -1; nonce: number } | null;
   setSelection: (s: SelectionInfo | null) => void;
   triggerExplain: (sel: ExplainSelection) => void;
   clearExplain: () => void;
@@ -94,6 +104,12 @@ interface ReaderState {
   setTotalPages: (total: number) => void;
   requestJump: (page: number) => void;
   requestPanel: (panel: string) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
+  toggleSearch: () => void;
+  requestFind: (query: string) => void;
+  requestFindStep: (dir: 1 | -1) => void;
+  setFindResult: (matchCount: number, current: number) => void;
 }
 
 const ZOOM_MIN = 50;
@@ -119,6 +135,12 @@ export const useReader = create<ReaderState>((set) => ({
   panelRequest: null,
   outlineRequest: null,
   thumbnailsRequest: null,
+  searchOpen: false,
+  searchQuery: "",
+  searchMatchCount: 0,
+  searchCurrent: 0,
+  findRequest: null,
+  findStepRequest: null,
   setSelection: (s) => set({ selection: s }),
   triggerExplain: (sel) => {
     capture("explain_requested", { length: sel.text.length });
@@ -153,4 +175,31 @@ export const useReader = create<ReaderState>((set) => ({
   setTotalPages: (total) => set({ totalPages: total }),
   requestJump: (page) => set({ jumpRequest: { page, nonce: Date.now() } }),
   requestPanel: (panel) => set({ panelRequest: { panel, nonce: Date.now() } }),
+  openSearch: () => set({ searchOpen: true }),
+  closeSearch: () =>
+    set({
+      searchOpen: false,
+      searchQuery: "",
+      searchMatchCount: 0,
+      searchCurrent: 0,
+      // iframe 오버레이도 비우도록 빈 쿼리로 FIND 재요청.
+      findRequest: { query: "", nonce: Date.now() },
+    }),
+  toggleSearch: () =>
+    set((state) =>
+      state.searchOpen
+        ? {
+            searchOpen: false,
+            searchQuery: "",
+            searchMatchCount: 0,
+            searchCurrent: 0,
+            findRequest: { query: "", nonce: Date.now() },
+          }
+        : { searchOpen: true },
+    ),
+  requestFind: (query) =>
+    set({ searchQuery: query, findRequest: { query, nonce: Date.now() } }),
+  requestFindStep: (dir) => set({ findStepRequest: { dir, nonce: Date.now() } }),
+  setFindResult: (matchCount, current) =>
+    set({ searchMatchCount: matchCount, searchCurrent: current }),
 }));

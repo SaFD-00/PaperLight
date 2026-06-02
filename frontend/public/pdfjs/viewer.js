@@ -20,6 +20,8 @@ let translationCols = []; // 페이지별 번역 컬럼 element.
 let translationSentences = []; // 페이지별 [{ i, el, globalStart, globalEnd }] (교차 하이라이트용).
 let visibilityObserver = null;
 let savedHighlights = [];
+let searchMatches = []; // [{ page, startOffset, endOffset }] — 페이지 내 검색 일치.
+let searchCurrent = -1; // 현재 강조 중인 일치 인덱스(0-based, 없으면 -1).
 
 const HL_COLORS = {
   yellow: "rgba(255, 224, 102, 0.5)",
@@ -47,7 +49,11 @@ hlStyle.textContent =
   "border:1px solid rgba(0,0,0,0.12);background:rgba(255,255,255,0.92);" +
   "color:#374151;font:600 11px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer;" +
   "box-shadow:0 1px 3px rgba(0,0,0,0.12);opacity:0.55;transition:opacity .12s;}" +
-  ".figure-explain-btn:hover{opacity:1;background:#fff;border-color:rgba(0,0,0,0.22);}";
+  ".figure-explain-btn:hover{opacity:1;background:#fff;border-color:rgba(0,0,0,0.22);}" +
+  // 페이지 내 검색 일치 표시(현재 일치는 주황 강조).
+  ".search-hit{position:absolute;pointer-events:none;mix-blend-mode:multiply;" +
+  "background:rgba(255,213,79,0.55);border-radius:1px;}" +
+  ".search-hit--active{background:rgba(255,138,0,0.7);}";
 document.head.appendChild(hlStyle);
 
 // 해석 패널이 열렸을 때만 문장 hover 리포팅 활성화.
@@ -168,6 +174,92 @@ function renderHighlightsForPage(pageNum) {
 function renderAllHighlights() {
   for (const el of container.querySelectorAll(".highlight-overlay")) el.remove();
   for (let i = 1; i <= pageWrappers.length; i++) renderHighlightsForPage(i);
+}
+
+// ── 페이지 내 검색 ────────────────────────────────────────────────────────────
+function clearSearch() {
+  for (const el of container.querySelectorAll(".search-hit")) el.remove();
+  searchMatches = [];
+  searchCurrent = -1;
+}
+
+// text-layer.textContent 에서 대소문자 무시 부분일치를 페이지 순서대로 수집.
+function runSearch(query) {
+  clearSearch();
+  const q = (query || "").trim().toLowerCase();
+  if (!q) {
+    send("FIND_RESULT", { matchCount: 0, current: 0 });
+    return;
+  }
+  for (let i = 0; i < pageWrappers.length; i++) {
+    const wrapper = pageWrappers[i];
+    const layer = wrapper ? wrapper.querySelector(".text-layer") : null;
+    const text = (layer ? layer.textContent || "" : "").toLowerCase();
+    if (!text) continue;
+    let from = 0;
+    let idx;
+    while ((idx = text.indexOf(q, from)) >= 0) {
+      searchMatches.push({ page: i + 1, startOffset: idx, endOffset: idx + q.length });
+      from = idx + q.length;
+    }
+  }
+  renderSearchHits();
+  if (searchMatches.length > 0) {
+    searchCurrent = 0;
+    focusMatch(0);
+  }
+  send("FIND_RESULT", {
+    matchCount: searchMatches.length,
+    current: searchMatches.length > 0 ? 1 : 0,
+  });
+}
+
+// 일치 구간을 Range → getClientRects 로 변환해 wrapper 에 % 오버레이로 배치(줌 무관).
+function renderSearchHits() {
+  for (const el of container.querySelectorAll(".search-hit")) el.remove();
+  for (let m = 0; m < searchMatches.length; m++) {
+    const match = searchMatches[m];
+    const wrapper = pageWrappers[match.page - 1];
+    const layer = wrapper ? wrapper.querySelector(".text-layer") : null;
+    if (!layer) continue;
+    const startPos = locateOffset(layer, match.startOffset);
+    const endPos = locateOffset(layer, match.endOffset);
+    if (!startPos || !endPos) continue;
+    const range = document.createRange();
+    try {
+      range.setStart(startPos.node, startPos.local);
+      range.setEnd(endPos.node, endPos.local);
+    } catch (_) {
+      continue;
+    }
+    const wr = wrapper.getBoundingClientRect();
+    for (const r of range.getClientRects()) {
+      if (r.width <= 0 || r.height <= 0) continue;
+      const div = document.createElement("div");
+      div.className = "search-hit" + (m === searchCurrent ? " search-hit--active" : "");
+      div.dataset.matchIdx = String(m);
+      div.style.left = ((r.left - wr.left) / wr.width) * 100 + "%";
+      div.style.top = ((r.top - wr.top) / wr.height) * 100 + "%";
+      div.style.width = (r.width / wr.width) * 100 + "%";
+      div.style.height = (r.height / wr.height) * 100 + "%";
+      wrapper.appendChild(div);
+    }
+  }
+}
+
+function focusMatch(idx) {
+  for (const el of container.querySelectorAll(".search-hit")) {
+    el.classList.toggle("search-hit--active", Number(el.dataset.matchIdx) === idx);
+  }
+  const el = container.querySelector('.search-hit[data-match-idx="' + idx + '"]');
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function stepSearch(dir) {
+  if (searchMatches.length === 0) return;
+  searchCurrent = (searchCurrent + dir + searchMatches.length) % searchMatches.length;
+  focusMatch(searchCurrent);
+  send("FIND_RESULT", { matchCount: searchMatches.length, current: searchCurrent + 1 });
 }
 
 // ── 원문↔해석 문장 교차 하이라이트 ────────────────────────────────────────────
@@ -730,6 +822,8 @@ async function loadPdf(url) {
   pageFigureAnchors = [];
   translationCols = [];
   translationSentences = [];
+  searchMatches = [];
+  searchCurrent = -1;
   if (currentDoc) {
     try { await currentDoc.destroy(); } catch (_) { /* noop */ }
     currentDoc = null;
@@ -913,6 +1007,15 @@ window.addEventListener("message", async (event) => {
     }
     case "REQUEST_THUMBNAILS":
       await sendThumbnails();
+      break;
+    case "FIND":
+      runSearch(msg.query);
+      break;
+    case "FIND_STEP":
+      stepSearch(msg.dir);
+      break;
+    case "FIND_CLEAR":
+      clearSearch();
       break;
   }
 });

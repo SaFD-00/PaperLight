@@ -90,7 +90,7 @@ export function TopToolbar() {
         >
           <Menu size={16} />
         </IconButton>
-        <IconButton label="페이지 내 검색">
+        <IconButton label="페이지 내 검색" onClick={() => useReader.getState().toggleSearch()}>
           <Search size={16} />
         </IconButton>
       </div>

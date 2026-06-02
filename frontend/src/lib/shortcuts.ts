@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCommand } from "@/stores/command";
+import { useReader } from "@/stores/reader";
 import { LIBRARY_TAB_ID, useTabs } from "@/stores/tabs";
 
 function isMod(e: KeyboardEvent): boolean {
@@ -20,6 +21,13 @@ export function useTabShortcuts(): void {
       if (e.key.toLowerCase() === "k") {
         e.preventDefault();
         useCommand.getState().toggle();
+        return;
+      }
+
+      // ⌘F → 페이지 내 검색(리더 라우트에서만 브라우저 찾기 대체).
+      if (e.key.toLowerCase() === "f" && window.location.pathname.startsWith("/r/")) {
+        e.preventDefault();
+        useReader.getState().openSearch();
         return;
       }
 
