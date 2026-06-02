@@ -63,6 +63,7 @@ Icon?
 .claude/analysis/
 .claude/reflexions/
 .claude/knowledge/
+.claude/settings.json
 # --- Playwright ---
 test-results/
 playwright-report/
