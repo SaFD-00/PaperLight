@@ -18,11 +18,16 @@ from typing import Any
 
 from sqlalchemy import select
 
+from paperlight.agents.context import (
+    GROUND_GUARD,
+    apply_context,
+    build_paper_context,
+)
 from paperlight.agents.references import get_references
 from paperlight.ingestion.render import render_region
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
-from paperlight.providers.cache import load_figure_layout, stream_with_cache
+from paperlight.providers.cache import load_figure_layout, read_cached, stream_with_cache
 from paperlight.storage.db import get_session_factory
 from paperlight.storage.object_store import get_object_store, pdf_key
 
@@ -30,10 +35,10 @@ logger = logging.getLogger(__name__)
 
 SUMMARY_PROMPT_VERSION = "summary-v1"
 HIGHLIGHT_PROMPT_VERSION = "highlight-v1"
-PARAGRAPH_DESC_PROMPT_VERSION = "paragraph-desc-v1"
-PARAGRAPH_IMPORTANCE_PROMPT_VERSION = "paragraph-importance-v1"
-FIGURE_PROMPT_VERSION = "figure-v2"  # v2: marker bbox 있으면 비전(이미지) 입력
-TABLE_PROMPT_VERSION = "table-v2"
+PARAGRAPH_DESC_PROMPT_VERSION = "paragraph-desc-v2"  # v2: 요약+RAG 맥락 주입
+PARAGRAPH_IMPORTANCE_PROMPT_VERSION = "paragraph-importance-v2"  # v2: 요약 맥락 주입
+FIGURE_PROMPT_VERSION = "figure-v3"  # v2: marker bbox 비전 입력 / v3: 논문 맥락 주입
+TABLE_PROMPT_VERSION = "table-v3"
 
 _SUMMARY_CORPUS_CHARS = 12000
 
@@ -51,10 +56,12 @@ _HIGHLIGHT_SYSTEM = (
     "각 항목은 인용 문장과 가능하면 페이지를 표기하세요. 본문에 없는 내용은 추가하지 마세요."
 )
 _PARAGRAPH_DESC_SYSTEM = (
-    "다음 단락의 핵심을 한국어 한 문장으로 요약하세요. 군더더기 없이 요점만 출력하세요."
+    "[대상 단락]의 핵심을 한국어 한 문장으로 요약하세요. [논문 요약]·[관련 본문 발췌]가 "
+    "있으면 논문 전체 흐름을 고려하되, 지어내지 말고 군더더기 없이 한 문장만 출력하세요."
 )
 _PARAGRAPH_IMPORTANCE_SYSTEM = (
-    "다음 단락의 중요도를 Critical, Important, Normal 중 하나로만 분류해 한 단어로 출력하세요."
+    "[대상 단락]이 논문 전체에서 갖는 중요도를 Critical, Important, Normal 중 하나로만 "
+    "분류해 한 단어로 출력하세요. [논문 요약]은 판단 참고용입니다."
 )
 _FIGURE_SYSTEM = (
     "다음 본문에 언급된 그림(Figure)을 한국어로 설명하세요. 이미지 없이 텍스트만으로 추론하며, "
@@ -113,11 +120,15 @@ async def _figure_pregen(
     kind: str,
     figures_by_page: dict[int, list[dict[str, Any]]],
     pdf_data: bytes | None,
+    paper_summary: str | None,
 ) -> None:
     """이 청크 페이지에 bbox가 있으면 영역을 렌더해 비전으로, 없으면 텍스트로 설명."""
     is_table = kind == "table"
     task = "table_description" if is_table else "figure_description"
     version = TABLE_PROMPT_VERSION if is_table else FIGURE_PROMPT_VERSION
+    context = await build_paper_context(
+        paper_id, ch.text, exclude_chunk_id=ch.id, precomputed_summary=paper_summary
+    )
 
     region: dict[str, Any] | None = None
     if pdf_data is not None:
@@ -136,6 +147,9 @@ async def _figure_pregen(
                 f"주변 본문:\n{ch.text[:1500]}\n\n위 {noun}를 설명해주세요."
             )
             system = _TABLE_VISION_SYSTEM if is_table else _FIGURE_VISION_SYSTEM
+            if context:
+                system = f"{system}\n\n{GROUND_GUARD}"
+                prompt = f"[논문 맥락]\n{context}\n\n{prompt}"
             messages: list[dict[str, Any]] = [
                 {"role": "system", "content": system},
                 {
@@ -152,10 +166,7 @@ async def _figure_pregen(
     # 텍스트 폴백(bbox/이미지 없음 — pymupdf 모드 또는 렌더 실패)
     await _safe_run(
         task,
-        [
-            {"role": "system", "content": _TABLE_SYSTEM if is_table else _FIGURE_SYSTEM},
-            {"role": "user", "content": ch.text},
-        ],
+        apply_context(_TABLE_SYSTEM if is_table else _FIGURE_SYSTEM, ch.text, context),
         paper_id=paper_id,
         chunk_id=ch.id,
         version=version,
@@ -225,31 +236,49 @@ async def pregen_paper(paper_id: str) -> None:
         version=HIGHLIGHT_PROMPT_VERSION,
     )
 
+    # summary 생성(위) 직후 1회 읽어 per-chunk 맥락 주입에 재사용(DB 왕복·재계산 최소화).
+    paper_summary = await read_cached(
+        "summary",
+        paper_id=paper_id,
+        chunk_id=f"summary:{paper_id}",
+        prompt_version=SUMMARY_PROMPT_VERSION,
+    )
+
     for ch in chunks:
+        # 단락 설명: 요약 + 관련 본문(자기 자신 제외). 분류기보다 풍부한 맥락.
+        desc_ctx = await build_paper_context(
+            paper_id, ch.text, top_k=2, exclude_chunk_id=ch.id, precomputed_summary=paper_summary
+        )
+        desc_user = f"{desc_ctx}\n\n[대상 단락]\n{ch.text}" if desc_ctx else ch.text
         await _safe_run(
             "paragraph_description",
             [
                 {"role": "system", "content": _PARAGRAPH_DESC_SYSTEM},
-                {"role": "user", "content": ch.text},
+                {"role": "user", "content": desc_user},
             ],
             paper_id=paper_id,
             chunk_id=ch.id,
             version=PARAGRAPH_DESC_PROMPT_VERSION,
         )
+        # 중요도: 요약만(분류기엔 RAG 노이즈). 한 단어 출력 유지 위해 가드 미사용.
+        imp_ctx = await build_paper_context(
+            paper_id, ch.text, related=False, precomputed_summary=paper_summary
+        )
+        imp_user = f"{imp_ctx}\n\n[대상 단락]\n{ch.text}" if imp_ctx else ch.text
         await _safe_run(
             "paragraph_importance",
             [
                 {"role": "system", "content": _PARAGRAPH_IMPORTANCE_SYSTEM},
-                {"role": "user", "content": ch.text},
+                {"role": "user", "content": imp_user},
             ],
             paper_id=paper_id,
             chunk_id=ch.id,
             version=PARAGRAPH_IMPORTANCE_PROMPT_VERSION,
         )
         if _FIGURE_RE.search(ch.text):
-            await _figure_pregen(paper_id, ch, "figure", figures_by_page, pdf_data)
+            await _figure_pregen(paper_id, ch, "figure", figures_by_page, pdf_data, paper_summary)
         if _TABLE_RE.search(ch.text):
-            await _figure_pregen(paper_id, ch, "table", figures_by_page, pdf_data)
+            await _figure_pregen(paper_id, ch, "table", figures_by_page, pdf_data, paper_summary)
 
     # References(F-05): 추출+보강을 미리 Cache memo에 채워 패널 첫 클릭 대기 제거. 격리.
     try:
