@@ -12,14 +12,21 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, model_validator
 
+from paperlight.agents.context import SUMMARY_PROMPT_VERSION
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
-from paperlight.providers.cache import stream_with_cache
+from paperlight.providers.cache import read_cached, stream_with_cache
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
-TRANSLATE_PROMPT_VERSION = "translate-v1"
-ALIGNED_PROMPT_VERSION = "translate-aligned-v1"
+TRANSLATE_PROMPT_VERSION = "translate-v2"  # v2: 논문 요약을 용어 일관성 참고로 주입
+ALIGNED_PROMPT_VERSION = "translate-aligned-v2"
+
+_TERMS_CAP = 800
+_TERMS_GUARD = (
+    "아래 [용어 참고]는 논문의 용어·주제 일관성 참고용입니다. "
+    "번역에 새로운 내용을 추가하지 말고 원문만 충실히 옮기세요."
+)
 
 SYSTEM_PROMPT = (
     "당신은 학술 논문 번역가입니다. "
@@ -37,6 +44,19 @@ ALIGNED_SYSTEM_PROMPT = (
     "번호와 문장 개수를 그대로 유지하고, 수식·고유 명사·약어는 원문을 보존합니다. "
     "추가 설명이나 머리말은 절대 쓰지 마세요."
 )
+
+
+async def _terminology(paper_id: str | None) -> str:
+    """논문 요약을 용어 일관성 참고용 텍스트로 (없으면 빈 문자열)."""
+    if not paper_id:
+        return ""
+    summary = await read_cached(
+        "summary",
+        paper_id=paper_id,
+        chunk_id=f"summary:{paper_id}",
+        prompt_version=SUMMARY_PROMPT_VERSION,
+    )
+    return (summary or "")[:_TERMS_CAP]
 
 _LINE_RE = re.compile(r"^\s*(\d+)[.):\t ]+(.*)$")
 
@@ -65,8 +85,12 @@ def _format_sse(event: dict[str, Any]) -> str:
 async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIterator[str]:
     if paper_id:
         paper_id_var.set(paper_id)
+    system = SYSTEM_PROMPT
+    terms = await _terminology(paper_id)
+    if terms:
+        system = f"{SYSTEM_PROMPT}\n\n{_TERMS_GUARD}\n[용어 참고]\n{terms}"
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {
             "role": "user",
             "content": f"다음 텍스트를 {target_lang}로 번역해주세요:\n\n```\n{text}\n```",
@@ -105,8 +129,17 @@ async def _stream_aligned(
     if paper_id:
         paper_id_var.set(paper_id)
     numbered = "\n".join(f"{i + 1}\t{s}" for i, s in enumerate(sentences))
+    # 용어 참고는 system 에만 — 번호 매긴 user 입력은 손대지 않아 1:1 문장 대응이 유지된다.
+    system = ALIGNED_SYSTEM_PROMPT
+    terms = await _terminology(paper_id)
+    if terms:
+        system = (
+            f"{ALIGNED_SYSTEM_PROMPT}\n\n{_TERMS_GUARD} [용어 참고]는 번역하지 마세요. "
+            "출력은 입력 문장과 번호 기준 1:1 대응이며 문장 개수·번호를 그대로 유지합니다.\n"
+            f"[용어 참고]\n{terms}"
+        )
     messages = [
-        {"role": "system", "content": ALIGNED_SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": f"다음 문장들을 {target_lang}로 번역하세요:\n\n{numbered}"},
     ]
     emitted: set[int] = set()

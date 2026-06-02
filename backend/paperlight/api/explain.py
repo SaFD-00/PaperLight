@@ -13,15 +13,16 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from paperlight.agents.chat import generate_followups
+from paperlight.agents.context import GROUND_GUARD, apply_context, build_paper_context
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
 
 router = APIRouter(prefix="/api/explain", tags=["explain"])
 
-EXPLAIN_PROMPT_VERSION = "explain-v1"
-FIGURE_PROMPT_VERSION = "figure-v2"
-TABLE_PROMPT_VERSION = "table-v2"
+EXPLAIN_PROMPT_VERSION = "explain-v2"  # v2: 전체 논문 맥락(요약+RAG) 주입
+FIGURE_PROMPT_VERSION = "figure-v3"  # v3: 전체 논문 맥락 주입
+TABLE_PROMPT_VERSION = "table-v3"
 
 _FIGURE_HISTORY_TURNS = 6
 
@@ -71,10 +72,10 @@ def _format_sse(event: dict[str, Any]) -> str:
 async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
     if paper_id:
         paper_id_var.set(paper_id)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"다음 단락을 설명해주세요:\n\n```\n{text}\n```"},
-    ]
+    context = await build_paper_context(paper_id, text)
+    messages = apply_context(
+        SYSTEM_PROMPT, f"다음 단락을 설명해주세요:\n\n```\n{text}\n```", context
+    )
     try:
         async for token in stream_with_cache(
             "explanation",
@@ -119,11 +120,20 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
 
     if req.question.strip():
         user_text = req.question
+        context = ""
     else:
         user_text = f"{req.label or req.kind} 캡션:\n{req.captionText or '(없음)'}"
         if req.context:
             user_text += f"\n\n주변 본문:\n{req.context}"
         user_text += f"\n\n위 {('표' if is_table else '그림')}를 설명해주세요."
+        # 첫 설명 턴에만 전체 논문 맥락(요약+RAG) 주입 — 후속 질문은 history가 맥락을 잇는다.
+        context = await build_paper_context(
+            req.paperId, f"{req.captionText}\n{req.context}"
+        )
+
+    if context:
+        system = f"{system}\n\n{GROUND_GUARD}"
+        user_text = f"[논문 맥락]\n{context}\n\n{user_text}"
 
     history = req.history[-_FIGURE_HISTORY_TURNS:]
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *history]

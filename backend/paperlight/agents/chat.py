@@ -16,11 +16,12 @@ from paperlight.storage.vector import get_vector_store
 
 logger = logging.getLogger(__name__)
 
-CHAT_PROMPT_VERSION = "chat-v1"
+CHAT_PROMPT_VERSION = "chat-v2"  # v2: 논문 요약을 전체 맥락으로 system에 주입
 
 _TOP_K = 4
 _HISTORY_TURNS = 6
 _CHUNK_CHARS = 1500
+_SUMMARY_CAP = 1200
 
 SYSTEM_PROMPT = (
     "당신은 학술 논문 질의응답 어시스턴트입니다. 아래 제공된 [발췌문]만 근거로 한국어로 답하세요. "
@@ -67,9 +68,22 @@ def build_messages(
     question: str,
     chunks: list[RetrievedChunk],
     history: list[dict[str, str]],
+    *,
+    paper_summary: str = "",
 ) -> list[dict[str, str]]:
-    """System + prior turns (≤N) + grounded user turn with retrieved context."""
-    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    """System + prior turns (≤N) + grounded user turn with retrieved context.
+
+    paper_summary(있으면)는 전체 논문 맥락으로 system 에 덧붙인다. 답변 근거는 여전히
+    [발췌문]이며 요약은 흐름 파악용 — 인용/캐시 키(질문+검색 chunk+히스토리)는 불변.
+    """
+    system = SYSTEM_PROMPT
+    if paper_summary:
+        system = (
+            f"{SYSTEM_PROMPT}\n\n아래 [논문 요약]은 전체 맥락 파악용입니다. 답변의 근거는 "
+            f"여전히 [발췌문]에서 찾되, 요약으로 논문 전체 흐름을 이해하세요.\n"
+            f"[논문 요약]\n{paper_summary[:_SUMMARY_CAP]}"
+        )
+    messages: list[dict[str, str]] = [{"role": "system", "content": system}]
     messages.extend(history[-_HISTORY_TURNS:])
     if chunks:
         context = "\n\n".join(f"[페이지 {c.page}] {c.text[:_CHUNK_CHARS]}" for c in chunks)

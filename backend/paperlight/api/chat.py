@@ -30,13 +30,14 @@ from paperlight.agents.chat import (
     generate_followups,
     retrieve,
 )
+from paperlight.agents.context import SUMMARY_PROMPT_VERSION
 from paperlight.api.papers import _get_owned
 from paperlight.auth.dependencies import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
 from paperlight.observability.context import paper_id_var
 from paperlight.observability.sentry import capture_exception
 from paperlight.providers.base import reasoning_sink
-from paperlight.providers.cache import stream_with_cache
+from paperlight.providers.cache import read_cached, stream_with_cache
 from paperlight.storage.db import get_session, session_scope
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -104,7 +105,13 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
     # arrive on a side channel (reasoning_sink) while content tokens come through the
     # generator; a queue merges both so reasoning streams live instead of going silent.
     chunks = await retrieve(paper_id, question)
-    messages = build_messages(question, chunks, history)
+    summary = await read_cached(
+        "summary",
+        paper_id=paper_id,
+        chunk_id=f"summary:{paper_id}",
+        prompt_version=SUMMARY_PROMPT_VERSION,
+    )
+    messages = build_messages(question, chunks, history, paper_summary=summary or "")
     sig = context_signature(question, chunks, history)
     parts: list[str] = []
 
