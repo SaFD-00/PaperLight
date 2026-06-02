@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { SettingsMenu } from "@/components/shell/SettingsMenu";
 import { useAuth } from "@/stores/auth";
+import { useCommand } from "@/stores/command";
 import { type Density, type Theme, useSettings } from "@/stores/settings";
 import { useReader } from "@/stores/reader";
 
@@ -159,7 +160,7 @@ export function TopToolbar() {
         >
           <ListTree size={14} />
         </IconButton>
-        <IconButton label="명령 팔레트 (⌘K)">
+        <IconButton label="명령 팔레트 (⌘K)" onClick={() => useCommand.getState().toggle()}>
           <Search size={14} />
         </IconButton>
         <button

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useCommand } from "@/stores/command";
 import { LIBRARY_TAB_ID, useTabs } from "@/stores/tabs";
 
 function isMod(e: KeyboardEvent): boolean {
@@ -14,6 +15,14 @@ export function useTabShortcuts(): void {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (!isMod(e)) return;
+
+      // ⌘K → 명령 팔레트 토글(입력 중에도 동작).
+      if (e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        useCommand.getState().toggle();
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         return;

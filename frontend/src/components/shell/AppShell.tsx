@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { AnalyticsProvider } from "@/components/shell/AnalyticsProvider";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 import { TabBar } from "@/components/shell/TabBar";
 import { TopToolbar } from "@/components/shell/TopToolbar";
 import { ThemeProvider } from "@/components/shell/ThemeProvider";
@@ -37,6 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <AnalyticsProvider>
+        <CommandPalette />
         {bare ? (
           <main className="flex-1 overflow-y-auto">{children}</main>
         ) : (
