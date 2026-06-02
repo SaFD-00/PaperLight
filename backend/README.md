@@ -6,7 +6,7 @@ FastAPI + LangGraph backend. See [docs/PRD.md](../docs/PRD.md) §7 for the full 
 
 ```bash
 uv sync --extra dev
-uv run uvicorn paperlight.main:app --reload --port 8000
+uv run uvicorn paperlight.main:app --reload --reload-dir paperlight --port 8000
 ```
 
 Health check: <http://localhost:8000/health>
