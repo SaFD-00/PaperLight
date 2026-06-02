@@ -67,12 +67,21 @@ def _cors_origins() -> list[str]:
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
+def _cors_origin_regex() -> str | None:
+    # dev 에서는 Next.js dev 서버가 임의 포트(3000/3100/e2e 등)로 뜰 수 있어
+    # localhost·127.0.0.1 의 모든 포트를 허용한다. prod 는 명시 origin 만 사용.
+    if os.environ.get("APP_ENV", "development") == "development":
+        return r"http://(localhost|127\.0\.0\.1):\d+"
+    return None
+
+
 app = FastAPI(title="PaperLight API", version="0.0.1", lifespan=lifespan)
 
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
