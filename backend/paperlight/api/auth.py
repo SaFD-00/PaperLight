@@ -1,7 +1,8 @@
-"""Auth API — Phase 1 S7b (stub/mock 모드).
+"""Auth API — Phase 1 S7b.
 
-PRD §7.3: Google OAuth 2.0 + JWT access(15m) + refresh(30d) with rotation.
-Real Google OAuth integration deferred until client credentials are provisioned.
+PRD §7.3: Google OAuth 2.0(authorization-code flow) + JWT access(15m) +
+refresh(30d) with rotation. Google 흐름은 `GOOGLE_OAUTH_CLIENT_ID/SECRET` 설정 시
+활성화되며, 미설정 시 dev `/api/auth/dev/mock-login` 으로 폴백한다.
 """
 
 from __future__ import annotations
