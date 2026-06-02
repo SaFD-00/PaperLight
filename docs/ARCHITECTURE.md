@@ -20,10 +20,12 @@ PaperLight/
 │   ├── paperlight/
 │   │   ├── main.py                  # FastAPI app entry
 │   │   ├── api/                     # 라우터: auth / tabs / papers / library / chat / explain / translate / podcast
+│   │   │                            #  + 공용 헬퍼: _sse.py(format_sse), _ownership.py(소유권 검증)
 │   │   ├── agents/                  # LangGraph 노드 (chat, ingest, podcast, search, summary, highlight)
 │   │   ├── ingestion/               # parser → chunker → embedder → pipeline
 │   │   ├── providers/               # LLMProvider 추상화 (openrouter / openai / gemini) + TTSProvider (openai / elevenlabs)
 │   │   ├── storage/                 # db.py (Postgres), vector.py (Qdrant), object.py (R2)
+│   │   ├── utils/                   # 공용 유틸 (time.now_ms 등)
 │   │   └── models/                  # Pydantic + SQLAlchemy 엔티티
 │   └── tests/                       # pytest (TestClient + Provider mocks)
 │
@@ -31,12 +33,12 @@ PaperLight/
 │   ├── src/
 │   │   ├── app/                     # 페이지 라우팅 (Library, Reader/[paperId])
 │   │   ├── components/
-│   │   │   ├── shell/               # TabBar, TopToolbar, SettingsMenu
-│   │   │   ├── reader/              # ReaderShell, PdfViewer, Sidebar(TOC/페이지), FloatingSelectionMenu, TranslationSidePanel, SelectionExplain/TranslatePopover
-│   │   │   ├── library/             # 4-pane: Tree, List, Detail, TagCloud
-│   │   │   └── panels/              # ChatPanel, SummaryPanel, InsightsPanel, TranslationPane … (+ common/Markdown)
+│   │   │   ├── shell/               # TabBar, TopToolbar(→toolbar/*), CommandPalette(→command-palette/*), SettingsMenu
+│   │   │   ├── reader/              # ReaderShell, PdfViewer(+pdfTranslation/useFigureLayout/useReaderIframeSync), Sidebar, FloatingSelectionMenu, …
+│   │   │   ├── library/             # 4-pane: Tree(→collection-tree/*), List, Detail, TagCloud
+│   │   │   └── panels/              # ChatPanel(→chat/*), SummaryPanel, InsightsPanel, TranslationPane … (+ common/Markdown)
 │   │   ├── stores/                  # Zustand: tabs, settings, library, reader
-│   │   ├── lib/                     # api/, pdf/, selection/, theme/, i18n/
+│   │   ├── lib/                     # api/, pdf/, selection/, theme/, i18n/, cycle.ts, fixtures/
 │   │   ├── styles/                  # tokens.css (DESIGN §3), globals.css
 │   │   └── locales/                 # next-intl: ko/en/ja/zh-CN/es .json
 │   └── public/pdfjs/                # pdf.js 정적 자산 (worker + viewer)
