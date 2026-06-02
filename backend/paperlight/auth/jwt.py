@@ -48,9 +48,7 @@ def encode_access_token(sub: str, *, now: int | None = None) -> str:
     return jwt.encode(payload, _get_secret(), algorithm=_ALGORITHM)
 
 
-def encode_refresh_token(
-    sub: str, jti: str, family: str, *, now: int | None = None
-) -> str:
+def encode_refresh_token(sub: str, jti: str, family: str, *, now: int | None = None) -> str:
     issued = now if now is not None else _now()
     payload = {
         "sub": sub,

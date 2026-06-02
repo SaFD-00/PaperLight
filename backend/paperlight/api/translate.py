@@ -58,6 +58,7 @@ async def _terminology(paper_id: str | None) -> str:
     )
     return (summary or "")[:_TERMS_CAP]
 
+
 _LINE_RE = re.compile(r"^\s*(\d+)[.):\t ]+(.*)$")
 
 

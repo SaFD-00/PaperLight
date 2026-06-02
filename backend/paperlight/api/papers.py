@@ -156,9 +156,7 @@ async def get_paper(paper_id: str, session: SessionDep, user_id: UserDep) -> dic
 
 
 @router.get("/{paper_id}/pdf-url")
-async def pdf_presigned_url(
-    paper_id: str, session: SessionDep, user_id: UserDep
-) -> dict[str, Any]:
+async def pdf_presigned_url(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
     await get_owned_paper(session, paper_id, user_id)
     url = get_object_store().presigned_get(pdf_key(paper_id))
     return {"url": url, "ttlSeconds": DEFAULT_TTL_SECONDS}

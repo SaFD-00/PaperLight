@@ -123,9 +123,7 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
             user_text += f"\n\n주변 본문:\n{req.context}"
         user_text += f"\n\n위 {('표' if is_table else '그림')}를 설명해주세요."
         # 첫 설명 턴에만 전체 논문 맥락(요약+RAG) 주입 — 후속 질문은 history가 맥락을 잇는다.
-        context = await build_paper_context(
-            req.paperId, f"{req.captionText}\n{req.context}"
-        )
+        context = await build_paper_context(req.paperId, f"{req.captionText}\n{req.context}")
 
     if context:
         system = f"{system}\n\n{GROUND_GUARD}"

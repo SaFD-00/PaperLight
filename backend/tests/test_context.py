@@ -13,9 +13,7 @@ def _stub_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _summary(_task: str, **_kw: object) -> str | None:
         return "이 논문은 X를 제안한다."
 
-    async def _retrieve(
-        _paper_id: str, _query: str, *, top_k: int = 3
-    ) -> list[RetrievedChunk]:
+    async def _retrieve(_paper_id: str, _query: str, *, top_k: int = 3) -> list[RetrievedChunk]:
         return [
             RetrievedChunk(chunk_id="self", page=1, text="대상 단락 자신", score=0.99),
             RetrievedChunk(chunk_id="c2", page=4, text="관련 본문 둘", score=0.8),

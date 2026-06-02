@@ -163,12 +163,16 @@ async def google_callback(
 
     # google_sub 우선 매칭 → 없으면 email 로 기존 계정 연결 → 둘 다 없으면 신규.
     user = (
-        await session.execute(select(User).where(User.google_sub == identity.sub))
-    ).scalars().first()
+        (await session.execute(select(User).where(User.google_sub == identity.sub)))
+        .scalars()
+        .first()
+    )
     if user is None:
         user = (
-            await session.execute(select(User).where(User.email == identity.email))
-        ).scalars().first()
+            (await session.execute(select(User).where(User.email == identity.email)))
+            .scalars()
+            .first()
+        )
         if user is not None:
             user.google_sub = identity.sub
         else:
@@ -196,9 +200,7 @@ async def refresh(
     try:
         payload = decode_token(refresh_token)
     except JWTError as exc:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, f"invalid refresh token: {exc}"
-        ) from exc
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"invalid refresh token: {exc}") from exc
     if payload.get("typ") != "refresh":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "wrong token type")
     jti = payload.get("jti")

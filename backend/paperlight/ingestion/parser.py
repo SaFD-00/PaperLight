@@ -56,10 +56,7 @@ def _parse_marker(data: bytes) -> list[PageText]:
     except Exception:
         logger.exception("marker figure extraction failed; falling back to text-only")
         return pages
-    return [
-        PageText(p.page_num, p.text, tuple(by_page.get(p.page_num, ())))
-        for p in pages
-    ]
+    return [PageText(p.page_num, p.text, tuple(by_page.get(p.page_num, ()))) for p in pages]
 
 
 def _marker_figures(data: bytes) -> dict[int, list[FigureRegion]]:

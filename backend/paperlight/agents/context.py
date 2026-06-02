@@ -76,9 +76,7 @@ async def build_paper_context(
             chunks = []
         picked = [c for c in chunks if c.chunk_id != exclude_chunk_id][:top_k]
         if picked:
-            joined = "\n\n".join(
-                f"[페이지 {c.page}] {c.text[:_RELATED_CHARS]}" for c in picked
-            )
+            joined = "\n\n".join(f"[페이지 {c.page}] {c.text[:_RELATED_CHARS]}" for c in picked)
             blocks.append(f"[관련 본문 발췌]\n{joined}")
 
     return "\n\n".join(blocks)

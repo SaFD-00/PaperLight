@@ -67,9 +67,7 @@ async def _seed_one(paper_id: str, slug: str) -> None:
             )
             await session.commit()
         chunks = list(
-            (await session.execute(select(Chunk).where(Chunk.paper_id == paper_id)))
-            .scalars()
-            .all()
+            (await session.execute(select(Chunk).where(Chunk.paper_id == paper_id))).scalars().all()
         )
 
     # PDF must be in the object store before ingest_paper reads it back.

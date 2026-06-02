@@ -94,22 +94,16 @@ class _FakeEventSource:
         yield _FakeSSE("[DONE]")
 
 
-async def _run_openrouter(
-    monkeypatch: pytest.MonkeyPatch, **kwargs: Any
-) -> dict[str, Any]:
+async def _run_openrouter(monkeypatch: pytest.MonkeyPatch, **kwargs: Any) -> dict[str, Any]:
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     captured: dict[str, Any] = {}
 
     @contextlib.asynccontextmanager
-    async def fake_connect(
-        client: Any, method: str, url: str, *, headers: Any, json: Any
-    ) -> Any:
+    async def fake_connect(client: Any, method: str, url: str, *, headers: Any, json: Any) -> Any:
         captured["payload"] = json
         yield _FakeEventSource()
 
-    monkeypatch.setattr(
-        "paperlight.providers.openrouter_provider.aconnect_sse", fake_connect
-    )
+    monkeypatch.setattr("paperlight.providers.openrouter_provider.aconnect_sse", fake_connect)
     out = ""
     async for tok in OpenRouterProvider().stream_chat(
         [{"role": "user", "content": "x"}], "qwen/qwen3.6-35b-a3b", **kwargs
@@ -136,9 +130,7 @@ async def test_openrouter_omits_reasoning_when_unset(
 async def test_openrouter_includes_sampling_params(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    payload = await _run_openrouter(
-        monkeypatch, temperature=0.1, top_p=0.9, max_tokens=4000
-    )
+    payload = await _run_openrouter(monkeypatch, temperature=0.1, top_p=0.9, max_tokens=4000)
     assert payload["temperature"] == 0.1
     assert payload["top_p"] == 0.9
     assert payload["max_tokens"] == 4000

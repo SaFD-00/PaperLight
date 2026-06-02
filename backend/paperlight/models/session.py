@@ -13,9 +13,7 @@ class Session(Base):
     __tablename__ = "sessions"
 
     jti: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
     family_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     expires_at: Mapped[int] = mapped_column(BigInteger, nullable=False)
     revoked_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)

@@ -64,9 +64,7 @@ def _to_orm(payload: TabPayload, user_id: str) -> Tab:
 
 @router.get("")
 async def list_tabs(session: SessionDep, user_id: UserDep) -> list[dict[str, object]]:
-    result = await session.execute(
-        select(Tab).where(Tab.user_id == user_id).order_by(Tab.position)
-    )
+    result = await session.execute(select(Tab).where(Tab.user_id == user_id).order_by(Tab.position))
     return [t.to_dict() for t in result.scalars().all()]
 
 

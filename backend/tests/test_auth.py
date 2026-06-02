@@ -55,9 +55,7 @@ def test_jwt_invalid_raises() -> None:
 
 
 async def test_mock_login_creates_user_and_sets_cookies(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/auth/dev/mock-login", json={"email": "alice@example.com"}
-    )
+    resp = await client.post("/api/auth/dev/mock-login", json={"email": "alice@example.com"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["email"] == "alice@example.com"

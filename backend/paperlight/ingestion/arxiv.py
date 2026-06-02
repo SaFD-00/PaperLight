@@ -80,15 +80,11 @@ def _meta_from_atom(arxiv_id: str, xml_text: str) -> ArxivMeta:
         raise ValueError(f"arXiv returned no entry for {arxiv_id}")
     title = (entry.findtext(f"{_ATOM}title") or "").strip()
     abstract = (entry.findtext(f"{_ATOM}summary") or "").strip()
-    authors = [
-        (a.findtext(f"{_ATOM}name") or "").strip() for a in entry.findall(f"{_ATOM}author")
-    ]
+    authors = [(a.findtext(f"{_ATOM}name") or "").strip() for a in entry.findall(f"{_ATOM}author")]
     published = entry.findtext(f"{_ATOM}published") or ""
     year = int(published[:4]) if published[:4].isdigit() else None
     doi = entry.findtext(f"{_ARXIV_NS}doi")
-    categories = [
-        c.attrib["term"] for c in entry.findall(f"{_ATOM}category") if "term" in c.attrib
-    ]
+    categories = [c.attrib["term"] for c in entry.findall(f"{_ATOM}category") if "term" in c.attrib]
     pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
     for link in entry.findall(f"{_ATOM}link"):
         if link.attrib.get("title") == "pdf":
