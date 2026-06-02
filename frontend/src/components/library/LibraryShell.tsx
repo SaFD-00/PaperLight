@@ -10,44 +10,10 @@ import { ImportExportMenu } from "@/components/library/ImportExportMenu";
 import { PaperList } from "@/components/library/PaperList";
 import { SearchBar } from "@/components/library/SearchBar";
 import { TagCloud } from "@/components/library/TagCloud";
+import { PILOTS } from "@/lib/fixtures/pilots";
 import type { LibraryPaper } from "@/lib/types";
 import { useLibrary } from "@/stores/library";
 import { useTabs } from "@/stores/tabs";
-
-const PILOTS: LibraryPaper[] = [
-  {
-    id: "sample-1",
-    title: "Code2World: A GUI World Model via Renderable Code Generation",
-    authors: ["Zheng et al., 2026"],
-    year: 2026,
-    venue: null,
-    arxivId: "2602.09856",
-    doi: null,
-    status: "to_read",
-    progressPct: 0,
-    ingestionStatus: "ready",
-    createdAt: 0,
-    updatedAt: 0,
-    tags: [],
-    collectionIds: [],
-  },
-  {
-    id: "sample-2",
-    title: "How Mobile World Model Guides GUI Agents?",
-    authors: ["Xu et al., 2026"],
-    year: 2026,
-    venue: null,
-    arxivId: "2605.10347",
-    doi: null,
-    status: "to_read",
-    progressPct: 0,
-    ingestionStatus: "ready",
-    createdAt: 0,
-    updatedAt: 0,
-    tags: [],
-    collectionIds: [],
-  },
-];
 
 export function LibraryShell() {
   const router = useRouter();
