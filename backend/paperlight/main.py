@@ -16,6 +16,7 @@ from paperlight.api import (
     annotations,
     auth,
     chat,
+    deep_search,
     explain,
     library,
     papers,
@@ -96,6 +97,7 @@ app.include_router(auth.router)
 app.include_router(tabs.router)
 app.include_router(explain.router)
 app.include_router(translate.router)
+app.include_router(deep_search.router)
 
 
 @app.get("/health")
