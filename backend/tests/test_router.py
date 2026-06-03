@@ -9,8 +9,8 @@ from paperlight.providers import router
 
 def test_candidates_explanation_order() -> None:
     cands = router.candidates("explanation")
-    assert cands[0] == ("openrouter", "qwen/qwen3.6-35b-a3b")
-    assert ("openrouter", "qwen/qwen3.6-flash") in cands
+    assert cands[0] == ("openrouter", "qwen/qwen3.6-flash")
+    assert ("openrouter", "qwen/qwen3.6-35b-a3b") in cands
 
 
 def test_candidates_figure_description_primary() -> None:
@@ -20,11 +20,11 @@ def test_candidates_figure_description_primary() -> None:
 
 def test_candidates_unknown_task_falls_back_to_default() -> None:
     cands = router.candidates("does-not-exist")
-    assert cands == [("openrouter", "qwen/qwen3.6-35b-a3b")]
+    assert cands == [("openrouter", "qwen/qwen3.6-flash")]
 
 
 def test_primary_model() -> None:
-    assert router.primary_model("translation") == "qwen/qwen3.6-flash"
+    assert router.primary_model("translation") == "qwen/qwen3.6-35b-a3b"
     assert router.primary_model("table_description") == "qwen/qwen3.6-plus"
 
 
@@ -78,7 +78,7 @@ async def test_stream_task_stub_mode_is_deterministic(
     monkeypatch.setenv("LLM_PROVIDER", "stub")
     messages = [{"role": "user", "content": "hi"}]
     out = await _collect("explanation", messages)
-    assert out.startswith("[stub:qwen/qwen3.6-35b-a3b]")
+    assert out.startswith("[stub:qwen/qwen3.6-flash]")
 
 
 async def test_stream_task_raises_when_all_providers_unavailable(
@@ -95,7 +95,7 @@ async def test_stream_task_falls_back_past_failing_model(
 ) -> None:
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    # figure_description: qwen3.6-plus(primary) → qwen3.6-35b-a3b(fallback), both openrouter.
+    # figure_description: qwen3.6-plus(primary) → qwen3.6-flash(fallback), both openrouter.
     captured: dict[str, str | None] = {}
 
     async def fake_stream(  # type: ignore[no-untyped-def]
@@ -119,6 +119,6 @@ async def test_stream_task_falls_back_past_failing_model(
     )
     out = await _collect("figure_description", [{"role": "user", "content": "x"}])
     assert out == "ok"
-    assert captured["model"] == "qwen/qwen3.6-35b-a3b"  # the openrouter fallback model
+    assert captured["model"] == "qwen/qwen3.6-flash"  # the openrouter fallback model
     assert captured["reasoning_effort"] == "medium"  # figure_description effort
     assert captured["max_tokens"] == "1500"  # figure_description hyperparameter
