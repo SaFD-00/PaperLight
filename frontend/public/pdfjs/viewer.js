@@ -430,7 +430,7 @@ async function extractBodyText(pageNum) {
       normTop: pageH > 0 ? (pageH - it.transform[5]) / pageH : 0,
       fontFamily: (styles[it.fontName] && styles[it.fontName].fontFamily) || "",
     }));
-    const { bodyText, segments } = extractBody(items);
+    const { bodyText, segments } = extractBody(items, { firstPage: pageNum === 1 });
     if (!bodyText) return { text: fullText, segments: identity }; // 전부 drop되면 폴백.
     return { text: bodyText, segments };
   } catch (_) {

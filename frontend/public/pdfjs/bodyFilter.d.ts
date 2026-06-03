@@ -19,7 +19,10 @@ export interface BodySegment {
   globalEnd: number;
 }
 
-export function extractBody(items: BodyItem[]): {
+export function extractBody(
+  items: BodyItem[],
+  opts?: { firstPage?: boolean },
+): {
   bodyText: string;
   segments: BodySegment[];
 };

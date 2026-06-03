@@ -12,6 +12,12 @@ const REF_HEADING_RE = /^(references|bibliography|acknowledg(e?ments)?)\b/i;
 const NUMERIC_LINE_RE = /^[\d.,()[\]{}%±+\-–—\s/:;=*]+$/;
 // pdf.js styles 의 fontFamily 에 흔히 나타나는 수식 폰트군.
 const MATH_FONT_RE = /(cmmi|cmsy|cmex|msam|msbm|stixmath|mathjax|cmr|eufm|rsfs)/i;
+// 이메일 라인(저자 연락처). 전 페이지 적용.
+const EMAIL_RE = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i;
+// arXiv 식별자(세로 사이드바 스탬프 포함, 회전돼도 라인 텍스트로 join되면 매칭). 전 페이지 적용.
+const ARXIV_ID_RE = /arxiv:\s*\d{4}\.\d{4,5}/i;
+// 1페이지 front-matter 밴드 종료 지점(초록 헤딩). firstPage 일 때만 사용.
+const ABSTRACT_RE = /^abstract\b/i;
 
 function nonSpaceLen(s) {
   return s.replace(/\s/g, "").length;
@@ -82,22 +88,46 @@ function modalHeight(items) {
 
 /**
  * @param {import("./bodyFilter").BodyItem[]} items
+ * @param {{ firstPage?: boolean }} [opts]
  * @returns {{ bodyText: string, segments: import("./bodyFilter").BodySegment[] }}
  */
-export function extractBody(items) {
+export function extractBody(items, opts = {}) {
   const lines = groupLines(items);
   const modal = modalHeight(items);
   let refReached = false;
   // 작은 폰트 캡션 직후 같은 소형 폰트로 이어지는 멀티라인 캡션을 본문 재개 전까지 제거.
   let captionMode = false;
 
+  // 1페이지 front-matter 밴드: 초록 헤딩 이전 구간에서 제목(최대 폰트)만 남기고
+  // 저자·소속·이메일·Project/Dataset/Model 링크·*Equal contribution 등을 제거한다.
+  // 초록 헤딩이 없으면 밴드 미적용(과잉 제거 방지) — 전 페이지 공통 규칙만 남는다.
+  let abstractIdx = -1;
+  let titleHeight = 0;
+  if (opts.firstPage) {
+    abstractIdx = lines.findIndex(
+      (l) => ABSTRACT_RE.test(l.text.trim()) && nonSpaceLen(l.text.trim()) < 30,
+    );
+    if (abstractIdx > 0) {
+      for (let i = 0; i < abstractIdx; i++) {
+        titleHeight = Math.max(titleHeight, lines[i].medianHeight);
+      }
+    }
+  }
+
   let bodyText = "";
   /** @type {import("./bodyFilter").BodySegment[]} */
   const segments = [];
 
-  for (const line of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
     const trimmed = line.text.trim();
     const len = nonSpaceLen(trimmed);
+
+    // front-matter 밴드(초록 헤딩 이전): 제목 라인만 유지, 나머지는 drop.
+    if (abstractIdx > 0 && idx < abstractIdx) {
+      const isTitle = titleHeight > 0 && line.medianHeight >= titleHeight * 0.95;
+      if (!isTitle) continue;
+    }
 
     // 캡션 연속 줄: 본문 폰트(>= modal*0.9)로 복귀하면 모드 해제 후 일반 규칙 적용, 아니면 drop.
     if (captionMode && !refReached) {
@@ -112,6 +142,10 @@ export function extractBody(items) {
       drop = true;
     } else if (trimmed === "") {
       drop = true;
+    } else if (EMAIL_RE.test(trimmed)) {
+      drop = true; // 저자 이메일 라인.
+    } else if (ARXIV_ID_RE.test(trimmed)) {
+      drop = true; // arXiv 세로 식별자/스탬프.
     } else if (CAPTION_RE.test(trimmed)) {
       drop = true;
       // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).

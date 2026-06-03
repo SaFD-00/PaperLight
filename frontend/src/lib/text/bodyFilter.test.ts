@@ -116,6 +116,59 @@ describe("extractBody", () => {
     expect(bodyText).toContain("This following sentence is body");
   });
 
+  it("drops first-page front-matter band, keeps title and abstract/body", () => {
+    const items = [
+      item("How Mobile World Model Guides GUI Agents?", { fontHeight: 16 }), // 제목(최대 폰트) → keep
+      item("Weihal Xu, Kun Huang, Yuwen Feng, Bo An", { fontHeight: 11 }), // 저자 → drop
+      item("Nanjing Technological University, Xiamen University", { fontHeight: 9 }), // 소속 → drop
+      item("Project  Dataset  Model", { fontHeight: 9 }), // 링크 행 → drop
+      item("Abstract", { fontHeight: 11 }), // 초록 헤딩 → keep (밴드 종료)
+      item("Recent advances in mobile world models enable better GUI agents here.", {
+        fontHeight: 10,
+      }), // 초록 본문 → keep
+    ];
+    const { bodyText } = extractBody(items, { firstPage: true });
+    expect(bodyText).toContain("How Mobile World Model Guides GUI Agents?");
+    expect(bodyText).toContain("Abstract");
+    expect(bodyText).toContain("Recent advances in mobile world models");
+    expect(bodyText).not.toContain("Weihal Xu");
+    expect(bodyText).not.toContain("Nanjing Technological University");
+    expect(bodyText).not.toContain("Project  Dataset  Model");
+  });
+
+  it("does not apply front-matter band when not first page", () => {
+    const items = [
+      item("How Mobile World Model Guides GUI Agents?", { fontHeight: 16 }),
+      item("A section heading line in the body of a later page here.", { fontHeight: 11 }),
+      item("Abstract", { fontHeight: 11 }),
+      item("Some later-page body sentence that must remain intact.", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items, { firstPage: false });
+    // 밴드 미적용 → 저자처럼 보이는 라인도 본문으로 유지.
+    expect(bodyText).toContain("A section heading line in the body");
+    expect(bodyText).toContain("Some later-page body sentence");
+  });
+
+  it("drops email lines on any page", () => {
+    const items = [
+      item("This sentence is real body content of the paper here. ", { normTop: 0.5 }),
+      item("Email: weihal.xu@example.edu, bo.an@example.com", { normTop: 0.95 }), // 이메일 → drop
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("This sentence is real body content");
+    expect(bodyText).not.toContain("@example");
+  });
+
+  it("drops arXiv identifier (vertical sidebar stamp) on any page", () => {
+    const items = [
+      item("arXiv:2605.10347v1 [cs.AI] 11 May 2026", { normTop: 0.5 }), // 세로 식별자 → drop
+      item("This is the genuine body text of the article here.", { normTop: 0.5 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).not.toContain("arXiv:2605.10347");
+    expect(bodyText).toContain("This is the genuine body text");
+  });
+
   it("drops Korean figure/table captions", () => {
     const items = [
       item("이 문장은 충분히 긴 한국어 본문 문장으로 모달 폰트를 정합니다.", { fontHeight: 10 }),
