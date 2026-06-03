@@ -13,7 +13,7 @@
 |-------|------|------|------------|------|
 | **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | ✅ S6 완료 (T0~T10) — 사용자 브라우저 AC 검증 대기 |
 | **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth(Google OAuth) ✅ · S8 arXiv import ✅ · S9 Ingestion ✅ · S10 LLM Abstraction ✅ · S11 Auto pre-gen ✅ · S12 Chat+Citation ✅ · S13 Library 4-pane ✅ · S14 Markup ✅ · S15 Observability ✅ · S16 CI ✅ — **MVP 코드 완료**(라이브 배포·OAuth 자격증명만 대기) |
-| **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
+| **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | 🚧 4대 제품 기능 stub-first 구현 ✅ (F-13 Podcast · F-09 Deep Search · F-07 Preview · Export-Notion) — i18n·Observability·Payment·라이브 키 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
 
 > **Game Gate**: Phase 3에서 DAU ≥ 1,000 AND PWA 사용률 ≥ 35% 충족 시 네이티브 모바일 검토. 그 전까지는 PWA만.
@@ -148,16 +148,18 @@ S1 ──┬──► S2 ──► S4 ──► S6
 
 ### 4.1 주요 작업 묶음
 
-| 묶음 | 범위 | 관련 F-넘버 |
-|------|------|-------------|
-| **F-13 Podcast** | 2인 대담 스크립트 (LangGraph) → TTS (OpenAI tts-1-hd default + ElevenLabs fallback) → 챕터·동기 하이라이트 | F-13 |
-| **F-09 Deep Search** | 라이브러리 임베딩 평균 → 관심 벡터 → Semantic Scholar/OpenAlex 검색 + 재랭킹 | F-09 |
-| **F-07 Preview** | Figure/Table cross-ref 호버 미니 프리뷰 | F-07 |
-| **Export** | Notion OAuth, Obsidian `.md`, BibTeX/RIS/EndNote | F-11 보강 |
-| **i18n** | en/ja/zh-CN/es 메시지 카탈로그 (ko는 Phase 0~1에 완료) | [PRD §17](./PRD.md) |
-| **Observability 안정화** | Prometheus + Grafana 추가, OpenTelemetry distributed trace | [PRD §7.6](./PRD.md) |
-| **GDPR ZIP** | `GET /api/export/gdpr-zip` — 사용자 데이터 추출 | [PRD §8.2](./PRD.md) |
-| **결제 검토** | Pro/Team/Edu/BYO 티어 검토 — 실제 도입은 v2 결정 | [PRD §9](./PRD.md) |
+| 묶음 | 범위 | 관련 F-넘버 | 상태 |
+|------|------|-------------|------|
+| **F-13 Podcast** | 2인 대담 스크립트(`podcast_graph`) → TTS(stub-first: 키 없으면 placeholder mp3, 있으면 OpenAI tts-1-hd) → stitch/SRT → 🎧 패널 플레이어+대본. ElevenLabs·동기 하이라이트 follow-up | F-13 | ✅ stub-first |
+| **F-09 Deep Search** | 라이브러리 청크 임베딩 평균 → 관심 벡터 → 추천 + '왜 추천' 설명(`/discover`). stub-first(외부 Semantic Scholar opt-in), Cohere 재랭킹 follow-up | F-09 | ✅ stub-first |
+| **F-07 Preview** | Figure/Table cross-ref 호버 미니 프리뷰(`render_region` 크롭, Summary 본문 linkify) | F-07 | ✅ |
+| **Export** | Notion(stub-first: 미연동 시 마크다운 fallback) + 기존 Obsidian/Markdown(Phase 1). BibTeX/RIS/EndNote follow-up | F-11 보강 | 🚧 Notion ✅ |
+| **i18n** | en/ja/zh-CN/es 메시지 카탈로그 (ko는 Phase 0~1에 완료) | [PRD §17](./PRD.md) | ⬜ |
+| **Observability 안정화** | Prometheus + Grafana 추가, OpenTelemetry distributed trace | [PRD §7.6](./PRD.md) | ⬜ |
+| **GDPR ZIP** | `GET /api/export/gdpr-zip` — 사용자 데이터 추출 | [PRD §8.2](./PRD.md) | ⬜ |
+| **결제 검토** | Pro/Team/Edu/BYO 티어 검토 — 실제 도입은 v2 결정 | [PRD §9](./PRD.md) | ⬜ |
+
+> **2026-06-03 stub-first 구현**: 4대 제품 기능(F-13/F-09/F-07/Export-Notion)을 외부 키·OAuth 없이도 오프라인/CI에서 동작하도록 stub-first로 end-to-end 구현(`references.py`/`embedder.py`/`LLM_PROVIDER=stub` 패턴). 마이그레이션 0개. 회귀: BE pytest 202 · FE vitest 36 · Playwright e2e 34(s18~s21 신규) · `next build` green.
 
 ### 4.2 Phase 2 종료 조건
 
