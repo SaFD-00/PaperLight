@@ -17,6 +17,7 @@ import { NotesPanel } from "@/components/panels/NotesPanel";
 import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { useReader } from "@/stores/reader";
+import { ResizeHandle } from "./ResizeHandle";
 
 type PanelId =
   | "summary"
@@ -43,6 +44,8 @@ export function RightPanel({ paperId }: { paperId: string }) {
   const [active, setActive] = useState<PanelId>("summary");
   const askText = useReader((s) => s.askText);
   const panelRequest = useReader((s) => s.panelRequest);
+  const width = useReader((s) => s.rightPanelWidth);
+  const setWidth = useReader((s) => s.setRightPanelWidth);
 
   useEffect(() => {
     if (askText) setActive("chat");
@@ -55,8 +58,10 @@ export function RightPanel({ paperId }: { paperId: string }) {
   return (
     <aside
       aria-label="AI 패널"
-      className="flex h-full w-[360px] flex-col border-l border-border-subtle bg-bg-surface"
+      style={{ width }}
+      className="relative flex h-full shrink-0 flex-col border-l border-border-subtle bg-bg-surface"
     >
+      <ResizeHandle side="left" width={width} onChange={setWidth} />
       <div className="flex shrink-0 items-center gap-0.5 border-b border-border-subtle px-1.5 py-1.5">
         {PANEL_TABS.map((t) => {
           const Icon = t.icon;

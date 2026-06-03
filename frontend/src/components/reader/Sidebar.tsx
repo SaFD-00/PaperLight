@@ -3,10 +3,13 @@
 import clsx from "clsx";
 import { useEffect } from "react";
 import { useReader } from "@/stores/reader";
+import { ResizeHandle } from "./ResizeHandle";
 
 export function Sidebar() {
   const mode = useReader((s) => s.sidebarMode);
   const setMode = useReader((s) => s.setSidebarMode);
+  const width = useReader((s) => s.sidebarWidth);
+  const setWidth = useReader((s) => s.setSidebarWidth);
   const outline = useReader((s) => s.outline);
   const thumbnails = useReader((s) => s.thumbnails);
   const totalPages = useReader((s) => s.totalPages);
@@ -22,7 +25,8 @@ export function Sidebar() {
   return (
     <aside
       aria-label="목차/페이지 사이드바"
-      className="flex h-full w-[180px] shrink-0 flex-col border-r border-border-subtle bg-bg-base text-text-secondary"
+      style={{ width }}
+      className="relative flex h-full shrink-0 flex-col border-r border-border-subtle bg-bg-base text-text-secondary"
     >
       <div className="flex shrink-0 gap-0.5 border-b border-border-subtle p-1.5">
         {(["toc", "pages"] as const).map((m) => (
@@ -106,6 +110,8 @@ export function Sidebar() {
           )}
         </div>
       )}
+
+      <ResizeHandle side="right" width={width} onChange={setWidth} />
     </aside>
   );
 }

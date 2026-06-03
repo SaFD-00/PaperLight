@@ -52,6 +52,10 @@ interface ReaderState {
   aiPanelOpen: boolean;
   /** 좌측 사이드바(TOC/페이지) 열림 여부. */
   sidebarOpen: boolean;
+  /** 좌측 사이드바 폭(px) — 드래그로 조절, 비영속. */
+  sidebarWidth: number;
+  /** 우측 AI 패널 폭(px) — 드래그로 조절, 비영속. */
+  rightPanelWidth: number;
   /** 좌측 사이드바 표시 모드. */
   sidebarMode: "toc" | "pages";
   /** PDF에서 추출한 목차(TOC). */
@@ -93,6 +97,8 @@ interface ReaderState {
   setTranslation: (enabled: boolean) => void;
   toggleAiPanel: () => void;
   toggleSidebar: () => void;
+  setSidebarWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
   setSidebarMode: (mode: "toc" | "pages") => void;
   setOutline: (items: OutlineItem[]) => void;
   setThumbnail: (page: number, dataUrl: string) => void;
@@ -116,6 +122,13 @@ const ZOOM_MIN = 50;
 const ZOOM_MAX = 250;
 const ZOOM_STEP = 10;
 
+export const SIDEBAR_WIDTH_MIN = 160;
+export const SIDEBAR_WIDTH_MAX = 480;
+export const SIDEBAR_WIDTH_DEFAULT = 180;
+export const RIGHT_PANEL_WIDTH_MIN = 280;
+export const RIGHT_PANEL_WIDTH_MAX = 600;
+export const RIGHT_PANEL_WIDTH_DEFAULT = 360;
+
 export const useReader = create<ReaderState>((set) => ({
   selection: null,
   explainSelection: null,
@@ -125,6 +138,8 @@ export const useReader = create<ReaderState>((set) => ({
   translationEnabled: false,
   aiPanelOpen: true,
   sidebarOpen: true,
+  sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+  rightPanelWidth: RIGHT_PANEL_WIDTH_DEFAULT,
   sidebarMode: "toc",
   outline: [],
   thumbnails: {},
@@ -163,6 +178,12 @@ export const useReader = create<ReaderState>((set) => ({
   setTranslation: (enabled) => set({ translationEnabled: enabled }),
   toggleAiPanel: () => set((state) => ({ aiPanelOpen: !state.aiPanelOpen })),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  setSidebarWidth: (width) =>
+    set({ sidebarWidth: Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, width)) }),
+  setRightPanelWidth: (width) =>
+    set({
+      rightPanelWidth: Math.min(RIGHT_PANEL_WIDTH_MAX, Math.max(RIGHT_PANEL_WIDTH_MIN, width)),
+    }),
   setSidebarMode: (mode) => set({ sidebarMode: mode }),
   setOutline: (items) => set({ outline: items }),
   setThumbnail: (page, dataUrl) =>
