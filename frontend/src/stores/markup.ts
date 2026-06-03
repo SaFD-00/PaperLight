@@ -21,7 +21,14 @@ interface MarkupState {
   removeHighlight: (highlightId: string) => Promise<void>;
   saveNote: (paperId: string, markdownText: string) => Promise<void>;
   exportNotes: (paperId: string, format: "markdown" | "obsidian") => Promise<string>;
+  exportToNotion: (paperId: string) => Promise<NotionExport>;
   reset: () => void;
+}
+
+export interface NotionExport {
+  mode: "stub" | "created";
+  url: string | null;
+  markdown: string | null;
 }
 
 export const useMarkup = create<MarkupState>((set, get) => ({
@@ -78,6 +85,16 @@ export const useMarkup = create<MarkupState>((set, get) => ({
     if (!res.ok) return "";
     capture("export_notes", { format });
     return res.text();
+  },
+
+  exportToNotion: async (paperId) => {
+    const fallback: NotionExport = { mode: "stub", url: null, markdown: "" };
+    const res = await apiFetch(`/api/annotations/papers/${paperId}/export/notion`, {
+      method: "POST",
+    });
+    if (!res.ok) return fallback;
+    capture("export_notes", { format: "notion" });
+    return (await res.json()) as NotionExport;
   },
 
   reset: () => set({ highlights: [], note: null, loading: false }),

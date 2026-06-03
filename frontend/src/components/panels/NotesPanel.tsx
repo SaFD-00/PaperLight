@@ -22,11 +22,13 @@ export function NotesPanel({ paperId }: { paperId: string }) {
   const saveNote = useMarkup((s) => s.saveNote);
   const removeHighlight = useMarkup((s) => s.removeHighlight);
   const exportNotes = useMarkup((s) => s.exportNotes);
+  const exportToNotion = useMarkup((s) => s.exportToNotion);
   const requestJump = useReader((s) => s.requestJump);
 
   const [md, setMd] = useState("");
   const [saved, setSaved] = useState(true);
   const [aiBusy, setAiBusy] = useState(false);
+  const [notionMsg, setNotionMsg] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedFor = useRef<string | null>(null);
 
@@ -101,6 +103,18 @@ export function NotesPanel({ paperId }: { paperId: string }) {
     URL.revokeObjectURL(url);
   }
 
+  async function doNotion() {
+    const result = await exportToNotion(paperId);
+    if (result.mode === "created" && result.url) {
+      window.open(result.url, "_blank", "noreferrer");
+      setNotionMsg("Notion에 저장됨");
+    } else {
+      if (result.markdown) await navigator.clipboard?.writeText(result.markdown).catch(() => {});
+      setNotionMsg("Notion 미연동 — 마크다운을 클립보드에 복사했습니다");
+    }
+    setTimeout(() => setNotionMsg(null), 4000);
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
@@ -123,7 +137,21 @@ export function NotesPanel({ paperId }: { paperId: string }) {
         >
           <Download className="size-3" aria-hidden /> Obsidian
         </button>
+        <button
+          type="button"
+          onClick={doNotion}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-secondary hover:bg-bg-muted"
+          aria-label="Notion 내보내기"
+        >
+          <Download className="size-3" aria-hidden /> Notion
+        </button>
       </header>
+
+      {notionMsg && (
+        <div className="border-b border-border-subtle bg-bg-muted px-3 py-1 text-[11px] text-text-secondary">
+          {notionMsg}
+        </div>
+      )}
 
       <section aria-label="하이라이트 목록" className="border-b border-border-subtle">
         {highlights.length === 0 ? (

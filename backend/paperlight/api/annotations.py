@@ -23,10 +23,11 @@ from paperlight.auth.dependencies import get_user_id
 from paperlight.models.highlight import Highlight
 from paperlight.models.note import Note
 from paperlight.models.paper import Paper
+from paperlight.services.notion_export import export_to_notion
 from paperlight.storage.db import get_session
 from paperlight.storage.object_store import get_object_store, note_key
 
-EXPORT_FORMATS = ("markdown", "obsidian")
+EXPORT_FORMATS = ("markdown", "obsidian", "notion")
 
 router = APIRouter(prefix="/api/annotations", tags=["annotations"])
 
@@ -171,15 +172,9 @@ def _render_export(paper: Paper, highlights: list[Highlight], note: Note | None,
     return "\n".join(lines) + "\n"
 
 
-@router.get("/papers/{pid}/export")
-async def export_annotations(
-    pid: str,
-    session: SessionDep,
-    user_id: UserDep,
-    fmt: Annotated[str, Query(alias="format")] = "markdown",
-) -> PlainTextResponse:
-    if fmt not in EXPORT_FORMATS:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unknown format")
+async def _load_export(
+    session: AsyncSession, pid: str, user_id: str
+) -> tuple[Paper, list[Highlight], Note | None]:
     paper = await get_owned_paper(session, pid, user_id)
     highlights = list(
         (
@@ -191,6 +186,27 @@ async def export_annotations(
         ).scalars()
     )
     note = await session.scalar(select(Note).where(Note.paper_id == pid, Note.user_id == user_id))
+    return paper, highlights, note
+
+
+@router.get("/papers/{pid}/export")
+async def export_annotations(
+    pid: str,
+    session: SessionDep,
+    user_id: UserDep,
+    fmt: Annotated[str, Query(alias="format")] = "markdown",
+) -> PlainTextResponse:
+    if fmt not in EXPORT_FORMATS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unknown format")
+    paper, highlights, note = await _load_export(session, pid, user_id)
     return PlainTextResponse(
         _render_export(paper, highlights, note, fmt), media_type="text/markdown"
     )
+
+
+@router.post("/papers/{pid}/export/notion")
+async def export_notion(pid: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
+    """Notion 동기화(F-11). 미연동 시 mode=stub + 마크다운 반환(graceful)."""
+    paper, highlights, note = await _load_export(session, pid, user_id)
+    markdown = _render_export(paper, highlights, note, "markdown")
+    return await export_to_notion(paper.title, markdown)
