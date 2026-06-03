@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 
 PDF_KEY_TEMPLATE = "papers/{paper_id}/original.pdf"
 NOTE_KEY_TEMPLATE = "notes/{note_id}.md"
+AUDIO_KEY_TEMPLATE = "podcasts/{podcast_id}.mp3"
 DEFAULT_TTL_SECONDS = 10 * 60
 
 
@@ -26,6 +27,10 @@ def pdf_key(paper_id: str) -> str:
 
 def note_key(note_id: str) -> str:
     return NOTE_KEY_TEMPLATE.format(note_id=note_id)
+
+
+def audio_key(podcast_id: str) -> str:
+    return AUDIO_KEY_TEMPLATE.format(podcast_id=podcast_id)
 
 
 def _token_secret() -> str:
@@ -52,12 +57,32 @@ def verify_pdf_token(paper_id: str, expires_at: int, signature: str) -> bool:
     return hmac.compare_digest(sign_pdf_token(paper_id, expires_at), signature)
 
 
+def sign_audio_token(podcast_id: str, expires_at: int) -> str:
+    msg = f"podcast:{podcast_id}:{expires_at}".encode()
+    return hmac.new(_token_secret().encode(), msg, hashlib.sha256).hexdigest()
+
+
+def verify_audio_token(podcast_id: str, expires_at: int, signature: str) -> bool:
+    if expires_at < int(time.time()):
+        return False
+    return hmac.compare_digest(sign_audio_token(podcast_id, expires_at), signature)
+
+
+def audio_url(podcast_id: str, ttl: int = DEFAULT_TTL_SECONDS) -> str:
+    """Podcast 오디오 가드 라우트 URL(HMAC 서명, 쿠키 불필요)."""
+    exp = int(time.time()) + ttl
+    qs = urlencode({"exp": exp, "sig": sign_audio_token(podcast_id, exp)})
+    return f"{_public_base_url()}/api/podcast/{podcast_id}/audio?{qs}"
+
+
 class ObjectStore(Protocol):
     def put_pdf(self, key: str, data: bytes) -> None: ...
     def get_pdf(self, key: str) -> bytes: ...
     def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str: ...
     def put_text(self, key: str, text: str) -> None: ...
     def get_text(self, key: str) -> str: ...
+    def put_audio(self, key: str, data: bytes) -> None: ...
+    def get_audio(self, key: str) -> bytes: ...
 
 
 class LocalObjectStore:
@@ -87,6 +112,15 @@ class LocalObjectStore:
     def get_text(self, key: str) -> str:
         try:
             return self._blobs[key].decode()
+        except KeyError as err:
+            raise FileNotFoundError(key) from err
+
+    def put_audio(self, key: str, data: bytes) -> None:
+        self._blobs[key] = data
+
+    def get_audio(self, key: str) -> bytes:
+        try:
+            return self._blobs[key]
         except KeyError as err:
             raise FileNotFoundError(key) from err
 
@@ -130,6 +164,13 @@ class S3ObjectStore:
     def get_text(self, key: str) -> str:
         data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
         return data.decode()
+
+    def put_audio(self, key: str, data: bytes) -> None:
+        self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType="audio/mpeg")
+
+    def get_audio(self, key: str) -> bytes:
+        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+        return data
 
 
 _store: ObjectStore | None = None
