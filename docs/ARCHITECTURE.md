@@ -239,7 +239,7 @@ class LLMProvider(Protocol):
     async def embed(self, texts: list[str], model: str) -> list[list[float]]: ...
 ```
 
-**기본 라우팅** (Phase 0~1) — 라우팅 설정은 레포 루트 `config/agents.yaml`(router가 로드), 전 agent OpenRouter Qwen3.6 + agent별 `reasoning_effort`:
+**기본 라우팅** (Phase 0~1) — 라우팅 설정은 레포 루트 `config/agents.yaml`(router가 로드 시 구조 검증: `default`·각 agent·각 `fallback`이 `provider`+`model`을 갖는지 fail-fast), 전 agent OpenRouter Qwen3.6 + agent별 `reasoning_effort`:
 - 일반 텍스트 추론 → `openrouter/qwen/qwen3.6-35b-a3b` (경량 task는 `qwen3.6-flash`)
 - Figure/Table description (Vision) → `openrouter/qwen/qwen3.6-plus` (F-14)
 - 팟캐스트 창작 → `openrouter/qwen/qwen3.6-plus`(`reasoning_effort: high`)

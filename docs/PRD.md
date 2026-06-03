@@ -718,6 +718,7 @@ tts:
 - **hyperparameters**: `config/agents.yaml`로 통합·배선됨 — agent별 `temperature`·`top_p`·`max_tokens`를 `router`가 읽어 OpenRouter 요청에 전달. 단, **reasoning_effort != none 인 agent는 temperature/top_p를 전송하지 않음**(thinking 모델이 sampling을 무시/거부; greedy 디코딩 비권장). 별도 `hyperparameters.yaml`은 제거.
 - **providers**: base_url·timeout은 provider 코드에 하드코딩되어 별도 `providers.yaml` 제거(시크릿은 `.env`).
 - **prompts / glossary**: `prompts/`·`glossary/`는 여전히 **미배선 스펙**(생성 경로가 코드에 하드코딩). 후속 배선 대상.
+- **loader**: 중앙 집중식 Pydantic 로더 stub(`config/loader.py`)은 미사용 dead code라 제거. `agents.yaml` 로드·검증은 `router`가 일원화(로드 시 구조 검증). **hot-reload**는 여전히 미래 스펙(현재 `@lru_cache`로 프로세스 1회 로드, 변경 시 재시작 필요).
 
 ### 7.6 데이터 모델 (Podcast)
 > v2.0 정의 유지. 전체 데이터 모델은 §8.5 참조.
