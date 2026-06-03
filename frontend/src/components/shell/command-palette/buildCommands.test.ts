@@ -14,10 +14,11 @@ function deps(papers = [{ id: "p1", title: "Attention Is All You Need", authors:
 }
 
 describe("buildCommands", () => {
-  it("이동 3개 + 설정 2개 + 논문 수만큼 명령을 만든다", () => {
+  it("이동 4개 + 설정 2개 + 논문 수만큼 명령을 만든다", () => {
     const cmds = buildCommands(deps());
-    expect(cmds).toHaveLength(6);
+    expect(cmds).toHaveLength(7);
     expect(cmds.filter((c) => c.id.startsWith("paper-"))).toHaveLength(1);
+    expect(cmds.find((c) => c.id === "nav-discover")).toBeTruthy();
   });
 
   it("논문 명령 실행 시 탭을 열고 리더로 이동한다", () => {

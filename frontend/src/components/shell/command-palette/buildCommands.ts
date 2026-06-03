@@ -1,4 +1,4 @@
-import { BookOpen, FileDown, FileText, Home, Moon, Rows3 } from "lucide-react";
+import { BookOpen, FileDown, FileText, Home, Moon, Rows3, Telescope } from "lucide-react";
 import { cycle, DENSITY_CYCLE, THEME_CYCLE } from "@/lib/cycle";
 import type { Density, Theme } from "@/stores/settings";
 
@@ -50,6 +50,13 @@ export function buildCommands({
       hint: "이동",
       icon: FileDown,
       run: () => router.push("/import"),
+    },
+    {
+      id: "nav-discover",
+      label: "Deep Search (논문 추천)",
+      hint: "이동",
+      icon: Telescope,
+      run: () => router.push("/discover"),
     },
     { id: "nav-home", label: "홈(랜딩)", hint: "이동", icon: Home, run: () => router.push("/") },
   ];
