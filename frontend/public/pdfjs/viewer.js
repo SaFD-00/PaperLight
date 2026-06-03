@@ -105,6 +105,27 @@ function heuristicOutline() {
   return items;
 }
 
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// arXiv(hyperref) 내장 outline 제목엔 섹션 번호가 빠져 있고 번호는 본문에만 렌더된다.
+// 목적지 페이지 text-layer에서 제목 바로 앞 섹션 번호(숫자형 1/2.1, 부록형 A/E.1)를 복원.
+function sectionNumberPrefix(title, pageIndex) {
+  const t = (title || "").trim();
+  if (!t || /^\d/.test(t)) return ""; // 이미 번호로 시작하면 스킵(중복 방지)
+  const layer = pageWrappers[pageIndex]
+    ? pageWrappers[pageIndex].querySelector(".text-layer")
+    : null;
+  const text = layer ? layer.textContent || "" : "";
+  if (!text) return "";
+  const flexible = t.split(/\s+/).map(escapeRegex).join("\\s*"); // 제목 내 공백 유연 매칭
+  const num = "(?:\\d+(?:\\.\\d+)*|[A-Z](?:\\.\\d+)*)"; // 1 / 2.1 / A / E.1
+  const re = new RegExp("(?:^|[^A-Za-z0-9])(" + num + ")[\\s.]+" + flexible);
+  const m = text.match(re);
+  return m ? m[1].trim() : "";
+}
+
 async function buildOutline() {
   if (!currentDoc) return [];
   let outline = null;
@@ -119,7 +140,10 @@ async function buildOutline() {
       for (const node of nodes) {
         const page = await destToPage(node.dest);
         const title = (node.title || "").trim();
-        if (page && title) items.push({ title, page, level });
+        if (page && title) {
+          const prefix = sectionNumberPrefix(title, page - 1);
+          items.push({ title: prefix ? prefix + " " + title : title, page, level });
+        }
         if (node.items && node.items.length) await walk(node.items, level + 1);
       }
     };
