@@ -12,7 +12,7 @@
 | Phase | 기간 | 범위 | 핵심 산출물 | 상태 |
 |-------|------|------|------------|------|
 | **0** | 4주 | 데모 프로토타입 | Tab Bar + 3-Column Reader + pdf.js Shadow DOM + F-04 Explanation + F-02 Translation | ✅ S6 완료 (T0~T10) — 사용자 브라우저 AC 검증 대기 |
-| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth(Google OAuth) ✅ · S8 arXiv import ✅ · S9 Ingestion ✅ · S10 LLM Abstraction ✅ · S11 Auto pre-gen ✅ · S12 Chat+Citation ✅ · S13 Library 4-pane ✅ · S14 Markup ✅ · S15 Observability ✅ (다음 S16 CI) |
+| **1 (MVP)** | 8주 | 100명 베타 | Google OAuth + Library 4-pane + Ingestion 자동 사전 생성 + Chat+Citation | 🚧 S7a ✅ · S7b Auth(Google OAuth) ✅ · S8 arXiv import ✅ · S9 Ingestion ✅ · S10 LLM Abstraction ✅ · S11 Auto pre-gen ✅ · S12 Chat+Citation ✅ · S13 Library 4-pane ✅ · S14 Markup ✅ · S15 Observability ✅ · S16 CI ✅ — **MVP 코드 완료**(라이브 배포·OAuth 자격증명만 대기) |
 | **2 (GA)** | 12주 | 정식 런칭 | F-13 Podcast (수동) + F-09 Deep Search + F-07 Preview + Export + Observability 안정화 | ⬜ 대기 |
 | **3 (확장)** | 12주+ | 확장·모바일 | F-12 Team + Mind Map + Compare + PWA | ⬜ 대기 |
 
@@ -132,7 +132,7 @@ S1 ──┬──► S2 ──► S4 ──► S6
 | **S13** | **Library 4-pane** | F-08 — Zotero 패턴 4-pane(`/api/library`: Collection 트리 CRUD(self-FK 무한 깊이·순환 방지) / papers 필터·정렬·검색(제목/저자/태그/**본문 chunks LIKE**) / Tag get-or-create·Tag Cloud count / 상태·별표·휴지통·Bulk(status/addTag/removeTag/move/trash/restore) / BibTeX·RIS·EndNote import+export(`agents/bib.py` 순수함수)). 특수 폴더 Starred(특수 컬렉션)·Unread·Recently Read·Trash는 가상 필터 → **신규 마이그레이션 0**. FE `useLibrary` store + 4-pane(CollectionTree/PaperList(멀티선택·Bulk)/DetailPanel/TagCloud)+SearchBar+ImportExportMenu. drag&drop·네이티브 우클릭은 보류(버튼·드롭다운) | F-08, [PRD §5.6](./PRD.md) | ✅ |
 | **S14** | **Markup** | F-11 — 사용자 하이라이트 + Markdown 노트 + S3 백업 + pdf.js 채널 3개 추가. `/api/annotations`(하이라이트 CRUD page+정규화 bbox·노트 get-or-create+PUT R2 백업(`notes/{id}.md`)·Markdown/Obsidian export). `object_store.put_text/get_text`. pdf.js 채널 RENDER_HIGHLIGHTS·REMOVE_HIGHLIGHT(host→iframe)·HIGHLIGHT_CLICK(iframe→host) + SELECTION_CHANGE 정규화 rects → 스케일독립 overlay. Floating Menu 5액션(설명·번역·Ask·하이라이트·복사) + `useMarkup` + NotesPanel(자동저장·하이라이트 목록·`/ai` 인라인·export). **신규 마이그레이션 0**(0001 highlights/notes 재사용). Notion OAuth·F-10 자동 하이라이트는 보류 | F-11, [PRD §5.5](./PRD.md) | ✅ |
 | **S15** | **Observability** | Sentry + PostHog + Langfuse 통합 (Phase 1은 트레이스 가시화까지) — **전부 env 게이팅(키 부재 시 no-op)**. BE: `observability/`(settings·trace contextvars·`init_sentry` lifespan·순수 ASGI `RequestContextMiddleware`로 `X-Request-Id`·`get_langfuse` + `stream_task` Langfuse generation 래핑·chat/explain/translate paper_id+`capture_exception`). FE: `@sentry/nextjs`(withSentryConfig+instrumentation+error boundary 2개) + `posthog-js`(`lib/analytics` + `AnalyticsProvider` + 큐레이션 이벤트 7종). **신규 마이그레이션 0** | [PRD §7.9](./PRD.md) | ✅ |
-| **S16** | **CI + 종료 회귀** | GitHub Actions — frontend lint/test/build + backend pytest + docker-compose smoke + Playwright Phase 1 신규 suite | — | ⬜ |
+| **S16** | **CI + 종료 회귀** | GitHub Actions 3-job: backend(ruff/mypy/pytest 182) · frontend(typecheck/lint/vitest 31/`next build`) · **e2e**(Playwright 30 — `page.route` 목킹이라 BE 불필요). frontend job에 vitest·build 스텝 추가 + e2e 별도 job 신설. 실 논문 PDF presigned 연결(`Center.tsx`→`/pdf-url`) + test_router 5건 회귀 동기화(c2a6b9e mid=flash). docker-compose smoke는 앱 컨테이너(Dockerfile) 부재로 Phase 2 이관 | — | ✅ |
 
 ### 3.2 Phase 1 종료 조건
 
