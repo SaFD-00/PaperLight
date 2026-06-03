@@ -47,6 +47,24 @@ def test_hyperparameters_gated_by_reasoning() -> None:
     }
 
 
+def test_load_rejects_route_missing_required_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory
+) -> None:
+    bad = tmp_path / "agents.yaml"  # type: ignore[operator]
+    bad.write_text(
+        "default: {provider: openrouter, model: m}\n"
+        "agents:\n  summary: {provider: openrouter}\n",  # missing model
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PAPERLIGHT_AGENTS_CONFIG", str(bad))
+    router._load.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="agents.summary needs provider"):
+            router.candidates("summary")
+    finally:
+        router._load.cache_clear()
+
+
 async def _collect(task: str, messages: list[dict[str, str]]) -> str:
     out = ""
     async for token in router.stream_task(task, messages):

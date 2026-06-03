@@ -35,12 +35,28 @@ def _config_path() -> Path:
     return Path(override) if override else _DEFAULT_CONFIG_PATH
 
 
+def _require_route(entry: Any, where: str, path: str) -> None:
+    """Each route (default / agent / fallback) must be a mapping with provider+model."""
+    if not isinstance(entry, dict) or "provider" not in entry or "model" not in entry:
+        raise RuntimeError(f"agents.yaml: {where} needs provider+model: {path}")
+
+
+def _validate(cfg: dict[str, Any], path: str) -> None:
+    """Fail-fast structure check so a typo surfaces here, not as a KeyError later."""
+    _require_route(cfg.get("default"), "default", path)
+    for task, entry in (cfg.get("agents") or {}).items():
+        _require_route(entry, f"agents.{task}", path)
+        for i, fb in enumerate(entry.get("fallback") or []):
+            _require_route(fb, f"agents.{task}.fallback[{i}]", path)
+
+
 @lru_cache(maxsize=1)
 def _load(path: str) -> dict[str, Any]:
     with Path(path).open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     if not isinstance(data, dict):
         raise RuntimeError(f"agents.yaml must be a mapping: {path}")
+    _validate(data, path)
     return data
 
 
