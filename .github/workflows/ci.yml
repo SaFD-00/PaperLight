@@ -55,3 +55,29 @@ jobs:
       - name: Lint
         run: pnpm lint
         continue-on-error: true
+      - name: Test (vitest)
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Playwright (Phase 1 suite)
+        run: pnpm exec playwright test
