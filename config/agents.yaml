@@ -4,11 +4,32 @@
 # 미지정 항목은 default에서 상속. (provider base_url/timeout은 provider 코드에 하드코딩.)
 # 주의: reasoning_effort != none 이면 temperature/top_p는 전송하지 않음(thinking 모델이 무시/거부).
 #       → 해당 agent의 temperature 값은 향후 effort=none 전환 시에만 적용되는 스펙값.
+#
+# ── Provider presets (`/reset-default` SoT) ────────────────────────────────────
+# `/reset-default --preset <qwen|gpt|gemini>` 가 각 agent의 provider+model(+fallback의
+# provider+model)을 아래 표대로 되돌린다. plain 실행 = qwen = committed canonical.
+# reasoning_effort/temperature/top_p/max_tokens 는 preset 무관(agent 의미값) — 미변경.
+# embedding/reranker/tts 도 preset 무관 — 미변경.
+#
+# Tier → (provider, model) per preset:
+#   tier   qwen (openrouter)       gpt (openai)    gemini (gemini)
+#   high   qwen/qwen3.6-plus       gpt-5.4-mini    gemini-2.5-flash
+#   mid    qwen/qwen3.6-flash      gpt-5.4-mini    gemini-2.5-flash
+#   low    qwen/qwen3.6-35b-a3b    gpt-5.4-nano    gemini-2.5-flash-lite
+#
+# Agent → tier:
+#   high : figure_description, table_description, podcast_outline, podcast_script
+#   mid  : default, summary, chat, explanation, podcast_critique, critique
+#   low  : translation, paragraph_description, paragraph_importance,
+#          classifier, highlight, domain_classifier
+# Agent → fallback-tier (그 외 agent는 fallback 없음):
+#   summary→high, chat→high, explanation→low, translation→mid,
+#   figure_description→mid, table_description→mid, podcast_outline→mid, podcast_script→mid
 version: "2026.06.03"
 
 default:
   provider: openrouter
-  model: qwen/qwen3.6-35b-a3b
+  model: qwen/qwen3.6-flash
   reasoning_effort: medium
   temperature: 0.3
   top_p: 0.9
@@ -17,7 +38,7 @@ default:
 agents:
   summary:
     provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    model: qwen/qwen3.6-flash
     reasoning_effort: medium
     temperature: 0.2
     max_tokens: 3000
@@ -26,7 +47,7 @@ agents:
 
   chat:
     provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    model: qwen/qwen3.6-flash
     reasoning_effort: medium
     temperature: 0.4
     max_tokens: 2048
@@ -35,21 +56,21 @@ agents:
 
   explanation:
     provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    model: qwen/qwen3.6-flash
     reasoning_effort: medium
     temperature: 0.2
     max_tokens: 1500
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-flash }
+      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
 
   translation:
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: none
     temperature: 0.1
     max_tokens: 4000
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
 
   figure_description:        # F-14 — vision (qwen3.6-plus 멀티모달)
     provider: openrouter
@@ -58,7 +79,7 @@ agents:
     temperature: 0.2
     max_tokens: 1500
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
 
   table_description:         # F-14 — vision
     provider: openrouter
@@ -67,18 +88,18 @@ agents:
     temperature: 0.2
     max_tokens: 1500
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
 
   paragraph_description:     # F-15 — batch, cheap
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: none
     temperature: 0.2
     max_tokens: 400
 
   paragraph_importance:      # F-15 — classifier
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: none
     temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
     max_tokens: 100
@@ -90,7 +111,7 @@ agents:
     temperature: 0.6
     max_tokens: 2000
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
 
   podcast_script:
     provider: openrouter
@@ -99,39 +120,39 @@ agents:
     temperature: 0.7
     max_tokens: 8000
     fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-35b-a3b }
+      - { provider: openrouter, model: qwen/qwen3.6-flash }
 
   podcast_critique:
     provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    model: qwen/qwen3.6-flash
     reasoning_effort: medium
     temperature: 0.3
     max_tokens: 1500
 
   critique:
     provider: openrouter
-    model: qwen/qwen3.6-35b-a3b
+    model: qwen/qwen3.6-flash
     reasoning_effort: medium
     temperature: 0.3
     max_tokens: 1500
 
   classifier:
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: none
     temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
     max_tokens: 100
 
   highlight:
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: low
     temperature: 0.2
     max_tokens: 1000
 
   domain_classifier:         # 논문 도메인 분류 (글로서리 선택용)
     provider: openrouter
-    model: qwen/qwen3.6-flash
+    model: qwen/qwen3.6-35b-a3b
     reasoning_effort: none
     temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
     max_tokens: 100
