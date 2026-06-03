@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/panels/ChatPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
+import { PodcastPanel } from "@/components/panels/PodcastPanel";
 import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { useReader } from "@/stores/reader";
@@ -90,11 +91,13 @@ export function RightPanel({ paperId }: { paperId: string }) {
         {active === "chat" && <ChatPanel paperId={paperId} />}
         {active === "references" && <ReferencesPanel paperId={paperId} />}
         {active === "notes" && <NotesPanel paperId={paperId} />}
+        {active === "podcast" && <PodcastPanel paperId={paperId} />}
         {active !== "summary" &&
           active !== "insights" &&
           active !== "chat" &&
           active !== "references" &&
-          active !== "notes" && (
+          active !== "notes" &&
+          active !== "podcast" && (
             <div className="space-y-4 p-4 text-sm text-text-muted">
               <p className="text-xs">
                 {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
