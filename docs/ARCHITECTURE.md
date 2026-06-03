@@ -119,7 +119,7 @@ PaperLight/
 [SelectionExplainPopover — 선택 문장 바로 옆 인라인 스트리밍(markdown)]
 ```
 
-> **레이아웃**: ReaderShell은 `Sidebar | Center(PDF) | RightPanel(AI 탭)` flex 행. 해석(번역)은 **별도 사이드 패널이 아니라 PDF 연속 스크롤 안에서 각 페이지 오른쪽에 나란히 붙는 컬럼**(viewer.js `.page-row = [.page-wrapper | .page-translation]`)이며, 상단 툴바 [T] 토글로 컬럼을 켜고/끈다. 좌측 사이드바·AI 패널은 각각 토글. 좌측 사이드바는 TOC↔페이지(썸네일) 전환 + 클릭 이동.
+> **레이아웃**: ReaderShell은 `Sidebar | Center(PDF) | RightPanel(AI 탭)` flex 행. 해석(번역)은 **별도 사이드 패널이 아니라 PDF 연속 스크롤 안에서 각 페이지 오른쪽에 나란히 붙는 컬럼**(viewer.js `.page-row = [.page-wrapper | .page-translation]`)이며, 상단 툴바 [T] 토글로 컬럼을 켜고/끈다. 좌측 사이드바·AI 패널은 각각 토글이며, 경계 모서리 드래그(`ResizeHandle`)로 폭 조절 가능(사이드바 160~480px·패널 280~600px, `reader` 스토어 보관·비영속). 좌측 사이드바는 TOC↔페이지(썸네일) 전환 + 클릭 이동.
 
 ### 3.2b Reader: 페이지별 번역 컬럼 + 원문↔해석 교차 하이라이트 (F-02)
 
