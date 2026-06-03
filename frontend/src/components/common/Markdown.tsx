@@ -1,6 +1,8 @@
+import { Children, type ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CrossRefText } from "@/components/reader/CrossRefText";
 
 // Tailwind typography 플러그인 없이 토큰 색상에 맞춘 최소 마크다운 스타일.
 const COMPONENTS: Components = {
@@ -62,11 +64,35 @@ const COMPONENTS: Components = {
   td: ({ children }) => <td className="border border-border-subtle px-2 py-1">{children}</td>,
 };
 
-/** 패널 출력용 마크다운 렌더러. */
-export function Markdown({ children }: { children: string }) {
+/** 문자열 children을 cross-ref 프리뷰로 감싼다(비문자열은 그대로). F-07. */
+function linkifyChildren(children: ReactNode, paperId: string): ReactNode {
+  return Children.map(children, (child) =>
+    typeof child === "string" ? <CrossRefText paperId={paperId} text={child} /> : child,
+  );
+}
+
+/** 패널 출력용 마크다운 렌더러. crossRefPaperId 지정 시 본문 cross-ref 호버 프리뷰(F-07). */
+export function Markdown({
+  children,
+  crossRefPaperId,
+}: {
+  children: string;
+  crossRefPaperId?: string;
+}) {
+  const components: Components = crossRefPaperId
+    ? {
+        ...COMPONENTS,
+        p: ({ children }) => (
+          <p className="my-1.5 leading-relaxed">{linkifyChildren(children, crossRefPaperId)}</p>
+        ),
+        li: ({ children }) => (
+          <li className="leading-relaxed">{linkifyChildren(children, crossRefPaperId)}</li>
+        ),
+      }
+    : COMPONENTS;
   return (
     <div className="text-sm text-text-primary [&>:first-child]:mt-0 [&>:last-child]:mb-0">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {children}
       </ReactMarkdown>
     </div>

@@ -8,6 +8,7 @@ camelCase wire format (FE Zustand 1:1).
 from __future__ import annotations
 
 import asyncio
+import base64
 import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -34,6 +35,7 @@ from paperlight.api._sse import format_sse
 from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
 from paperlight.ingestion.pipeline import ingest_paper
+from paperlight.ingestion.render import render_region
 from paperlight.models.cache import Cache
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
@@ -215,6 +217,22 @@ async def get_figures(paper_id: str, session: SessionDep, user_id: UserDep) -> d
     """Figure/Table bbox layout(정밀 marker 모드에서만 채워짐). 없으면 빈 리스트."""
     await get_owned_paper(session, paper_id, user_id)
     return {"figures": await load_figure_layout(paper_id)}
+
+
+@router.get("/{paper_id}/figures/{idx}/image")
+async def figure_image(paper_id: str, idx: int, session: SessionDep, user_id: UserDep) -> Response:
+    """F-07 Preview — layout[idx] 도표 영역을 PNG로 크롭(정밀 marker 모드에서만 존재)."""
+    await get_owned_paper(session, paper_id, user_id)
+    layout = await load_figure_layout(paper_id)
+    if idx < 0 or idx >= len(layout):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "figure not found")
+    entry = layout[idx]
+    try:
+        data = await asyncio.to_thread(get_object_store().get_pdf, pdf_key(paper_id))
+    except FileNotFoundError as err:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "pdf not found") from err
+    b64 = await asyncio.to_thread(render_region, data, entry["page"], entry["bbox"])
+    return Response(content=base64.b64decode(b64), media_type="image/png")
 
 
 @router.get("/{paper_id}/summary")

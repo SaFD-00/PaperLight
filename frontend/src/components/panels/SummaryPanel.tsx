@@ -52,7 +52,7 @@ export function SummaryPanel({ paperId }: { paperId: string }) {
         {status === "empty" && (
           <p className="text-text-muted">아직 요약이 생성되지 않았습니다. 인제스트 직후 자동 생성됩니다.</p>
         )}
-        {status === "ready" && <Markdown>{text}</Markdown>}
+        {status === "ready" && <Markdown crossRefPaperId={paperId}>{text}</Markdown>}
       </section>
     </div>
   );
