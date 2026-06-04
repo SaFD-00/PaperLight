@@ -967,12 +967,26 @@ container.addEventListener("mousemove", (e) => {
   lastHoverPage = pageNum;
   clearTranslationActive();
   highlightTranslationAt(pageNum, offset);
+  // 영어 원문 hover 시 원문 자체도 강조(한국어 hover와 대칭). offset이 속한 문장 범위를 표시.
+  const store = translationSentences[pageNum - 1];
+  let matched = null;
+  if (store) {
+    for (const en of store) {
+      if (en && en.globalStart >= 0 && offset >= en.globalStart && offset < en.globalEnd) {
+        matched = en;
+        break;
+      }
+    }
+  }
+  if (matched) highlightSentence(pageNum, matched.globalStart, matched.globalEnd);
+  else clearLinkedOverlays();
 });
 container.addEventListener("mouseleave", () => {
   if (!hoverEnabled) return;
   lastHoverOffset = -1;
   lastHoverPage = -1;
   clearTranslationActive();
+  clearLinkedOverlays();
 });
 
 window.addEventListener("message", async (event) => {
