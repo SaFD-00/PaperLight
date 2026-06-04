@@ -105,25 +105,47 @@ function heuristicOutline() {
   return items;
 }
 
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+// 섹션 번호 토큰: 1 / 2.1 / C.3.1 / A / E.1 (각 구성요소 1~2자리 → 본문 숫자열 오인 방지)
+const SECTION_NUM_ONLY = /^(?:\d{1,2}|[A-Z])(?:\.\d{1,2}){0,3}$/;
+const SECTION_NUM_LEAD = /^((?:\d{1,2}|[A-Z])(?:\.\d{1,2}){0,3})[.\s]+(.*)$/;
 
 // arXiv(hyperref) 내장 outline 제목엔 섹션 번호가 빠져 있고 번호는 본문에만 렌더된다.
-// 목적지 페이지 text-layer에서 제목 바로 앞 섹션 번호(숫자형 1/2.1, 부록형 A/E.1)를 복원.
+// 목적지 페이지 text-layer의 span을 순회해, 선두 번호를 떼면 제목으로 시작하는
+// 헤딩 span을 찾아 그 번호 토큰만 복원한다(평탄 textContent의 span 혼입 방지).
 function sectionNumberPrefix(title, pageIndex) {
   const t = (title || "").trim();
   if (!t || /^\d/.test(t)) return ""; // 이미 번호로 시작하면 스킵(중복 방지)
   const layer = pageWrappers[pageIndex]
     ? pageWrappers[pageIndex].querySelector(".text-layer")
     : null;
-  const text = layer ? layer.textContent || "" : "";
-  if (!text) return "";
-  const flexible = t.split(/\s+/).map(escapeRegex).join("\\s*"); // 제목 내 공백 유연 매칭
-  const num = "(?:\\d+(?:\\.\\d+)*|[A-Z](?:\\.\\d+)*)"; // 1 / 2.1 / A / E.1
-  const re = new RegExp("(?:^|[^A-Za-z0-9])(" + num + ")[\\s.]+" + flexible);
-  const m = text.match(re);
-  return m ? m[1].trim() : "";
+  if (!layer) return "";
+  const titleWords = t.toLowerCase().split(/\s+/);
+  // span 텍스트가 제목 첫 단어들(최대 3개)로 시작하는지 — 겹치는 만큼 모두 일치해야 함.
+  const startsTitle = (s) => {
+    const w = (s || "").replace(/\s+/g, " ").trim().toLowerCase().split(/\s+/);
+    if (!w[0]) return false;
+    const n = Math.min(3, titleWords.length, w.length);
+    for (let k = 0; k < n; k++) if (w[k] !== titleWords[k]) return false;
+    return true;
+  };
+  const spans = layer.querySelectorAll("span");
+  for (let i = 0; i < spans.length; i++) {
+    const raw = (spans[i].textContent || "").replace(/\s+/g, " ").trim();
+    // (a) 한 span에 "번호 + 제목"
+    const m = raw.match(SECTION_NUM_LEAD);
+    if (m && startsTitle(m[2])) return m[1];
+    // (b) 번호만 있는 span: pdf.js는 [번호][공백][제목]을 별개 span으로 쪼개므로
+    //     공백/빈 span을 건너뛰고 첫 비공백 span이 제목으로 시작하면 채택.
+    if (SECTION_NUM_ONLY.test(raw)) {
+      for (let j = i + 1; j < spans.length && j <= i + 4; j++) {
+        const nx = (spans[j].textContent || "").replace(/\s+/g, " ").trim();
+        if (!nx) continue; // 공백 전용 span 스킵
+        if (startsTitle(nx)) return raw;
+        break; // 첫 비공백 span이 제목이 아니면 중단(오접두 방지)
+      }
+    }
+  }
+  return "";
 }
 
 async function buildOutline() {
