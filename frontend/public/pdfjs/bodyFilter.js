@@ -41,10 +41,12 @@ function groupLines(items) {
     const normTop = cur.reduce((m, x) => Math.min(m, x.normTop), 1);
     let mathChars = 0;
     let totalChars = 0;
+    let figChars = 0;
     for (const x of cur) {
       const n = nonSpaceLen(x.str);
       totalChars += n;
       if (MATH_FONT_RE.test(x.fontFamily)) mathChars += n;
+      if (x.inFigure) figChars += n;
     }
     lines.push({
       items: cur,
@@ -54,6 +56,8 @@ function groupLines(items) {
       medianHeight,
       normTop,
       mathRatio: totalChars ? mathChars / totalChars : 0,
+      // 라인의 과반 글자가 figure/table 영역 안이면 도표 내부 텍스트로 간주.
+      inFigure: totalChars > 0 && figChars / totalChars > 0.5,
     });
     cur = [];
   };
@@ -146,6 +150,8 @@ export function extractBody(items, opts = {}) {
       drop = true; // 저자 이메일 라인.
     } else if (ARXIV_ID_RE.test(trimmed)) {
       drop = true; // arXiv 세로 식별자/스탬프.
+    } else if (line.inFigure) {
+      drop = true; // Figure/Table 영역 내부 텍스트(다이어그램 라벨·표 셀).
     } else if (CAPTION_RE.test(trimmed)) {
       drop = true;
       // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).

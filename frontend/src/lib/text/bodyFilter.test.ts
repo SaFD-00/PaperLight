@@ -14,6 +14,7 @@ function item(str: string, opts: Partial<BodyItem> = {}): BodyItem {
     fontHeight: opts.fontHeight ?? 10,
     normTop: opts.normTop ?? 0.5,
     fontFamily: opts.fontFamily ?? "Times",
+    inFigure: opts.inFigure ?? false,
   };
 }
 
@@ -167,6 +168,41 @@ describe("extractBody", () => {
     const { bodyText } = extractBody(items);
     expect(bodyText).not.toContain("arXiv:2605.10347");
     expect(bodyText).toContain("This is the genuine body text");
+  });
+
+  it("drops figure/table region text and preserves neighbor offsets", () => {
+    const items = [
+      item("This is real body prose before the figure region here. "), // keep
+      item("Constraint ", { inFigure: true, fontHeight: 7 }), // 그림 내부 라벨 → drop
+      item("Initial Synthesis ", { inFigure: true, fontHeight: 7 }), // 그림 내부 라벨 → drop
+      item("Cold Start", { inFigure: true, fontHeight: 7 }), // 그림 내부 라벨 → drop
+      item("Body prose continues after the figure region with full size."), // keep
+    ];
+    const { bodyText, segments } = extractBody(items);
+
+    expect(bodyText).toContain("This is real body prose before");
+    expect(bodyText).toContain("Body prose continues after the figure");
+    expect(bodyText).not.toContain("Constraint");
+    expect(bodyText).not.toContain("Initial Synthesis");
+    expect(bodyText).not.toContain("Cold Start");
+
+    // drop된 figure 텍스트를 건너뛰어도 keep segment 의 globalStart 가 원문과 일치.
+    const full = fullText(items);
+    for (const seg of segments) {
+      expect(bodyText.slice(seg.bodyStart, seg.bodyEnd)).toBe(
+        full.slice(seg.globalStart, seg.globalEnd),
+      );
+    }
+  });
+
+  it("keeps a line when figure items are a minority (below half)", () => {
+    const items = [
+      // 한 라인에 figure 토큰 1개 + 본문 토큰 다수(hasEOL=false 로 한 라인 구성).
+      item("x ", { inFigure: true, hasEOL: false }),
+      item("This is a long genuine body sentence that should be kept intact."),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("This is a long genuine body sentence");
   });
 
   it("drops Korean figure/table captions", () => {

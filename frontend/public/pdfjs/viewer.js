@@ -445,15 +445,34 @@ async function extractBodyText(pageNum) {
     const tc = await page.getTextContent();
     const joined = tc.items.map((it) => it.str).join("");
     if (joined !== fullText) return { text: fullText, segments: identity };
-    const pageH = page.getViewport({ scale: 1 }).height;
+    const vp = page.getViewport({ scale: 1 });
+    const pageH = vp.height;
+    const pageW = vp.width;
     const styles = tc.styles || {};
-    const items = tc.items.map((it) => ({
-      str: it.str,
-      hasEOL: !!it.hasEOL,
-      fontHeight: it.height || Math.hypot(it.transform[2], it.transform[3]),
-      normTop: pageH > 0 ? (pageH - it.transform[5]) / pageH : 0,
-      fontFamily: (styles[it.fontName] && styles[it.fontName].fontFamily) || "",
-    }));
+    // Figure/Table 영역(정규화 0..1) 확보: 백엔드 정밀 bbox 우선, 없으면 휴리스틱 폴백.
+    let regions = pageFigureAnchors[pageNum - 1];
+    if (!regions) regions = await detectFigureAnchors(pageNum);
+    const figRegions = (regions || []).map((a) => a.region).filter(Boolean);
+    const inAnyRegion = (cx, cy) =>
+      figRegions.some(
+        (r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h,
+      );
+    const items = tc.items.map((it) => {
+      const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
+      const x = it.transform[4];
+      const y = it.transform[5];
+      const w = it.width || 0;
+      const cx = pageW > 0 ? (x + w / 2) / pageW : 0;
+      const cy = pageH > 0 ? (pageH - (y + h / 2)) / pageH : 0;
+      return {
+        str: it.str,
+        hasEOL: !!it.hasEOL,
+        fontHeight: h,
+        normTop: pageH > 0 ? (pageH - y) / pageH : 0,
+        fontFamily: (styles[it.fontName] && styles[it.fontName].fontFamily) || "",
+        inFigure: figRegions.length > 0 && inAnyRegion(cx, cy),
+      };
+    });
     const { bodyText, segments } = extractBody(items, { firstPage: pageNum === 1 });
     if (!bodyText) return { text: fullText, segments: identity }; // 전부 drop되면 폴백.
     return { text: bodyText, segments };

@@ -9,6 +9,8 @@ export interface BodyItem {
   normTop: number;
   /** 해석된 폰트 패밀리(pdf.js styles[fontName].fontFamily). */
   fontFamily: string;
+  /** 이 item 중심이 Figure/Table 영역 안에 있는가(viewer.js가 region 기준 산출). */
+  inFigure?: boolean;
 }
 
 /** body 문자열 범위 ↔ 원문(text-layer) 전역 offset 매핑. */
