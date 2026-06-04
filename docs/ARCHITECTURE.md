@@ -126,7 +126,7 @@ PaperLight/
 ```
 [host] PAGE_VISIBLE(page) → 미요청이면 REQUEST_PAGE_TEXT(page) (스크롤 따라 lazy)
       ▼
-[iframe] extractBodyText: Figure 캡션(멀티라인·한국어 그림/표 포함)·표 수치·수식·페이지번호·이메일·arXiv 식별자(세로 스탬프)·1페이지 front-matter(저자·소속·링크, 제목만 유지) 보수적 제거
+[iframe] extractBodyText: Figure 캡션(멀티라인·한국어 그림/표 포함)·Figure/Table 영역 내부 텍스트(figure bbox region 중심 판정, 백엔드 정밀 bbox 우선·휴리스틱 폴백)·표 수치·수식·페이지번호·이메일·arXiv 식별자(세로 스탬프)·1페이지 front-matter(저자·소속·링크, 제목만 유지) 보수적 제거
       │ + body↔원문 offset 매핑(segments, pageSegments에 저장) → PAGE_TEXT(page, bodyText)
       ▼
 [host] splitSentences(bodyText) → POST /api/translate(aligned)
@@ -135,7 +135,7 @@ PaperLight/
       ▼
 [iframe] 해당 페이지 .page-translation 컬럼에 문장 span 증분 렌더
       │ bodyStart/bodyEnd → mapBodyRange(segments) → 원문 전역 offset
-      │ 번역 span hover → 원문 연회색 오버레이 / 원문 hover → 번역 span 강조 (양방향, iframe 내부)
+      │ 번역 span hover → 원문 연회색 오버레이 / 원문 hover → 번역 span 강조 + 원문도 연회색 오버레이 (대칭 양방향, iframe 내부)
 ```
 
 > 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
