@@ -205,7 +205,7 @@ Host React  ───► iframe.contentWindow.postMessage({ type, payload })
 
 **iframe → Host 메시지 타입**:
 - `SELECTION_CHANGE` (text, rect, rects, page) · `PAGE_VISIBLE` (page) · `PAGE_TEXT` (page, text=본문)
-- `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl) — TOC는 내장 outline 우선·휴리스틱 폴백이며, 내장 outline 제목엔 빠진 섹션 번호를 본문 text-layer에서 복원(숫자형 `1`/`2.1` + 부록형 `A`/`E.1`)해 앞에 붙임
+- `HIGHLIGHT_CLICK` (id) · `OUTLINE` (items) · `THUMBNAIL` (page, dataUrl) — TOC는 내장 outline 우선·휴리스틱 폴백이며, 내장 outline 제목엔 빠진 섹션 번호를 본문 text-layer **span 단위**로 헤딩을 찾아 복원(숫자형 `1`/`2.1` + 부록형 `A`/`E.1`)해 앞에 붙임. 평탄 `textContent`가 아닌 span을 순회하므로 앞 span(그림 숫자 등)이 번호에 혼입되지 않음
 - `REQUEST_FIGURES` (page) — 페이지 paint 시 백엔드 figure bbox 요청(번역 lazy 패턴 미러)
 - `FIGURE_EXPLAIN` (page, kind, label, captionText, imageDataUrl, rect) — Figure/Table 설명 버튼 클릭(crop 이미지)
 - `READY` / `ERROR`
