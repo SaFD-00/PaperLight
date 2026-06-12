@@ -133,7 +133,8 @@ PaperLight/
 [host] PAGE_VISIBLE(page) → 미요청이면 REQUEST_PAGE_TEXT(page) (스크롤 따라 lazy)
       ▼
 [iframe] extractBodyText: Figure/Table 캡션(멀티라인·한국어·Supplementary/Extended Data 접두)·
-      │ Figure/Table 영역 내부 텍스트(figure bbox region 중심 판정, 백엔드 bbox 우선·휴리스틱 폴백)·
+      │ Figure/Table 영역 내부 텍스트(item 중심이 textRegion 안이면 제외. textRegion=본문 보존형
+      │   제외 밴드 figureExclusionBand로, crop용 ±42% region과 분리 — 백엔드 bbox 우선·휴리스틱 폴백)·
       │ 표 수치·display 수식(수식번호 종결)·의사코드(Algorithm/Listing 블록)·저자 소속·Preprint 스탬프·
       │ 페이지번호·이메일·arXiv·러닝 헤더(furniture)·1페이지 front-matter·References/Checklist 보수적 제거.
       │ groupLines가 hasEOL 누락 join(헤더·캡션이 본문과 한 줄)을 줄높이(normTop) 점프로 분리.
@@ -152,7 +153,9 @@ PaperLight/
 
 > 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
 >
-> **비본문 제거 원칙(`bodyFilter.js`)**: 본문 오삭제 > 비본문 통과(보수적). 단일 페이지로 못 거르는 비본문(연속 References, 반복 러닝 헤더)은 **문서 수준**(전 페이지 1회 스캔, lazy·임의 순서 요청과 무관하게 결정적·memoize)에서, 위치·폰트·패턴·반복성 중 **2개 이상 신호의 AND**로만 제거한다. 양식 다양성은 `fixtures/pilot-papers`의 회귀 논문(#1 성-이니셜·#2 대괄호·#3 이니셜-성·#4 점번호 References)으로 검증한다. `frontend/src/lib/text/bodyFilter.test.ts`가 `bodyFilter.js`(viewer.js와 단일 소스)를 그대로 import해 순수 함수로 보장한다.
+> **비본문 제거 원칙(`bodyFilter.js`)**: 본문 오삭제 > 비본문 통과(보수적). 단일 페이지로 못 거르는 비본문(연속 References, 반복 러닝 헤더)은 **문서 수준**(전 페이지 1회 스캔, lazy·임의 순서 요청과 무관하게 결정적·memoize)에서, 위치·폰트·패턴·반복성 중 **2개 이상 신호의 AND**로만 제거한다. 양식 다양성은 `fixtures/pilot-papers`의 회귀 논문(#1 성-이니셜·#2 대괄호·#3 이니셜-성·#4 점번호 References·#5 역방향 표·#6 ICLR 다줄 캡션)으로 검증한다. `frontend/src/lib/text/bodyFilter.test.ts`가 `bodyFilter.js`(viewer.js와 단일 소스)를 그대로 import해 순수 함수로 보장한다.
+>
+> **Figure/Table 제외 밴드(`figureExclusionBand`)**: 고정 ±42% 밴드는 도표보다 넓어 인접 본문·섹션 헤딩·논문 제목·초록까지 inFigure로 삼켜 번역에서 누락시켰다(본문 과잉제거). 이를 막기 위해 **crop용 region(비전 입력, generous)과 inFigure 제외용 textRegion을 분리**한다. textRegion은 캡션 양옆을 스캔해 **도표 콘텐츠(표 행·도표 라벨 = 숫자 위주이거나 짧은 비-산문)** 구간만 잡고, 본문(긴 산문 또는 기능어 포함 짧은 wrap 줄, 또는 섹션 헤딩)이 재개되면 멈춘다. kind 관례(Figure=위/Table=아래)에 의존하지 않고 **콘텐츠가 인접한 쪽**을 골라 캡션이 표 위/아래 어디 있든(역방향 표) 대응하며, 다줄 캡션 연속줄은 최대 N줄까지 건너뛴다. 양쪽 다 본문이면(인라인 'Figure N shows ...' 오탐 캡션·텍스트 없는 그림) 제외 없음. 백엔드 marker bbox가 있으면 정밀하므로 textRegion=region(휴리스틱 대체). 20+편 실측: 본문 생존율 old 66–95% → new 87–99.8%, 회복:회귀 ≈ 8:1.
 
 ### 3.2c Reader: Figure/Table 인라인 비전 설명 + 후속 채팅 (F-04/F-14)
 
@@ -161,7 +164,8 @@ PaperLight/
 ```
 [iframe] 페이지 paint 시 REQUEST_FIGURES(page) → [host] marker bbox를 RENDER_FIGURES(page,figures)로
       │ 응답. figures 있으면 정밀 bbox 버튼, 없으면 detectFigureAnchors 휴리스틱 폴백
-      │ (캡션 앵커: Figure=캡션 위, Table=캡션 아래, ±42% 밴드 — 과잉 crop 허용)
+      │ (캡션 앵커. 앵커마다 두 region: ① crop용 region=±42% 밴드(비전 입력, 과잉 crop 허용)
+      │  ② inFigure 제외용 textRegion=figureExclusionBand(본문 보존형, §3.2b))
       ▼ (버튼 클릭)
 [iframe] cropRegion: page-canvas에서 region을 잘라 PNG dataURL → FIGURE_EXPLAIN(page, kind,
       │ label, captionText, imageDataUrl, rect) 전송
