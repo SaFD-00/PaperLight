@@ -4,6 +4,7 @@ import {
   mapBodyRange,
   parseCaptionLabel,
   scanReferenceActivation,
+  scanRunningFurniture,
 } from "/pdfjs/bodyFilter.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
@@ -20,7 +21,7 @@ let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
 let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
-let refActivationPromise = null; // 문서 수준 References/Checklist 구간 판정(페이지별 boolean), 1회 계산.
+let docFiltersPromise = null; // 문서 수준 필터(References/Checklist 구간 + 러닝 furniture), 1회 계산.
 let pageFigureAnchors = []; // 페이지별 [{ kind, label, captionText, region }] (Figure/Table 설명 앵커).
 let translationCols = []; // 페이지별 번역 컬럼 element.
 let translationSentences = []; // 페이지별 [{ i, el, globalStart, globalEnd }] (교차 하이라이트용).
@@ -458,16 +459,16 @@ function clearTranslationActive() {
   }
 }
 
-// 문서 수준 References/Checklist 구간을 한 번 계산(페이지별 refActiveAtStart). 모든 페이지의
-// 텍스트(figRegion 불필요)를 순서대로 훑어 scanReferenceActivation에 넘긴다. 페이지가 lazy·임의
-// 순서로 요청돼도 동일 결과를 보장하도록 memoize하고 loadPdf에서 초기화한다.
-async function getRefActivation() {
-  if (!refActivationPromise) refActivationPromise = computeRefActivation();
-  return refActivationPromise;
+// 문서 수준 필터(References/Checklist 구간 + 러닝 헤더/푸터 furniture)를 한 번 계산한다. 모든
+// 페이지 텍스트(figRegion 불필요)를 순서대로 모아 scanReferenceActivation/scanRunningFurniture에
+// 넘긴다. 페이지가 lazy·임의 순서로 요청돼도 동일 결과를 보장하도록 memoize하고 loadPdf에서 초기화.
+async function getDocFilters() {
+  if (!docFiltersPromise) docFiltersPromise = computeDocFilters();
+  return docFiltersPromise;
 }
 
-async function computeRefActivation() {
-  if (!currentDoc) return [];
+async function computeDocFilters() {
+  if (!currentDoc) return { activation: [], furniture: new Set() };
   const pagesItems = [];
   for (let i = 0; i < pageObjects.length; i++) {
     const page = pageObjects[i];
@@ -499,9 +500,12 @@ async function computeRefActivation() {
     }
   }
   try {
-    return scanReferenceActivation(pagesItems);
+    return {
+      activation: scanReferenceActivation(pagesItems),
+      furniture: scanRunningFurniture(pagesItems),
+    };
   } catch (_) {
-    return [];
+    return { activation: [], furniture: new Set() };
   }
 }
 
@@ -548,11 +552,12 @@ async function extractBodyText(pageNum) {
         inFigure: figRegions.length > 0 && inAnyRegion(cx, cy),
       };
     });
-    const activation = await getRefActivation();
+    const { activation, furniture } = await getDocFilters();
     const refActiveAtStart = !!activation[pageNum - 1];
     const { bodyText, segments, allDropped } = extractBody(items, {
       firstPage: pageNum === 1,
       refActiveAtStart,
+      furniture,
     });
     if (!bodyText) {
       // 비공백 입력이 의도적으로 전부 drop됐으면(References/Checklist·전면 Figure 페이지)
@@ -947,7 +952,7 @@ async function loadPdf(url) {
   pageWrappers = [];
   pageObjects = [];
   pageSegments = [];
-  refActivationPromise = null;
+  docFiltersPromise = null;
   pageFigureAnchors = [];
   translationCols = [];
   translationSentences = [];

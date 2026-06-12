@@ -6,6 +6,7 @@ import {
   mapBodyRange,
   parseCaptionLabel,
   scanReferenceActivation,
+  scanRunningFurniture,
 } from "../../../public/pdfjs/bodyFilter.js";
 
 function item(str: string, opts: Partial<BodyItem> = {}): BodyItem {
@@ -378,5 +379,51 @@ describe("scanReferenceActivation", () => {
       page([["[1] This looks like a citation but no References heading preceded it yet.", { fontHeight: 10 }]]),
     ];
     expect(scanReferenceActivation(pages)).toEqual([false, false]);
+  });
+});
+
+describe("러닝 헤더/푸터(furniture)", () => {
+  const HEADER = "A GUI World Model via Renderable Code Generation"; // 24자+ → 단일 페이지 규칙 통과
+
+  function headerPages(n: number): BodyItem[][] {
+    return Array.from({ length: n }, () => [item(HEADER, { normTop: 0.05 })]);
+  }
+
+  it("3페이지 이상 반복되는 상단 밴드 헤더를 furniture로 수집", () => {
+    const furniture = scanRunningFurniture(headerPages(5));
+    expect(furniture.size).toBe(1);
+    expect(furniture.has("a gui world model via renderable code generation")).toBe(true);
+  });
+
+  it("반복이 부족하면(2페이지) furniture로 잡지 않음", () => {
+    expect(scanRunningFurniture(headerPages(2)).size).toBe(0);
+  });
+
+  it("페이지 번호가 달라도 같은 헤더로 정규화(숫자→#)해 반복 카운트", () => {
+    const pages = Array.from({ length: 4 }, (_, i) => [
+      item(`${HEADER} ${i + 1}`, { normTop: 0.05 }),
+    ]);
+    const furniture = scanRunningFurniture(pages);
+    expect(furniture.size).toBe(1);
+  });
+
+  it("furniture 주입 시 24자+ 러닝 헤더를 drop(밴드 위치 AND 반복)", () => {
+    const items = [
+      item(HEADER, { normTop: 0.05 }), // 반복 헤더 → drop
+      item("This is the genuine body sentence that must survive the filter here.", {
+        normTop: 0.5,
+      }),
+    ];
+    const furniture = scanRunningFurniture(headerPages(5));
+    const { bodyText } = extractBody(items, { furniture });
+    expect(bodyText).not.toContain("Renderable Code Generation");
+    expect(bodyText).toContain("genuine body sentence");
+  });
+
+  it("밴드 밖(본문 영역)에서는 같은 텍스트라도 furniture로 drop하지 않음", () => {
+    const items = [item(HEADER, { normTop: 0.5 })]; // 본문 영역
+    const furniture = scanRunningFurniture(headerPages(5));
+    const { bodyText } = extractBody(items, { furniture });
+    expect(bodyText).toContain("Renderable Code Generation");
   });
 });

@@ -23,7 +23,7 @@ export interface BodySegment {
 
 export function extractBody(
   items: BodyItem[],
-  opts?: { firstPage?: boolean; refActiveAtStart?: boolean },
+  opts?: { firstPage?: boolean; refActiveAtStart?: boolean; furniture?: Set<string> },
 ): {
   bodyText: string;
   segments: BodySegment[];
@@ -36,6 +36,12 @@ export function extractBody(
  * References가 여러 페이지에 걸치는 경우와 말미 Checklist 보일러플레이트를 문서 수준으로 제외.
  */
 export function scanReferenceActivation(pagesItems: BodyItem[][]): boolean[];
+
+/**
+ * 문서 전체에서 상하단 밴드에 여러 페이지 반복되는 러닝 헤더/푸터의 정규화 키 집합을 반환.
+ * extractBody opts.furniture로 주입하면 '밴드 위치 AND 반복'인 24자+ 헤더도 제거한다.
+ */
+export function scanRunningFurniture(pagesItems: BodyItem[][], minRepeat?: number): Set<string>;
 
 export function mapBodyRange(
   segments: BodySegment[],

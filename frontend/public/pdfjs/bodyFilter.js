@@ -38,6 +38,14 @@ function nonSpaceLen(s) {
   return s.replace(/\s/g, "").length;
 }
 
+// 상하단 밴드(러닝 헤더/푸터 후보) 폭(정규화). 이 안의 라인만 furniture 반복 탐지 대상.
+const FURNITURE_BAND = 0.1;
+
+// 러닝 헤더/푸터 반복 탐지용 정규화 키: 숫자(페이지 번호 등 변동분)를 #로, 공백 정규화 + 소문자.
+function furnitureKey(text) {
+  return text.trim().toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+}
+
 /**
  * item 들을 hasEOL 기준으로 라인 단위로 묶는다.
  * 각 라인: { items, text, globalStart, globalEnd, medianHeight, normTop, mathRatio }
@@ -107,7 +115,7 @@ function modalHeight(items) {
 
 /**
  * @param {import("./bodyFilter").BodyItem[]} items
- * @param {{ firstPage?: boolean, refActiveAtStart?: boolean }} [opts]
+ * @param {{ firstPage?: boolean, refActiveAtStart?: boolean, furniture?: Set<string> }} [opts]
  * @returns {{ bodyText: string, segments: import("./bodyFilter").BodySegment[], allDropped: boolean }}
  */
 export function extractBody(items, opts = {}) {
@@ -197,6 +205,15 @@ export function extractBody(items, opts = {}) {
         drop = true; // 수식 라인(인라인 수식 보호 위해 짧은 라인만).
       } else if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.78 && len < 40) {
         drop = true; // 작은 폰트 + 짧은 라인(Figure 라벨·각주·위첨자).
+      } else if (
+        opts.furniture &&
+        !opts.firstPage &&
+        (line.normTop < FURNITURE_BAND || line.normTop > 1 - FURNITURE_BAND) &&
+        opts.furniture.has(furnitureKey(trimmed))
+      ) {
+        // 문서 수준 반복 러닝 헤더/푸터(학회 배너·논문 제목 헤더, 길이 무관). 단 1페이지는
+        // 제목이 러닝 헤더와 같은 문자열이라 furniture 미적용(front-matter 밴드가 제목 보호).
+        drop = true;
       } else if ((line.normTop < 0.06 || line.normTop > 0.94) && len < 24) {
         drop = true; // 페이지 헤더/푸터/페이지 번호.
       }
@@ -294,6 +311,34 @@ export function scanReferenceActivation(pagesItems) {
     }
   }
   return out;
+}
+
+/**
+ * 문서 전체에서 상하단 밴드에 '여러 페이지 반복'되는 러닝 헤더/푸터(학회 배너·논문 제목
+ * 헤더 등)를 식별해 정규화 키 집합으로 돌려준다. 단일 페이지로는 길이 제한(len<24)에 걸려
+ * 못 거르는 24자+ 헤더를 '밴드 위치 AND 반복'의 2신호로만 잡아 본문 오삭제를 피한다.
+ * @param {import("./bodyFilter").BodyItem[][]} pagesItems
+ * @param {number} [minRepeat] 반복 기준(기본 3페이지).
+ * @returns {Set<string>} furnitureKey 집합.
+ */
+export function scanRunningFurniture(pagesItems, minRepeat = 3) {
+  const freq = new Map();
+  for (const items of pagesItems) {
+    const lines = groupLines(items);
+    const seen = new Set(); // 한 페이지 내 중복은 1회만 카운트.
+    for (const l of lines) {
+      if (l.normTop >= FURNITURE_BAND && l.normTop <= 1 - FURNITURE_BAND) continue;
+      const t = l.text.trim();
+      if (nonSpaceLen(t) < 8) continue; // 짧은 헤더/페이지번호는 기존 길이 규칙이 처리.
+      const k = furnitureKey(t);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      freq.set(k, (freq.get(k) || 0) + 1);
+    }
+  }
+  const furniture = new Set();
+  for (const [k, n] of freq) if (n >= minRepeat) furniture.add(k);
+  return furniture;
 }
 
 /**
