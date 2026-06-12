@@ -1,0 +1,14 @@
+{
+  "slug": "evermemos",
+  "title": "EverMemOS: A Self-Organizing Memory Operating System for Structured Long-Horizon Reasoning",
+  "authors": ["Hu, Chuanrui", "Gao, Xingze", "Zhou, Zuyi", "Deng, Yafeng"],
+  "venue": "arXiv preprint",
+  "year": 2025,
+  "arxiv_id": null,
+  "pages": 16,
+  "size_bytes": 1663951,
+  "sha256": "265314799f9803a841a3aeb6fca949ce5eb6923d1d8a450de26843993e1605fd",
+  "added_at": "2026-06-12",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "notes": "본문 추출 회귀 검증용 (양식 다양성 #5 — figureExclusionBand). 벤치마크 표 캡션이 *표 데이터 아래*에 오는 역방향 양식(Table 1/2: ... 가 데이터 하단)이라, 캡션 관례(Table=아래)에 의존하지 않고 콘텐츠 인접 쪽을 고르는 양방향 밴드를 검증한다. 밀집 표 다수 → 표 행이 본문으로 새지 않는지(과잉 crop 없이) 확인."
+}

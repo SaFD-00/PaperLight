@@ -32,10 +32,14 @@
 | 2 | `2605.10347-mobile-world-model-gui-agents` | How Mobile World Model Guides GUI Agents? | Xu, Huang, Feng et al. | 2026 | [2605.10347](https://arxiv.org/abs/2605.10347) | 2026-05-20 |
 | 3 | `deepseekmath` | DeepSeekMath: Pushing the Limits of Mathematical Reasoning | Shao, Wang, Zhu et al. | 2024 | [2402.03300](https://arxiv.org/abs/2402.03300) | 2026-06-12 |
 | 4 | `textgrad` | TextGrad: Automatic "Differentiation" via Text | Yuksekgonul, Bianchi et al. | 2024 | [2406.07496](https://arxiv.org/abs/2406.07496) | 2026-06-12 |
+| 5 | `evermemos` | EverMemOS: A Self-Organizing Memory Operating System | Hu, Gao, Zhou et al. | 2025 | — | 2026-06-12 |
+| 6 | `iclr-pedagogical-distill` | Pedagogically-Inspired Data Synthesis for LM Knowledge Distillation | He, Chen, Zhang et al. | 2026 | ICLR 2026 | 2026-06-12 |
 
 > 상세 메타는 동일 이름의 `.meta.json` 참조. #1·#2는 GUI World Model 도메인(모바일/Android Agent)으로 묶여 F-09 Deep Search·F-13 Podcast 비교 실험에도 유용.
 >
-> **#3·#4는 본문 추출(번역 필터) 회귀 검증용 — 양식 다양성 확보**. #3 DeepSeekMath는 References가 *이니셜-성*(`Z. Du`) author-year 양식, #4 TextGrad는 *점 번호*(`74. Yang`) 양식 + *Supplementary Figure* 접두 캡션이라, 단일 양식(#1 성-이니셜 `Luo, D.` / #2 대괄호 `[16]`)으로는 못 잡던 References·캡션 케이스를 커버한다.
+> **#3~#6은 본문 추출(번역 필터) 회귀 검증용 — 양식 다양성 확보**.
+> - References/캡션 양식: #3 DeepSeekMath는 *이니셜-성*(`Z. Du`) author-year, #4 TextGrad는 *점 번호*(`74. Yang`) + *Supplementary Figure* 접두 캡션이라, 단일 양식(#1 성-이니셜 `Luo, D.` / #2 대괄호 `[16]`)으로는 못 잡던 References·캡션 케이스를 커버한다.
+> - Figure/Table 제외 밴드(`figureExclusionBand`): #5 EverMemOS는 표 캡션이 *표 데이터 아래*에 오는 **역방향 표** 양식, #6 ICLR 논문은 *다줄 표 캡션*(캡션 연속줄 2~3줄)이라, 캡션 위/아래 관례·연속줄 건너뜀(MAX_CONT)을 검증한다 → 인접 본문 과잉제거(overdrop) 없이 표 행만 제외되는지 확인.
 
 ## 4. `.meta.json` 스키마
 

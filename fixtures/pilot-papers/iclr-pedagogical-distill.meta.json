@@ -1,0 +1,14 @@
+{
+  "slug": "iclr-pedagogical-distill",
+  "title": "Pedagogically-Inspired Data Synthesis for Language Model Knowledge Distillation",
+  "authors": ["He, Bowei", "Chen, Yankai", "Zhang, Xiaokun", "Ma, Chen"],
+  "venue": "ICLR 2026",
+  "year": 2026,
+  "arxiv_id": null,
+  "pages": 38,
+  "size_bytes": 4315317,
+  "sha256": "ffe53c629be106945c9f6c4efe066ac0a5749f1ae46cfb9e1021fec6ba115e99",
+  "added_at": "2026-06-12",
+  "license": "ICLR/OpenReview (저자 보유, CC-BY)",
+  "notes": "본문 추출 회귀 검증용 (양식 다양성 #6 — figureExclusionBand). ICLR 2단 양식. 표 캡션이 *다줄*(Table 1: ... benchmarks for LLaMA and Qwen models. ... Open and underline indicate ...)이라, 캡션 연속줄(2~3줄)을 본문 재개로 오인해 표 밴드가 조기 정지(표 누출)하지 않는지(MAX_CONT 캡션 연속줄 건너뜀)를 검증한다. 역방향 표·러닝 헤더('Published as a conference paper at ICLR 2026') 포함."
+}
