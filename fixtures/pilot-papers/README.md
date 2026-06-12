@@ -30,8 +30,12 @@
 |---|------|-------|--------------|------|-------|-----------|
 | 1 | `2602.09856-code2world` | Code2World: A GUI World Model via Renderable Code Generation | Zheng, Zhong, Wang et al. | 2026 | [2602.09856](https://arxiv.org/abs/2602.09856) | 2026-05-20 |
 | 2 | `2605.10347-mobile-world-model-gui-agents` | How Mobile World Model Guides GUI Agents? | Xu, Huang, Feng et al. | 2026 | [2605.10347](https://arxiv.org/abs/2605.10347) | 2026-05-20 |
+| 3 | `deepseekmath` | DeepSeekMath: Pushing the Limits of Mathematical Reasoning | Shao, Wang, Zhu et al. | 2024 | [2402.03300](https://arxiv.org/abs/2402.03300) | 2026-06-12 |
+| 4 | `textgrad` | TextGrad: Automatic "Differentiation" via Text | Yuksekgonul, Bianchi et al. | 2024 | [2406.07496](https://arxiv.org/abs/2406.07496) | 2026-06-12 |
 
-> 상세 메타는 동일 이름의 `.meta.json` 참조. 두 논문은 GUI World Model 도메인(모바일/Android Agent)으로 묶여 있어 F-09 Deep Search·F-13 Podcast 비교 실험에도 유용.
+> 상세 메타는 동일 이름의 `.meta.json` 참조. #1·#2는 GUI World Model 도메인(모바일/Android Agent)으로 묶여 F-09 Deep Search·F-13 Podcast 비교 실험에도 유용.
+>
+> **#3·#4는 본문 추출(번역 필터) 회귀 검증용 — 양식 다양성 확보**. #3 DeepSeekMath는 References가 *이니셜-성*(`Z. Du`) author-year 양식, #4 TextGrad는 *점 번호*(`74. Yang`) 양식 + *Supplementary Figure* 접두 캡션이라, 단일 양식(#1 성-이니셜 `Luo, D.` / #2 대괄호 `[16]`)으로는 못 잡던 References·캡션 케이스를 커버한다.
 
 ## 4. `.meta.json` 스키마
 

@@ -1,0 +1,11 @@
+{
+  "slug": "deepseekmath",
+  "title": "DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models",
+  "venue": "arXiv preprint (cs.CL)",
+  "pages": 30,
+  "size_bytes": 1844642,
+  "sha256": "6cc20b3c5b8d25b8b53868fc4ec1792c144f07d67bdf7395138efd4422197e7b",
+  "added_at": "2026-06-12",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "notes": "본문 추출 회귀 검증용 (양식 다양성 #1). 2단 컬럼, author-year References가 '이니셜-성'(Z. Du, A. Lewkowycz) 양식이라 BIB_LINE_RE의 이니셜식 패턴·refs 헤딩 이후 임계 0.15·justEntered 강제를 검증한다. display 수식(GRPO 등) 다수."
+}

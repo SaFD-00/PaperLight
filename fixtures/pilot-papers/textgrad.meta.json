@@ -1,0 +1,11 @@
+{
+  "slug": "textgrad",
+  "title": "TextGrad: Automatic \"Differentiation\" via Text",
+  "venue": "arXiv preprint (cs.CL)",
+  "pages": 41,
+  "size_bytes": 1336878,
+  "sha256": "9cbfd5c78ad69e2a8363e76d6774f3e6b5e68f46b409d8b560e98276a985b428",
+  "added_at": "2026-06-12",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "notes": "본문 추출 회귀 검증용 (양식 다양성 #2). 2단 컬럼, 번호식 References가 대괄호가 아닌 점 번호('74. Yang, C., ...') 양식이라 BIB_LINE_RE의 점-번호 패턴을 검증. 부록 figure 캡션이 'Supplementary Figure N:' 접두라 CAPTION_RE의 supplementary/extended-data 접두를 검증."
+}
