@@ -124,9 +124,21 @@ PaperLight/
 ### 3.2b Reader: 페이지별 번역 컬럼 + 원문↔해석 교차 하이라이트 (F-02)
 
 ```
+[iframe] (1회) computeDocFilters: 전 페이지 텍스트를 순서대로 훑어 문서 수준 비본문 산출
+      │ scanReferenceActivation: References 헤딩 이후 '서지 시그니처 과반' 연속 페이지 + 말미
+      │   Checklist를 비본문으로(헤딩 직후 첫 페이지는 강제, Appendix 재개 시 해제). 양식 무관:
+      │   서지 시그니처가 [N]·"Luo, D."·"Z. Du"·"74. Yang"·arXiv·"et al"을 모두 커버.
+      │ scanRunningFurniture: 상하단 밴드에 3페이지+ 반복되는 러닝 헤더/푸터(길이 무관 제거)
+      ▼
 [host] PAGE_VISIBLE(page) → 미요청이면 REQUEST_PAGE_TEXT(page) (스크롤 따라 lazy)
       ▼
-[iframe] extractBodyText: Figure 캡션(멀티라인·한국어 그림/표 포함)·Figure/Table 영역 내부 텍스트(figure bbox region 중심 판정, 백엔드 정밀 bbox 우선·휴리스틱 폴백)·표 수치·수식·페이지번호·이메일·arXiv 식별자(세로 스탬프)·1페이지 front-matter(저자·소속·링크, 제목만 유지) 보수적 제거
+[iframe] extractBodyText: Figure/Table 캡션(멀티라인·한국어·Supplementary/Extended Data 접두)·
+      │ Figure/Table 영역 내부 텍스트(figure bbox region 중심 판정, 백엔드 bbox 우선·휴리스틱 폴백)·
+      │ 표 수치·display 수식(수식번호 종결)·의사코드(Algorithm/Listing 블록)·저자 소속·Preprint 스탬프·
+      │ 페이지번호·이메일·arXiv·러닝 헤더(furniture)·1페이지 front-matter·References/Checklist 보수적 제거.
+      │ groupLines가 hasEOL 누락 join(헤더·캡션이 본문과 한 줄)을 줄높이(normTop) 점프로 분리.
+      │ 전량 drop 시 빈 본문(splitSentences=0 no-op); fullText 폴백은 추출 실패(mismatch)만.
+      │ + cross-page: 페이지 끝에서 끊긴 문장은 다음 페이지 본문 앞에 붙여 완성 문장으로(carryAcrossPages)
       │ + body↔원문 offset 매핑(segments, pageSegments에 저장) → PAGE_TEXT(page, bodyText)
       ▼
 [host] splitSentences(bodyText) → POST /api/translate(aligned)
@@ -139,6 +151,8 @@ PaperLight/
 ```
 
 > 번역 원문은 백엔드 `parser.py`(ingestion)가 아니라 **iframe text-layer**에서 추출한다. 본문 필터는 렌더되는 text-layer를 바꾸지 않고 `bodyText`+`segments`만 별도 생성한다(가정 `items[].str 연결 == text-layer.textContent`, 어긋나면 필터 없이 전체 텍스트 폴백). 글꼴(세리프/산세리프)·크기는 host가 `SET_TRANSLATION_FONT`로 iframe에 전달(iframe은 next/font 변수를 못 봄 → viewer.css `@font-face` 자체 호스팅).
+>
+> **비본문 제거 원칙(`bodyFilter.js`)**: 본문 오삭제 > 비본문 통과(보수적). 단일 페이지로 못 거르는 비본문(연속 References, 반복 러닝 헤더)은 **문서 수준**(전 페이지 1회 스캔, lazy·임의 순서 요청과 무관하게 결정적·memoize)에서, 위치·폰트·패턴·반복성 중 **2개 이상 신호의 AND**로만 제거한다. 양식 다양성은 `fixtures/pilot-papers`의 회귀 논문(#1 성-이니셜·#2 대괄호·#3 이니셜-성·#4 점번호 References)으로 검증한다. `frontend/src/lib/text/bodyFilter.test.ts`가 `bodyFilter.js`(viewer.js와 단일 소스)를 그대로 import해 순수 함수로 보장한다.
 
 ### 3.2c Reader: Figure/Table 인라인 비전 설명 + 후속 채팅 (F-04/F-14)
 
