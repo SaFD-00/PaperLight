@@ -48,6 +48,11 @@ const EQUATION_NUM_RE = /\(\d{1,3}\)\s*$/;
 const MATH_SYMBOL_RE = /[=≤≥<>∥∑∏∫√≈≠←→∈∉⊂⊆∇∂α-ωΑ-Ω]|−/;
 // 위와 동일 문자집합의 global 버전(의사코드 wrap 줄 판정 시 기호 개수 카운트용, 중괄호 포함).
 const MATH_SYMBOL_GLOBAL_RE = /[=≤≥<>∥∑∏∫√≈≠←→∈∉⊂⊆∇∂α-ωΑ-Ω{}−]/g;
+// 섹션/부록 헤딩(번호·로마숫자·부록 글자 접두). figureExclusionBand에서 도표 인접 본문 경계로
+// 쓴다(짧아도 본문이므로 도표 밴드가 삼키면 안 됨): '4 Experiments', '4.1 Setup', 'A.2 ...',
+// 'III. Method'. 번호 뒤를 [A-Za-z]로 한정해 숫자 표 행('52.16 81.69 ...')을 헤딩으로 오인하지
+// 않는다. CAPTION_RE(Figure/Table 등)와는 별개로 '본문 라인 경계'만 식별한다.
+const FIG_HEADING_RE = /^(?:\d{1,2}(?:\.\d{1,2}){0,3}|[A-Z](?:\.\d{1,2}){0,2}|[ivxlc]{1,5})[.)]?\s+[A-Za-z]/;
 
 function nonSpaceLen(s) {
   return s.replace(/\s/g, "").length;
@@ -486,4 +491,162 @@ export function parseCaptionLabel(text) {
   else if (m[1] === "표") head = "표";
   else head = kind === "table" ? "Table" : "Figure";
   return { kind, label: `${head} ${m[2]}` };
+}
+
+// 캡션 기준 "본문 보존형" Figure/Table 제외 밴드(정규화 0..1 세로 구간) 계산.
+//
+// 고정 밴드(예: 0.42)는 도표보다 넓어 인접 본문·섹션 헤딩·제목까지 inFigure로 삼켜 번역에서
+// 누락시킨다(본문 과잉제거). 대신 캡션 양옆을 스캔해 **도표 콘텐츠**(표 행·도표 라벨 등 비-본문
+// 라인)가 인접한 쪽만, 그 콘텐츠가 끝나고 **본문이 재개되는 경계**까지만 제외한다. kind(figure/
+// table) 관례에 의존하지 않고 실제 콘텐츠 위치로 판정한다(표 캡션이 표 위/아래 어디든 대응).
+//
+// 본문 경계 = 헤딩(단독이라도) 또는 인접 본문이 이어지는 산문. 도표 사이에 낀 고립 산문 한 줄
+// (캡션 연속줄·표 부제)로는 멈추지 않아 도표 전체를 계속 제외한다. 양쪽 다 콘텐츠면 union,
+// 양쪽 다 본문이면(인라인 'Figure N shows ...' 오탐 캡션) 아무것도 제외하지 않는다(h=0).
+//
+// 이 region은 inFigure(번역 제외) 판정 전용 — crop(비전 설명 입력)용 generous region과 분리한다.
+// 보수성: 본문 오삭제 > 도표 라벨 통과. 경계가 애매하면 더 작게(본문 보존) 기운다.
+//
+// @param {{top:number,bot:number,x0:number,x1:number,text:string}[]} lines 페이지 전체 라인(정규화)
+// @param {{top:number,bot:number}} cap 캡션 라인 박스(정규화, top<bot)
+// @param {{x0:number,x1:number}} col 밴드 가로 컬럼(정규화)
+// @param {"figure"|"table"} kind 현재 미사용(콘텐츠 위치로 판정). 시그니처 호환 위해 유지.
+// @param {{maxBand?:number, minBodyLen?:number}} [opts]
+// @returns {{ y:number, h:number }} 정규화 제외 구간(h<=0이면 제외 없음)
+export function figureExclusionBand(lines, cap, col, kind, opts = {}) {
+  const maxBand = opts.maxBand != null ? opts.maxBand : 0.42;
+  const minBodyLen = opts.minBodyLen != null ? opts.minBodyLen : 50;
+  // 인접 본문(연속 단락)으로 볼 최대 세로 간격(정규화). 본문 줄 간격(~0.013)보다 넉넉히 크고
+  // 도표↔본문 사이 큰 공백보다 작다.
+  const ADJ_GAP = 0.028;
+  const cx0 = col.x0;
+  const cx1 = col.x1;
+  // 캡션과 같은 컬럼(가로 겹침)의 라인만 본문 경계 후보로 본다(반대 컬럼 본문 보호와 무관).
+  // 캡션 라인 자체는 제외한다 — 캡션 텍스트가 산문이라, 바로 인접한 본문/표 라인이 캡션을
+  // '연속 본문' 이웃으로 오인해 밴드를 조기 정지(도표 누출)시키는 것을 막는다.
+  const seq = (lines || [])
+    .filter((l) => {
+      if (!(l.x1 > cx0 + 1e-6 && l.x0 < cx1 - 1e-6)) return false;
+      const mid = (l.top + l.bot) / 2;
+      return !(mid >= cap.top - 1e-3 && mid <= cap.bot + 1e-3);
+    })
+    .sort((a, b) => a.top - b.top);
+  // 산문 = 긴 데 글자 위주·숫자 적음. 표 행(숫자 위주)·도표 라벨(짧음)은 산문이 아니다.
+  // "길다고 본문이 아니다(넓은 표 행도 길다)" → digit/alpha 비율로 산문만 인정.
+  const isProse = (t) => {
+    const ns = t.replace(/\s/g, "");
+    if (ns.length < minBodyLen) return false;
+    const digits = (ns.match(/\d/g) || []).length;
+    const letters = (ns.match(/[A-Za-zÀ-ɏͰ-Ͽ가-힣]/g) || []).length;
+    return digits / ns.length < 0.2 && letters / ns.length > 0.6;
+  };
+  // 짧아도 본문인 줄(2단/좁은 컬럼의 wrap된 산문)을 잡는 보조 신호. 영어 기능어가 한 개라도
+  // 있거나 한글이 섞이면 산문으로 본다 — 표 헤더·도표 라벨(기능어 없는 명사 나열)과 구분.
+  const FUNC_RE =
+    /\b(?:the|of|and|to|in|is|are|with|for|as|that|by|on|we|this|our|from|be|an|or|which|can|it|its|their|these|a)\b/i;
+  const isProseLine = (t) => {
+    if (isProse(t)) return true;
+    const ns = t.replace(/\s/g, "");
+    if (ns.length < 16 || !/\s/.test(t.trim())) return false;
+    const digits = (ns.match(/\d/g) || []).length;
+    const letters = (ns.match(/[A-Za-zÀ-ɏͰ-Ͽ가-힣]/g) || []).length;
+    if (digits / ns.length >= 0.2 || letters / ns.length <= 0.6) return false;
+    return FUNC_RE.test(t) || /[가-힣]/.test(t);
+  };
+  const prose = seq.map((l) => isProseLine((l.text || "").trim()));
+  const head = seq.map((l) => FIG_HEADING_RE.test((l.text || "").trim()));
+  // 밴드 정지(본문 경계) 라인:
+  //  - 헤딩: 단독이라도 정지(섹션 헤딩·제목은 짧고 고립돼도 본문이므로 보존).
+  //  - 산문: 인접(<ADJ_GAP)한 산문/헤딩 이웃이 있는 "연속 본문"일 때만 정지. 도표·표 사이에
+  //    낀 고립 산문 한 줄로는 정지하지 않아(이웃이 표 행) 도표 전체를 계속 제외한다.
+  const stops = seq.map((l, i) => {
+    if (head[i]) return true;
+    if (!prose[i]) return false;
+    const up =
+      i > 0 && seq[i].top - seq[i - 1].bot < ADJ_GAP && (prose[i - 1] || head[i - 1]);
+    const dn =
+      i < seq.length - 1 &&
+      seq[i + 1].top - seq[i].bot < ADJ_GAP &&
+      (prose[i + 1] || head[i + 1]);
+    return up || dn;
+  });
+
+  // 도표 콘텐츠 라인 = 비어있지 않은 비-산문(표 행·도표 라벨·축 숫자). 고립 산문(각주 사이
+  // 본문 한 줄·캡션 연속줄)은 콘텐츠로 치지 않는다 — 그래야 그림 아래로 본문이 이어지는
+  // 경우(초록이 그림을 감싸는 1페이지 등)에 그 본문을 도표로 오인해 제외하지 않는다.
+  const isContent = (i) => !stops[i] && (seq[i].text || "").trim() !== "" && !prose[i];
+
+  // 캡션 연속줄(다줄 캡션)로 건너뛸 산문 최대 줄수. 캡션 설명문은 길어야 3~4줄이고 본문 단락은
+  // 더 길어, 콘텐츠 없이 이만큼 넘게 산문이 이어지면 캡션이 아니라 본문으로 본다(본문 보호).
+  const MAX_CONT = 4;
+
+  // 한 방향 스캔: dir=-1(캡션 위) / +1(캡션 아래). 캡션 가장자리에서 maxBand 한도까지 가며
+  // 도표 콘텐츠가 끝나고 본문이 재개되는 지점까지를 밴드로 잡는다. content=도표 콘텐츠를 만났는지.
+  //  - 헤딩: 항상 정지(섹션 경계 = 본문).
+  //  - 콘텐츠를 본 뒤의 연속 본문(산문): 정지(본문 재개).
+  //  - 콘텐츠 전 산문: 캡션 연속줄로 보고 건너뛰되, MAX_CONT줄을 넘기면 본문으로 보고 정지
+  //    (그쪽에 표가 없다는 뜻 → content=false로 그 방향은 제외하지 않는다).
+  const scan = (dir) => {
+    const limit = dir < 0 ? Math.max(0, cap.top - maxBand) : Math.min(1, cap.bot + maxBand);
+    const idx = [];
+    for (let i = 0; i < seq.length; i++) {
+      if (dir < 0) {
+        if (seq[i].bot < cap.top + 1e-6 && seq[i].bot > limit - 1e-6) idx.push(i);
+      } else if (seq[i].top > cap.bot - 1e-6 && seq[i].top < limit + 1e-6) idx.push(i);
+    }
+    // 캡션에 가까운 라인부터.
+    idx.sort((a, b) => (dir < 0 ? seq[b].bot - seq[a].bot : seq[a].top - seq[b].top));
+    const edgeOf = (i) => (dir < 0 ? seq[i].bot : seq[i].top);
+    let edge = limit;
+    let content = false;
+    let proseRun = 0; // 콘텐츠 전 연속 산문 줄수(캡션 연속줄 추정).
+    for (const i of idx) {
+      if (head[i]) {
+        edge = edgeOf(i);
+        break;
+      }
+      if (isContent(i)) {
+        content = true;
+        proseRun = 0;
+        continue;
+      }
+      if (prose[i] || stops[i]) {
+        if (content) {
+          if (stops[i]) {
+            edge = edgeOf(i); // 콘텐츠 뒤 연속 본문 → 도표 끝.
+            break;
+          }
+          continue; // 콘텐츠 뒤 고립 산문(말단 라벨 등) → 건너뜀.
+        }
+        proseRun += 1;
+        if (proseRun > MAX_CONT) {
+          edge = edgeOf(i); // 콘텐츠 전 산문이 너무 길다 → 본문(캡션 연속줄 아님).
+          break;
+        }
+        continue; // 캡션 연속줄로 보고 건너뜀.
+      }
+      // 빈 줄 등 → 건너뜀.
+    }
+    return dir < 0 ? { lo: edge, hi: cap.top, content } : { lo: cap.bot, hi: edge, content };
+  };
+
+  const up = scan(-1);
+  // 그림은 캡션이 도표 아래라는 관례가 강해 위쪽만 본다(아래로 이어지는 본문 보호). 표는
+  // 캡션이 표 위/아래 어디든 올 수 있어 양방향 — 콘텐츠(표 행) 있는 쪽만 제외한다.
+  const dn = kind === "table" ? scan(1) : { lo: cap.bot, hi: cap.bot, content: false };
+  let lo;
+  let hi;
+  if (up.content && dn.content) {
+    lo = up.lo;
+    hi = dn.hi; // 캡션이 표 사이에 낀 경우(표 위·아래 모두 데이터): 양쪽 모두 제외.
+  } else if (up.content) {
+    lo = up.lo;
+    hi = cap.top;
+  } else if (dn.content) {
+    lo = cap.bot;
+    hi = dn.hi;
+  } else {
+    return { y: cap.top, h: 0 }; // 양쪽 다 본문(인라인 캡션 오탐·텍스트 없는 그림) → 제외 없음.
+  }
+  return { y: lo, h: Math.max(0, hi - lo) };
 }

@@ -2,6 +2,7 @@ import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
 import {
   carryAcrossPages,
   extractBody,
+  figureExclusionBand,
   mapBodyRange,
   parseCaptionLabel,
   scanReferenceActivation,
@@ -532,9 +533,13 @@ async function rawExtractBody(pageNum) {
     const pageW = vp.width;
     const styles = tc.styles || {};
     // Figure/Table 영역(정규화 0..1) 확보: 백엔드 정밀 bbox 우선, 없으면 휴리스틱 폴백.
+    // inFigure(번역 제외)에는 본문 보존형 textRegion을 쓴다(crop용 generous region과 분리).
+    // textRegion이 없으면(도표 콘텐츠 없음) 그 앵커는 제외에서 빠진다 — 인접 본문 과잉제거 방지.
     let regions = pageFigureAnchors[pageNum - 1];
     if (!regions) regions = await detectFigureAnchors(pageNum);
-    const figRegions = (regions || []).map((a) => a.region).filter(Boolean);
+    const figRegions = (regions || [])
+      .map((a) => (a.textRegion !== undefined ? a.textRegion : a.region))
+      .filter((r) => r && r.h > 0.001);
     const inAnyRegion = (cx, cy) =>
       figRegions.some(
         (r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h,
@@ -605,6 +610,47 @@ function clamp01(v) {
   return Math.max(0, Math.min(1, v));
 }
 
+// 페이지 text item을 hasEOL 기준 라인으로 묶어 정규화 박스를 만든다(figureExclusionBand 입력).
+// 각 라인: { top, bot, x0, x1, text } (정규화 0..1, top<bot). detectFigureAnchors와 동일 그룹.
+function buildPageLines(items, pageW, pageH) {
+  const lines = [];
+  let cur = [];
+  const flush = () => {
+    if (cur.length === 0) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let top = Infinity;
+    let bot = -Infinity;
+    for (const it of cur) {
+      const x = it.transform[4];
+      const y = it.transform[5];
+      const w = it.width || 0;
+      const h = it.height || Math.hypot(it.transform[2], it.transform[3]) || 0;
+      if (x < minX) minX = x;
+      if (x + w > maxX) maxX = x + w;
+      const t = (pageH - (y + h)) / pageH;
+      const b = (pageH - y) / pageH;
+      if (t < top) top = t;
+      if (b > bot) bot = b;
+    }
+    lines.push({
+      top: clamp01(top),
+      bot: clamp01(bot),
+      x0: clamp01(minX / pageW),
+      x1: clamp01(maxX / pageW),
+      text: cur.map((x) => x.str).join(""),
+    });
+    cur = [];
+  };
+  for (const it of items) {
+    if (typeof it.str !== "string") continue;
+    cur.push(it);
+    if (it.hasEOL) flush();
+  }
+  flush();
+  return lines;
+}
+
 async function detectFigureAnchors(pageNum) {
   const page = pageObjects[pageNum - 1];
   if (!page) return [];
@@ -618,6 +664,9 @@ async function detectFigureAnchors(pageNum) {
   const pageW = vp.width;
   const pageH = vp.height;
   if (pageW <= 0 || pageH <= 0) return [];
+
+  // 본문 보존형 textRegion(inFigure 제외 전용) 계산에 쓸 페이지 전체 라인.
+  const pageLines = buildPageLines(tc.items, pageW, pageH);
 
   const anchors = [];
   let cur = [];
@@ -671,11 +720,21 @@ async function detectFigureAnchors(pageNum) {
       rh = capTop - ry;
     }
     if (rh <= 0.03) return;
+    // crop region(비전 설명 입력)은 generous 0.42 밴드 그대로. inFigure(번역 제외)용 textRegion은
+    // 캡션 인접 본문·헤딩·제목을 보존하도록 도표 콘텐츠 구간만으로 좁힌다(두 용도 분리).
+    const band = figureExclusionBand(
+      pageLines,
+      { top: capTop, bot: capBot },
+      { x0: rx, x1: rx + rw },
+      label.kind,
+    );
+    const textRegion = band.h > 0.001 ? { x: rx, y: band.y, w: rw, h: band.h } : null;
     anchors.push({
       kind: label.kind,
       label: label.label,
       captionText: text.slice(0, 400),
       region: { x: rx, y: ry, w: rw, h: rh },
+      textRegion,
       btn: { left: clamp01(minX / pageW), top: capTop },
     });
   };
@@ -709,13 +768,17 @@ function cropRegion(pageNum, region) {
 }
 
 // 백엔드 figure(정규화 top-left bbox) → 내부 anchor 형식(휴리스틱과 동일 region/btn).
+// 백엔드 bbox는 정밀하므로 inFigure(번역 제외)에도 그대로 쓴다(textRegion = region) — 휴리스틱
+// 0.42 밴드를 대체. crop과 제외가 같은 정밀 영역이라 본문 과잉제거 위험이 없다.
 function backendToAnchor(f) {
   const b = f.bbox || {};
+  const region = { x: b.x || 0, y: b.y || 0, w: b.w || 0, h: b.h || 0 };
   return {
     kind: f.kind,
     label: f.label || "",
     captionText: f.captionText || "",
-    region: { x: b.x || 0, y: b.y || 0, w: b.w || 0, h: b.h || 0 },
+    region,
+    textRegion: region,
     btn: { left: clamp01(b.x || 0), top: clamp01(b.y || 0) },
   };
 }

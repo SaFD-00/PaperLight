@@ -4,6 +4,7 @@ import {
   type BodyItem,
   carryAcrossPages,
   extractBody,
+  figureExclusionBand,
   mapBodyRange,
   parseCaptionLabel,
   scanReferenceActivation,
@@ -652,5 +653,134 @@ describe("cross-page 문장 carry-over", () => {
     expect(segments).toHaveLength(1); // 미완 'head two cut' segment 제외
     const s = segments[0];
     expect(text.slice(s.bodyStart, s.bodyEnd)).toBe("head one.");
+  });
+});
+
+describe("figureExclusionBand — 본문 보존형 도표 제외 밴드", () => {
+  // 정규화 라인 박스. 기본 컬럼 전폭.
+  function ln(top: number, bot: number, text: string, x0 = 0.05, x1 = 0.95) {
+    return { top, bot, x0, x1, text };
+  }
+  // 길고 글자 위주·구두점 있는 본문 산문(isProse=true). 인덱스로 약간 변형.
+  function prose(n: number) {
+    return `This is a sufficiently long body sentence number ${n}, used to exercise prose detection here.`;
+  }
+  const FULL = { x0: 0.02, x1: 0.98 };
+  const inBand = (b: { y: number; h: number }, y: number) => y >= b.y && y <= b.y + b.h;
+
+  it("그림: 캡션 위 도표 라벨은 제외, 위쪽 본문 단락은 보존", () => {
+    const lines = [
+      ln(0.3, 0.32, prose(1)),
+      ln(0.33, 0.35, prose(2)),
+      ln(0.36, 0.38, prose(3)), // 본문 단락(연속 산문)
+      ln(0.55, 0.56, "0.2 0.4 0.6"), // 축 라벨(비산문)
+      ln(0.6, 0.61, "Accuracy"), // 라벨(짧음)
+      ln(0.7, 0.72, "Figure 1: caption text here"),
+    ];
+    const band = figureExclusionBand(lines, { top: 0.7, bot: 0.72 }, FULL, "figure");
+    expect(inBand(band, 0.555)).toBe(true); // 라벨 제외
+    expect(inBand(band, 0.605)).toBe(true);
+    expect(inBand(band, 0.34)).toBe(false); // 본문 보존
+    expect(band.y).toBeGreaterThan(0.37); // 본문 단락 아래에서 시작
+  });
+
+  it("그림: 텍스트 없는 이미지 + 캡션 아래로 이어지는 본문 → 제외 없음(아래 본문 보존)", () => {
+    // DeepSeekMath 1페이지: 초록이 Figure를 감싸며 캡션 아래로 이어진다.
+    const lines = [
+      ln(0.3, 0.32, prose(1)),
+      ln(0.33, 0.35, prose(2)),
+      ln(0.36, 0.38, prose(3)), // 위 본문(연속)
+      // 0.38~0.55 그림 이미지(텍스트 없음)
+      ln(0.55, 0.57, "Figure 1: Top1 accuracy of open-source models"),
+      ln(0.6, 0.62, prose(4)), // 캡션 아래로 이어지는 본문(고립처럼 보이나 본문)
+      ln(0.66, 0.68, "* Core contributors."),
+    ];
+    const band = figureExclusionBand(lines, { top: 0.55, bot: 0.57 }, FULL, "figure");
+    expect(band.h).toBeLessThan(0.02); // 위쪽에 도표 텍스트 없음 → 제외 없음
+    expect(inBand(band, 0.61)).toBe(false); // 아래 본문 보존
+  });
+
+  it("표: 캡션 아래 표 행 제외, 위/아래 본문 보존", () => {
+    const lines = [
+      ln(0.2, 0.22, prose(1)),
+      ln(0.24, 0.26, prose(2)), // 위 본문(연속)
+      ln(0.3, 0.32, "Table 1: results"),
+      ln(0.34, 0.35, "Method Acc Time"), // 헤더(짧음)
+      ln(0.37, 0.38, "A 1.2 3.4 5.6"), // 숫자 행
+      ln(0.4, 0.41, "B 7.8 9.0 1.2"),
+      ln(0.5, 0.52, prose(3)),
+      ln(0.53, 0.55, prose(4)), // 아래 본문(연속)
+    ];
+    const band = figureExclusionBand(lines, { top: 0.3, bot: 0.32 }, FULL, "table");
+    expect(inBand(band, 0.375)).toBe(true); // 표 행 제외
+    expect(inBand(band, 0.25)).toBe(false); // 위 본문 보존
+    expect(inBand(band, 0.54)).toBe(false); // 아래 본문 보존
+  });
+
+  it("표: 캡션이 표 아래에 오는 양식(데이터가 캡션 위) 대응", () => {
+    const lines = [
+      ln(0.2, 0.21, "Method Acc Time"), // 표 헤더(위)
+      ln(0.23, 0.24, "A 1.2 3.4 5.6"),
+      ln(0.26, 0.27, "B 7.8 9.0 1.2"), // 표 데이터(비산문)
+      ln(0.3, 0.32, "Table 2: results below caption"),
+      ln(0.36, 0.38, prose(1)),
+      ln(0.39, 0.41, prose(2)), // 아래 본문(연속)
+    ];
+    const band = figureExclusionBand(lines, { top: 0.3, bot: 0.32 }, FULL, "table");
+    expect(inBand(band, 0.235)).toBe(true); // 위쪽 표 데이터 제외
+    expect(inBand(band, 0.4)).toBe(false); // 아래 본문 보존
+  });
+
+  it("인라인 'Figure N shows ...' 오탐 캡션: 양쪽이 본문 → 제외 없음", () => {
+    const lines = [
+      ln(0.3, 0.32, prose(1)),
+      ln(0.33, 0.35, prose(2)),
+      ln(0.36, 0.38, "Figure 8 shows that a larger sampling number consistently improves accuracy."),
+      ln(0.39, 0.41, prose(3)),
+      ln(0.42, 0.44, prose(4)), // 위·아래 모두 연속 본문
+    ];
+    const band = figureExclusionBand(lines, { top: 0.36, bot: 0.38 }, FULL, "figure");
+    expect(band.h).toBeLessThan(0.02); // 도표 콘텐츠 없음 → 제외 없음
+  });
+
+  it("표 사이에 낀 고립 산문 한 줄로는 밴드가 멈추지 않는다", () => {
+    const lines = [
+      ln(0.2, 0.22, "Table 3: caption"),
+      ln(0.24, 0.25, "X 1 2 3"), // 표 행
+      ln(0.27, 0.28, prose(1)), // 고립 산문(이웃이 표 행) → 정지 아님
+      ln(0.3, 0.31, "Y 4 5 6"),
+      ln(0.33, 0.34, "Z 7 8 9"), // 표 행 계속
+      ln(0.4, 0.42, prose(2)),
+      ln(0.43, 0.45, prose(3)), // 연속 본문 → 여기서 정지
+    ];
+    const band = figureExclusionBand(lines, { top: 0.2, bot: 0.22 }, FULL, "table");
+    expect(inBand(band, 0.275)).toBe(true); // 고립 산문도 표 영역으로 제외
+    expect(inBand(band, 0.41)).toBe(false); // 연속 본문에서 정지(보존)
+  });
+
+  it("섹션 헤딩은 단독이라도 정지선 → 도표 위 헤딩 보존", () => {
+    const lines = [
+      ln(0.2, 0.3, prose(1)), // 본문 단락
+      ln(0.33, 0.35, "4.1 Setup"), // 섹션 헤딩(짧음·고립)
+      ln(0.4, 0.41, "0.2 0.4 0.6"), // 그림 라벨
+      ln(0.45, 0.46, "legend a"),
+      ln(0.55, 0.57, "Figure 2: caption"),
+    ];
+    const band = figureExclusionBand(lines, { top: 0.55, bot: 0.57 }, FULL, "figure");
+    expect(inBand(band, 0.34)).toBe(false); // 헤딩 보존
+    expect(inBand(band, 0.405)).toBe(true); // 그림 라벨 제외
+  });
+
+  it("컬럼 분리: 반대 컬럼 본문은 경계로 쓰지 않는다", () => {
+    const col = { x0: 0.02, x1: 0.47 }; // 좌측 컬럼
+    const lines = [
+      ln(0.2, 0.21, "0.2 0.4 0.6", 0.05, 0.45), // 좌 컬럼 그림 라벨
+      ln(0.25, 0.26, "legend", 0.05, 0.45),
+      ln(0.2, 0.4, prose(1), 0.55, 0.95), // 우 컬럼 본문(무관)
+      ln(0.3, 0.32, "Figure 3: left col caption", 0.05, 0.45),
+    ];
+    const band = figureExclusionBand(lines, { top: 0.3, bot: 0.32 }, col, "figure");
+    expect(inBand(band, 0.205)).toBe(true); // 좌 컬럼 라벨 제외
+    expect(band.h).toBeGreaterThan(0.05);
   });
 });

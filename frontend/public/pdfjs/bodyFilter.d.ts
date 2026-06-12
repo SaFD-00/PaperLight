@@ -69,3 +69,25 @@ export const CAPTION_RE: RegExp;
 export function parseCaptionLabel(
   text: string,
 ): { kind: "figure" | "table"; label: string } | null;
+
+/** figureExclusionBand 입력 라인 박스(정규화 0..1, top<bot). */
+export interface FigureLine {
+  top: number;
+  bot: number;
+  x0: number;
+  x1: number;
+  text: string;
+}
+
+/**
+ * 캡션 기준 "본문 보존형" Figure/Table 제외 밴드(inFigure 번역 제외 전용, crop용 region과 분리).
+ * 고정 0.42 밴드 대신 도표 콘텐츠(표 행·라벨) 구간만 반환해 인접 본문·섹션 헤딩·제목을 보존한다.
+ * 양쪽 다 본문이면(인라인 캡션 오탐·텍스트 없는 그림) h=0(제외 없음).
+ */
+export function figureExclusionBand(
+  lines: FigureLine[],
+  cap: { top: number; bot: number },
+  col: { x0: number; x1: number },
+  kind: "figure" | "table",
+  opts?: { maxBand?: number; minBodyLen?: number },
+): { y: number; h: number };
