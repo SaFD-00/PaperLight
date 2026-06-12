@@ -240,6 +240,17 @@ describe("parseCaptionLabel", () => {
     expect(parseCaptionLabel("표 2: 정확도")).toEqual({ kind: "table", label: "표 2" });
   });
 
+  it("parses Supplementary/Extended Data 접두 캡션(부록 양식)", () => {
+    expect(parseCaptionLabel("Supplementary Figure 2: Structural Novelty")).toEqual({
+      kind: "figure",
+      label: "Figure 2",
+    });
+    expect(parseCaptionLabel("Extended Data Table 3 shows the breakdown")).toEqual({
+      kind: "table",
+      label: "Table 3",
+    });
+  });
+
   it("returns null for non-captions", () => {
     expect(parseCaptionLabel("A normal body sentence.")).toBeNull();
     expect(parseCaptionLabel("Figure caption without a number")).toBeNull();
@@ -379,6 +390,40 @@ describe("scanReferenceActivation", () => {
       page([["[1] This looks like a citation but no References heading preceded it yet.", { fontHeight: 10 }]]),
     ];
     expect(scanReferenceActivation(pages)).toEqual([false, false]);
+  });
+
+  it("이니셜-성(Z. Du) author-year 양식의 연속 refs 페이지 활성", () => {
+    const pages = [
+      page([["Ordinary body content of the paper that fills a normal page here.", { fontHeight: 10 }]]),
+      page([["References", { fontHeight: 12, normTop: 0.1 }]]),
+      page([
+        ["Z. Du, Y. Qian, X. Liu, M. Ding. A cited paper. In Proceedings, 2024.", { fontHeight: 10 }],
+        ["A. Lewkowycz, A. Andreassen, D. Dohan. Another cited work, 2022.", { fontHeight: 10 }],
+      ]),
+      page([["This appendix prose should be translated and kept as body text.", { fontHeight: 10 }]]),
+    ];
+    expect(scanReferenceActivation(pages)).toEqual([false, false, true, false]);
+  });
+
+  it("번호식(74. Yang) 양식의 연속 refs 페이지 활성", () => {
+    const pages = [
+      page([["Ordinary body content on a normal page of this paper goes here now.", { fontHeight: 10 }]]),
+      page([["References", { fontHeight: 12, normTop: 0.1 }]]),
+      page([
+        ["74. Yang, C., Wang, X. Large Language Models as Optimizers. ICLR 2024.", { fontHeight: 10 }],
+        ["75. Song, X., Tian, Y. Another referenced paper here, 2023.", { fontHeight: 10 }],
+      ]),
+    ];
+    expect(scanReferenceActivation(pages)).toEqual([false, false, true]);
+  });
+
+  it("References 헤딩 직후 첫 페이지는 서지 신호가 약해도 강제 refs(justEntered)", () => {
+    const pages = [
+      page([["Body content that occupies a full normal page of the document here.", { fontHeight: 10 }]]),
+      page([["References", { fontHeight: 12, normTop: 0.1 }]]),
+      page([["Sparse first reference page with weak signals following the heading.", { fontHeight: 10 }]]),
+    ];
+    expect(scanReferenceActivation(pages)[2]).toBe(true);
   });
 });
 

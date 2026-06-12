@@ -5,9 +5,11 @@
 // 핵심 불변식: 입력 items[].str 의 연결 순서 = text-layer.textContent offset 공간.
 // drop된 item은 bodyText 에서 빠지되, keep된 item의 globalStart 는 보존된다.
 
-// 캡션 머리말(라벨 번호 포함). 영문 + 한국어(그림/표) 모두 매칭. .test(불리언)와
-// parseCaptionLabel(.exec)에서 공유한다.
-export const CAPTION_RE = /^(figure|fig\.?|table|algorithm|listing|그림|표)\s*(\d+)/i;
+// 캡션 머리말(라벨 번호 포함). 영문 + 한국어(그림/표) 모두 매칭. "Supplementary/Extended
+// Data/Appendix" 접두(부록 캡션 양식)는 non-capturing으로 허용해 그룹 인덱스를 유지한다.
+// .test(불리언)와 parseCaptionLabel(.exec)에서 공유한다.
+export const CAPTION_RE =
+  /^(?:(?:supplementary|supp\.?|extended\s+data|appendix)\s+)?(figure|fig\.?|table|algorithm|listing|그림|표)\s*(\d+)/i;
 // References/Bibliography/Acknowledgments 섹션 헤딩(단독 라인). 선택적 섹션 번호·로마숫자
 // 접두('7 References', 'VII. References')를 허용하되 $ 앵커로 단독 헤딩만 잡아 본문 중
 // 'references' 언급 오탐을 막는다. 이 라인 이후(같은 페이지)는 비본문으로 간주(refReached).
@@ -19,11 +21,11 @@ const CHECKLIST_HEADING_RE =
 // References 뒤 본문(Appendix/Supplementary) 재개 헤딩 — 같은 페이지 안에서 refReached 해제용.
 // arXiv 관행(References 뒤 Appendix는 번역 유지)을 보존한다.
 const RESUME_HEADING_RE = /^(?:appendix|appendices|supplement(?:ary)?(?:\s+materials?)?)\b/i;
-// 서지(참고문헌) 라인 시그니처. 번호 항목([N])과 author-year(저자 이니셜) 양식을 모두 커버:
-// 번호 머리·"Luo, D." 류 저자 이니셜·arXiv·"et al"·"In Proceedings". 실측상 References 페이지는
-// 이 신호 비율 0.48~0.70, 본문/Appendix는 0.00~0.04로 분리돼 임계 0.3에 큰 마진이 있다.
+// 서지(참고문헌) 라인 시그니처. 다양한 학회 양식을 커버한다:
+// 번호 항목([N])·"Luo, D."(성,이니셜)·"Z. Du"/"A. B. Smith"(이니셜,성)·arXiv·"et al"·
+// "In Proceedings". 실측상 References 페이지는 이 신호 비율이 본문/Appendix보다 크게 높다.
 const BIB_LINE_RE =
-  /(?:^\[\d{1,3}\]|^[A-Z][A-Za-z'`-]+,\s+[A-Z]\.|\barxiv[:\s]|\bet al\b|\bin proceedings\b)/i;
+  /(?:^\[\d{1,3}\]|^\d{1,3}\.\s+[A-Z][a-z]|^[A-Z][A-Za-z'`-]+,\s+[A-Z]\.|^[A-Z]\.(?:[\s-][A-Z]\.)*\s+[A-Z][a-z]|\barxiv[:\s]|\bet al\b|\bin proceedings\b)/i;
 const NUMERIC_LINE_RE = /^[\d.,()[\]{}%±+\-–—\s/:;=*]+$/;
 // pdf.js styles 의 fontFamily 에 흔히 나타나는 수식 폰트군.
 const MATH_FONT_RE = /(cmmi|cmsy|cmex|msam|msbm|stixmath|mathjax|cmr|eufm|rsfs)/i;
@@ -312,8 +314,10 @@ function hasHeading(lines, modal, re) {
 }
 
 // 페이지 라인 중 서지 시그니처 비율이 임계 이상이면 참(연속 References 페이지 판정).
-// 본문(Appendix)은 0.04 이하라 0.3 임계로 안전 분리(보수적: 마진 큼 → 본문 오삭제 회피).
-const BIB_PAGE_RATIO = 0.3;
+// References 헤딩 이후(refs 모드)에서만 호출하므로 본문 인용 페이지와 섞이지 않는다. 학회
+// 양식별 편차가 커(번호식 0.5~0.7, 이니셜식 0.15~0.5) 임계를 0.15로 두되, 헤딩 직후 첫
+// 페이지는 강제 refs로 보장해 양식 무관하게 첫 연속 페이지를 놓치지 않는다(아래 scan 참조).
+const BIB_PAGE_RATIO = 0.15;
 function isBibliographyPage(lines) {
   let total = 0;
   let bib = 0;
@@ -339,6 +343,7 @@ function isBibliographyPage(lines) {
 export function scanReferenceActivation(pagesItems) {
   const out = [];
   let mode = "body"; // "body" | "refs" | "tail"
+  let justEntered = false; // References 헤딩 직후 첫 페이지인가(양식 무관 강제 refs).
   for (const items of pagesItems) {
     if (mode === "tail") {
       out.push(true); // Checklist 이후: 전 페이지 비본문.
@@ -349,14 +354,19 @@ export function scanReferenceActivation(pagesItems) {
     if (mode === "body") {
       out.push(false);
       if (hasHeading(lines, modal, CHECKLIST_HEADING_RE)) mode = "tail";
-      else if (hasHeading(lines, modal, REF_HEADING_RE)) mode = "refs";
+      else if (hasHeading(lines, modal, REF_HEADING_RE)) {
+        mode = "refs";
+        justEntered = true;
+      }
     } else {
-      // refs: 헤딩 다음 페이지들. 서지 과반이면 비본문 유지, 아니면 본문 재개.
+      // refs: 헤딩 다음 페이지들. 헤딩 직후 첫 페이지는 강제로, 이후는 서지 시그니처가
+      // 임계 이상인 동안 비본문 유지. 산문(Appendix)으로 떨어지면 본문 재개.
       if (hasHeading(lines, modal, CHECKLIST_HEADING_RE)) {
         out.push(false);
         mode = "tail";
-      } else if (isBibliographyPage(lines)) {
+      } else if (justEntered || isBibliographyPage(lines)) {
         out.push(true);
+        justEntered = false;
       } else {
         out.push(false);
         mode = "body";
