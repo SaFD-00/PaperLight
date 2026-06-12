@@ -50,6 +50,10 @@ function furnitureKey(text) {
  * item 들을 hasEOL 기준으로 라인 단위로 묶는다.
  * 각 라인: { items, text, globalStart, globalEnd, medianHeight, normTop, mathRatio }
  */
+// hasEOL이 누락돼 헤더/캡션이 본문과 한 라인으로 join될 때, 세로 위치(normTop) 점프가
+// 이 값보다 크면 강제로 라인을 분리한다(줄 간격 ~0.013, 헤더→본문 점프 ~0.029 기준).
+const LINE_BREAK_GAP = 0.022;
+
 function groupLines(items) {
   const lines = [];
   let cur = [];
@@ -87,6 +91,11 @@ function groupLines(items) {
   for (const it of items) {
     const globalStart = cursor;
     cursor += it.str.length;
+    // hasEOL 누락으로 헤더/캡션이 본문과 한 라인에 묶이는 경우, 세로 위치 점프로 분리한다.
+    // offset 불변식은 유지된다(cursor는 분리와 무관하게 입력 순서대로 전진).
+    if (cur.length > 0 && Math.abs(it.normTop - cur[cur.length - 1].normTop) > LINE_BREAK_GAP) {
+      flush();
+    }
     cur.push({ ...it, globalStart, globalEnd: cursor });
     if (it.hasEOL) flush();
   }

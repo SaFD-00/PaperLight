@@ -427,3 +427,45 @@ describe("러닝 헤더/푸터(furniture)", () => {
     expect(bodyText).toContain("Renderable Code Generation");
   });
 });
+
+describe("groupLines normTop 라인 분리 (hasEOL 누락 join 교정)", () => {
+  const HEADER = "A GUI World Model via Renderable Code Generation";
+
+  it("hasEOL 누락으로 헤더가 본문과 join돼도 줄높이 점프로 분리 → 헤더만 furniture drop", () => {
+    const furniture = scanRunningFurniture(
+      Array.from({ length: 5 }, () => [item(HEADER, { normTop: 0.06 })]),
+    );
+    const items = [
+      // pdf.js가 헤더 끝 EOL을 누락해 본문과 한 item-run으로 묶인 상황(normTop 점프).
+      item(HEADER, { normTop: 0.06, hasEOL: false }),
+      item("This is the genuine body sentence that should be translated here.", {
+        normTop: 0.13,
+      }),
+    ];
+    const { bodyText } = extractBody(items, { furniture });
+    expect(bodyText).not.toContain("Renderable Code Generation");
+    expect(bodyText).toContain("genuine body sentence");
+  });
+
+  it("figure 캡션이 본문과 join돼도 줄높이 점프로 분리 → 캡션만 drop", () => {
+    const items = [
+      item("Some body text right before the figure caption on the same run.", {
+        normTop: 0.5,
+        hasEOL: false,
+      }),
+      item("Figure 3: A caption describing the figure in detail.", { normTop: 0.56 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("Some body text right before");
+    expect(bodyText).not.toContain("Figure 3");
+  });
+
+  it("줄높이가 비슷하면 같은 라인 유지(과분리 방지)", () => {
+    const items = [
+      item("first part ", { normTop: 0.5, hasEOL: false }),
+      item("second part of the same line.", { normTop: 0.505 }), // 0.005 < 임계
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("first part second part of the same line.");
+  });
+});
