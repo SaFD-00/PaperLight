@@ -1,5 +1,6 @@
 import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
 import {
+  carryAcrossPages,
   extractBody,
   mapBodyRange,
   parseCaptionLabel,
@@ -21,6 +22,7 @@ let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
 let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
+let pageRawBodies = []; // 페이지별 raw 추출 산물 캐시(cross-page carry 전), 1회 계산.
 let docFiltersPromise = null; // 문서 수준 필터(References/Checklist 구간 + 러닝 furniture), 1회 계산.
 let pageFigureAnchors = []; // 페이지별 [{ kind, label, captionText, region }] (Figure/Table 설명 앵커).
 let translationCols = []; // 페이지별 번역 컬럼 element.
@@ -511,7 +513,8 @@ async function computeDocFilters() {
 
 // 페이지 본문만 추출(Figure 캡션·표·수식·페이지번호 제거) + body↔원문 offset 매핑.
 // 가정: items[].str 연결 == text-layer.textContent. 어긋나면 필터 없이 전체 텍스트로 폴백.
-async function extractBodyText(pageNum) {
+// fallback=true: 추출 실패(mismatch/no page)로 fullText를 그대로 쓴 경우(cross-page carry 제외).
+async function rawExtractBody(pageNum) {
   const wrapper = pageWrappers[pageNum - 1];
   const layer = wrapper ? wrapper.querySelector(".text-layer") : null;
   const fullText = layer ? layer.textContent || "" : "";
@@ -519,11 +522,11 @@ async function extractBodyText(pageNum) {
     { bodyStart: 0, bodyEnd: fullText.length, globalStart: 0, globalEnd: fullText.length },
   ];
   const page = pageObjects[pageNum - 1];
-  if (!page) return { text: fullText, segments: identity };
+  if (!page) return { text: fullText, segments: identity, fallback: true };
   try {
     const tc = await page.getTextContent();
     const joined = tc.items.map((it) => it.str).join("");
-    if (joined !== fullText) return { text: fullText, segments: identity };
+    if (joined !== fullText) return { text: fullText, segments: identity, fallback: true };
     const vp = page.getViewport({ scale: 1 });
     const pageH = vp.height;
     const pageW = vp.width;
@@ -561,14 +564,38 @@ async function extractBodyText(pageNum) {
     });
     if (!bodyText) {
       // 비공백 입력이 의도적으로 전부 drop됐으면(References/Checklist·전면 Figure 페이지)
-      // 빈 본문을 보낸다(host에서 splitSentences=0 → no-op). 추출 실패만 fullText 폴백.
-      if (allDropped) return { text: "", segments: [] };
-      return { text: fullText, segments: identity };
+      // 빈 본문(host에서 splitSentences=0 → no-op). 추출 실패만 fullText 폴백.
+      if (allDropped) return { text: "", segments: [], fallback: false };
+      return { text: fullText, segments: identity, fallback: true };
     }
-    return { text: bodyText, segments };
+    return { text: bodyText, segments, fallback: false };
   } catch (_) {
-    return { text: fullText, segments: identity };
+    return { text: fullText, segments: identity, fallback: true };
   }
+}
+
+async function getRawBody(pageNum) {
+  if (pageRawBodies[pageNum - 1]) return pageRawBodies[pageNum - 1];
+  const result = await rawExtractBody(pageNum);
+  pageRawBodies[pageNum - 1] = result;
+  return result;
+}
+
+// cross-page: 페이지 끝에서 끊긴 문장은 그 페이지에서 제외하고, 다음 페이지 본문 앞에 이전
+// 페이지의 미완 꼬리를 붙여 완성 문장으로 해석한다(carryAcrossPages 순수 함수). 폴백·빈 페이지는
+// 미적용. 이전 페이지 raw가 필요하므로 getRawBody(memoized)로 1페이지 뒤만 추가 계산한다.
+async function extractBodyText(pageNum) {
+  const raw = await getRawBody(pageNum);
+  if (raw.fallback || raw.text === "") {
+    return { text: raw.text, segments: raw.segments };
+  }
+  let prevText = "";
+  if (pageNum > 1) {
+    const prev = await getRawBody(pageNum - 1);
+    if (!prev.fallback) prevText = prev.text;
+  }
+  const isLast = !!currentDoc && pageNum >= currentDoc.numPages;
+  return carryAcrossPages(prevText, raw, isLast);
 }
 
 // ── Figure/Table 인라인 설명 앵커 ───────────────────────────────────────────────
@@ -952,6 +979,7 @@ async function loadPdf(url) {
   pageWrappers = [];
   pageObjects = [];
   pageSegments = [];
+  pageRawBodies = [];
   docFiltersPromise = null;
   pageFigureAnchors = [];
   translationCols = [];

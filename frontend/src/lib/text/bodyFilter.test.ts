@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 // viewer.js 와 동일한 순수 모듈(런타임/테스트 단일 소스).
 import {
   type BodyItem,
+  carryAcrossPages,
   extractBody,
   mapBodyRange,
   parseCaptionLabel,
   scanReferenceActivation,
   scanRunningFurniture,
+  trailingIncomplete,
 } from "../../../public/pdfjs/bodyFilter.js";
 
 function item(str: string, opts: Partial<BodyItem> = {}): BodyItem {
@@ -589,5 +591,66 @@ describe("비본문 라인(의사코드·소속·스탬프·수식번호)", () =
     ];
     const { bodyText } = extractBody(items);
     expect(bodyText).toContain("consistent with the trend");
+  });
+});
+
+describe("cross-page 문장 carry-over", () => {
+  it("trailingIncomplete: 마지막 종결 이후를 미완 꼬리로 분리", () => {
+    expect(trailingIncomplete("First sentence. Second one is cut")).toEqual({
+      headLen: 15,
+      tail: "Second one is cut",
+    });
+    expect(trailingIncomplete("All complete here.")).toEqual({ headLen: 18, tail: "" });
+    expect(trailingIncomplete("No ender at all here")).toEqual({
+      headLen: 0,
+      tail: "No ender at all here",
+    });
+  });
+
+  it("페이지 끝 미완 문장을 제외하고 다음 페이지 앞에 붙여 완성", () => {
+    const prevText = "Complete sentence here. The model predicts the next";
+    const raw = {
+      text: "state accurately. New body sentence follows here.",
+      segments: [{ bodyStart: 0, bodyEnd: 49, globalStart: 100, globalEnd: 149 }],
+    };
+    const { text, segments } = carryAcrossPages(prevText, raw, false);
+    expect(text.startsWith("The model predicts the next state accurately.")).toBe(true);
+    expect(text).toContain("New body sentence follows here.");
+    expect(segments[0].bodyStart).toBe("The model predicts the next ".length);
+  });
+
+  it("이전 페이지 미완 꼬리(prevTail)는 segment가 없어 교차 하이라이트 비활성", () => {
+    const prevText = "Body. trailing cut";
+    const raw = {
+      text: "end. Next.",
+      segments: [{ bodyStart: 0, bodyEnd: 10, globalStart: 0, globalEnd: 10 }],
+    };
+    const { segments } = carryAcrossPages(prevText, raw, false);
+    expect(mapBodyRange(segments, 0, 5)).toBeNull(); // prevTail 영역
+  });
+
+  it("마지막 페이지는 자기 끝 문장(미완)도 유지", () => {
+    const raw = {
+      text: "Last page sentence without ending punctuation",
+      segments: [{ bodyStart: 0, bodyEnd: 45, globalStart: 0, globalEnd: 45 }],
+    };
+    const { text } = carryAcrossPages("", raw, true);
+    expect(text).toBe("Last page sentence without ending punctuation");
+  });
+
+  it("offset 불변식: head segment의 body↔global 대응 유지(미완 꼬리 제외)", () => {
+    const prevText = "Done. carry over";
+    const raw = {
+      text: "head one. head two cut",
+      segments: [
+        { bodyStart: 0, bodyEnd: 9, globalStart: 50, globalEnd: 59 },
+        { bodyStart: 9, bodyEnd: 22, globalStart: 59, globalEnd: 72 },
+      ],
+    };
+    const { text, segments } = carryAcrossPages(prevText, raw, false);
+    expect(text).toBe("carry over head one.");
+    expect(segments).toHaveLength(1); // 미완 'head two cut' segment 제외
+    const s = segments[0];
+    expect(text.slice(s.bodyStart, s.bodyEnd)).toBe("head one.");
   });
 });

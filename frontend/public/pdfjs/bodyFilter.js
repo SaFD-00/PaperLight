@@ -404,6 +404,50 @@ export function scanRunningFurniture(pagesItems, minRepeat = 3) {
   return furniture;
 }
 
+// 문장 종결(. ! ?) 위치 이후를 '미완 꼬리'로 분리. 페이지 끝에서 다음 페이지로 이어지는 문장 처리.
+// headLen: 마지막 종결까지 길이(미완 제외). tail: 종결 이후 미완 조각(trim). 종결이 없으면 전체가 미완.
+export function trailingIncomplete(text) {
+  const re = /[.!?]["')\]]?(?=\s|$)/g;
+  let last = -1;
+  let m;
+  while ((m = re.exec(text))) last = m.index + m[0].length;
+  if (last < 0) return { headLen: 0, tail: text.trim() };
+  return { headLen: last, tail: text.slice(last).trim() };
+}
+
+/**
+ * cross-page: 페이지 끝에서 끊긴 문장을 그 페이지 번역에서 제외하고, 다음 페이지 본문 앞에
+ * 이전 페이지의 미완 꼬리(prevText 기준)를 붙여 완성된 문장으로 해석한다.
+ * prevTail은 이전 페이지 원문이라 현재 페이지 segments에 매핑이 없어, 그 첫(이어진) 문장만
+ * 교차 하이라이트가 비활성된다(나머지 문장은 정상). offset 불변식은 head 구간 segment의
+ * bodyStart/bodyEnd를 prevTail 길이만큼 평행이동해 보존한다.
+ * @param {string} prevText 이전 페이지 raw 본문(없으면 "").
+ * @param {{ text: string, segments: import("./bodyFilter").BodySegment[] }} raw 현재 페이지 raw.
+ * @param {boolean} isLast 마지막 페이지면 자기 끝 문장도 유지(이어질 다음 페이지 없음).
+ * @returns {{ text: string, segments: import("./bodyFilter").BodySegment[] }}
+ */
+export function carryAcrossPages(prevText, raw, isLast) {
+  let prevTail = "";
+  if (prevText) {
+    const t = trailingIncomplete(prevText);
+    if (t.tail) prevTail = `${t.tail} `;
+  }
+  const headLen = isLast ? raw.text.length : trailingIncomplete(raw.text).headLen;
+  const offset = prevTail.length;
+  const segments = [];
+  for (const s of raw.segments) {
+    if (s.bodyStart >= headLen) continue; // 미완 꼬리(다음 페이지로 carry)는 제외.
+    const bEnd = Math.min(s.bodyEnd, headLen);
+    segments.push({
+      bodyStart: s.bodyStart + offset,
+      bodyEnd: bEnd + offset,
+      globalStart: s.globalStart,
+      globalEnd: s.globalEnd - (s.bodyEnd - bEnd),
+    });
+  }
+  return { text: prevTail + raw.text.slice(0, headLen), segments };
+}
+
 /**
  * body 공간 [bodyStart, bodyEnd) → 원문(text-layer) 전역 offset 으로 매핑.
  * @param {import("./bodyFilter").BodySegment[]} segments

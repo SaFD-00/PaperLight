@@ -43,6 +43,19 @@ export function scanReferenceActivation(pagesItems: BodyItem[][]): boolean[];
  */
 export function scanRunningFurniture(pagesItems: BodyItem[][], minRepeat?: number): Set<string>;
 
+/** 문장 종결 이후 미완 꼬리를 분리(페이지 경계 문장 처리). */
+export function trailingIncomplete(text: string): { headLen: number; tail: string };
+
+/**
+ * cross-page: 페이지 끝 미완 문장을 제외하고 이전 페이지 미완 꼬리를 앞에 붙여 완성 문장으로.
+ * 이어진 첫 문장은 segments 매핑이 없어 교차 하이라이트만 비활성(나머지 정상).
+ */
+export function carryAcrossPages(
+  prevText: string,
+  raw: { text: string; segments: BodySegment[] },
+  isLast: boolean,
+): { text: string; segments: BodySegment[] };
+
 export function mapBodyRange(
   segments: BodySegment[],
   bodyStart: number,
