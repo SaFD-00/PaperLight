@@ -23,11 +23,19 @@ export interface BodySegment {
 
 export function extractBody(
   items: BodyItem[],
-  opts?: { firstPage?: boolean },
+  opts?: { firstPage?: boolean; refActiveAtStart?: boolean },
 ): {
   bodyText: string;
   segments: BodySegment[];
+  /** 비공백 입력이 전부 drop됨(의도적 empty). viewer가 fullText 폴백과 구분한다. */
+  allDropped: boolean;
 };
+
+/**
+ * 문서 전체(페이지별 BodyItem)를 순서대로 훑어 페이지별 refActiveAtStart를 산출.
+ * References가 여러 페이지에 걸치는 경우와 말미 Checklist 보일러플레이트를 문서 수준으로 제외.
+ */
+export function scanReferenceActivation(pagesItems: BodyItem[][]): boolean[];
 
 export function mapBodyRange(
   segments: BodySegment[],

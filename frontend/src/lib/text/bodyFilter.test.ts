@@ -5,6 +5,7 @@ import {
   extractBody,
   mapBodyRange,
   parseCaptionLabel,
+  scanReferenceActivation,
 } from "../../../public/pdfjs/bodyFilter.js";
 
 function item(str: string, opts: Partial<BodyItem> = {}): BodyItem {
@@ -266,5 +267,116 @@ describe("mapBodyRange", () => {
   it("returns null for out-of-range", () => {
     const { segments } = extractBody([item("Hello world body text.")]);
     expect(mapBodyRange(segments, 9999, 10000)).toBeNull();
+  });
+});
+
+describe("extractBody — 문서 수준 References/Checklist", () => {
+  it("refActiveAtStart면 헤딩 없는 연속 참고문헌 페이지를 전부 drop + allDropped 신호", () => {
+    const items = [
+      item("[16] Some Author, Another Author. A paper title. In Proceedings of ICML, 2024.", {
+        fontHeight: 10,
+      }),
+      item("[17] Third Author. Another work here. arXiv preprint arXiv:2401.00001, 2024.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText, allDropped } = extractBody(items, { refActiveAtStart: true });
+    expect(bodyText).toBe("");
+    expect(allDropped).toBe(true);
+  });
+
+  it("refActiveAtStart 페이지에서 Appendix 헤딩을 만나면 본문이 재개됨(arXiv 관행)", () => {
+    const items = [
+      item("[9] Last Author. Final reference entry. In Proceedings, 2024.", { fontHeight: 10 }),
+      item("Appendix", { fontHeight: 12 }), // 재개 헤딩(헤딩 폰트)
+      item("This appendix body sentence must be translated and kept intact here.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items, { refActiveAtStart: true });
+    expect(bodyText).not.toContain("Last Author");
+    expect(bodyText).toContain("This appendix body sentence");
+  });
+
+  it("Checklist 헤딩 이후를 비본문으로 제거", () => {
+    const items = [
+      item("This is the final body paragraph before the boilerplate checklist here.", {
+        fontHeight: 10,
+      }),
+      item("NeurIPS Paper Checklist", { fontHeight: 12 }), // 헤딩 → 이후 drop
+      item("1. Claims Question: Do the main claims reflect the contributions and scope?", {
+        fontHeight: 10,
+      }),
+      item("Answer: [Yes] Justification: We claim the contributions in the introduction.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("final body paragraph");
+    expect(bodyText).not.toContain("Checklist");
+    expect(bodyText).not.toContain("Justification");
+  });
+
+  it("번호 붙은 References 헤딩('7 References')도 인식해 이후 제거", () => {
+    const items = [
+      item("Body sentence that establishes the modal font on this page right here.", {
+        fontHeight: 10,
+      }),
+      item("7 References", { fontHeight: 12 }),
+      item("[1] A. Author. A cited work. arXiv preprint arXiv:2401.1, 2024.", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("Body sentence");
+    expect(bodyText).not.toContain("Author");
+  });
+
+  it("전면 Figure 페이지(전부 inFigure)도 allDropped로 표시", () => {
+    const items = [
+      item("Origin State", { inFigure: true, fontHeight: 7 }),
+      item("Code2World Next State", { inFigure: true, fontHeight: 7 }),
+    ];
+    const { bodyText, allDropped } = extractBody(items);
+    expect(bodyText).toBe("");
+    expect(allDropped).toBe(true);
+  });
+});
+
+describe("scanReferenceActivation", () => {
+  function page(strs: Array<[string, Partial<BodyItem>?]>): BodyItem[] {
+    return strs.map(([s, o]) => item(s, o));
+  }
+
+  it("References 헤딩 다음 연속 서지 페이지만 활성, Appendix에서 해제", () => {
+    const pages = [
+      page([["Ordinary content body text that fills a normal reading page here.", { fontHeight: 10 }]]),
+      page([["References", { fontHeight: 12, normTop: 0.1 }]]), // 헤딩 페이지
+      page([
+        ["[1] Some Author, Other Author. A title. In Proceedings of ICML, 2024.", { fontHeight: 10 }],
+        ["[2] Third Author. Another work. arXiv preprint arXiv:2401.00001, 2024.", { fontHeight: 10 }],
+      ]),
+      page([
+        ["[3] Fourth Author. Yet another paper title. In Proceedings of NeurIPS, 2023.", { fontHeight: 10 }],
+      ]),
+      page([["This appendix paragraph is ordinary prose that should be translated.", { fontHeight: 10 }]]),
+    ];
+    expect(scanReferenceActivation(pages)).toEqual([false, false, true, true, false]);
+  });
+
+  it("Checklist 헤딩 이후 모든 페이지를 활성(끝까지)", () => {
+    const pages = [
+      page([["Regular body content that occupies a normal page of the paper here.", { fontHeight: 10 }]]),
+      page([["NeurIPS Paper Checklist", { fontHeight: 12, normTop: 0.1 }]]),
+      page([["1. Claims Question: Do the claims reflect the scope of the paper here?", { fontHeight: 10 }]]),
+      page([["Answer: [Yes] Justification: The contributions are stated in the intro.", { fontHeight: 10 }]]),
+    ];
+    expect(scanReferenceActivation(pages)).toEqual([false, false, true, true]);
+  });
+
+  it("References 헤딩이 없으면 어떤 페이지도 비본문으로 묶지 않음(보수적)", () => {
+    const pages = [
+      page([["First body page of the document with plenty of ordinary prose here.", { fontHeight: 10 }]]),
+      page([["[1] This looks like a citation but no References heading preceded it yet.", { fontHeight: 10 }]]),
+    ];
+    expect(scanReferenceActivation(pages)).toEqual([false, false]);
   });
 });

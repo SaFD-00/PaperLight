@@ -1,5 +1,10 @@
 import * as pdfjsLib from "/pdfjs/pdf.min.mjs";
-import { extractBody, mapBodyRange, parseCaptionLabel } from "/pdfjs/bodyFilter.js";
+import {
+  extractBody,
+  mapBodyRange,
+  parseCaptionLabel,
+  scanReferenceActivation,
+} from "/pdfjs/bodyFilter.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
 
@@ -15,6 +20,7 @@ let currentScale = 1.25;
 let pageWrappers = [];
 let pageObjects = [];
 let pageSegments = []; // 페이지별 body↔원문 offset 매핑(REQUEST_PAGE_TEXT 시 채움).
+let refActivationPromise = null; // 문서 수준 References/Checklist 구간 판정(페이지별 boolean), 1회 계산.
 let pageFigureAnchors = []; // 페이지별 [{ kind, label, captionText, region }] (Figure/Table 설명 앵커).
 let translationCols = []; // 페이지별 번역 컬럼 element.
 let translationSentences = []; // 페이지별 [{ i, el, globalStart, globalEnd }] (교차 하이라이트용).
@@ -452,6 +458,53 @@ function clearTranslationActive() {
   }
 }
 
+// 문서 수준 References/Checklist 구간을 한 번 계산(페이지별 refActiveAtStart). 모든 페이지의
+// 텍스트(figRegion 불필요)를 순서대로 훑어 scanReferenceActivation에 넘긴다. 페이지가 lazy·임의
+// 순서로 요청돼도 동일 결과를 보장하도록 memoize하고 loadPdf에서 초기화한다.
+async function getRefActivation() {
+  if (!refActivationPromise) refActivationPromise = computeRefActivation();
+  return refActivationPromise;
+}
+
+async function computeRefActivation() {
+  if (!currentDoc) return [];
+  const pagesItems = [];
+  for (let i = 0; i < pageObjects.length; i++) {
+    const page = pageObjects[i];
+    if (!page) {
+      pagesItems.push([]);
+      continue;
+    }
+    try {
+      const tc = await page.getTextContent();
+      const vp = page.getViewport({ scale: 1 });
+      const pageH = vp.height;
+      const styles = tc.styles || {};
+      pagesItems.push(
+        tc.items.map((it) => {
+          const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
+          const y = it.transform[5];
+          return {
+            str: it.str,
+            hasEOL: !!it.hasEOL,
+            fontHeight: h,
+            normTop: pageH > 0 ? (pageH - y) / pageH : 0,
+            fontFamily: (styles[it.fontName] && styles[it.fontName].fontFamily) || "",
+            inFigure: false,
+          };
+        }),
+      );
+    } catch (_) {
+      pagesItems.push([]);
+    }
+  }
+  try {
+    return scanReferenceActivation(pagesItems);
+  } catch (_) {
+    return [];
+  }
+}
+
 // 페이지 본문만 추출(Figure 캡션·표·수식·페이지번호 제거) + body↔원문 offset 매핑.
 // 가정: items[].str 연결 == text-layer.textContent. 어긋나면 필터 없이 전체 텍스트로 폴백.
 async function extractBodyText(pageNum) {
@@ -495,8 +548,18 @@ async function extractBodyText(pageNum) {
         inFigure: figRegions.length > 0 && inAnyRegion(cx, cy),
       };
     });
-    const { bodyText, segments } = extractBody(items, { firstPage: pageNum === 1 });
-    if (!bodyText) return { text: fullText, segments: identity }; // 전부 drop되면 폴백.
+    const activation = await getRefActivation();
+    const refActiveAtStart = !!activation[pageNum - 1];
+    const { bodyText, segments, allDropped } = extractBody(items, {
+      firstPage: pageNum === 1,
+      refActiveAtStart,
+    });
+    if (!bodyText) {
+      // 비공백 입력이 의도적으로 전부 drop됐으면(References/Checklist·전면 Figure 페이지)
+      // 빈 본문을 보낸다(host에서 splitSentences=0 → no-op). 추출 실패만 fullText 폴백.
+      if (allDropped) return { text: "", segments: [] };
+      return { text: fullText, segments: identity };
+    }
     return { text: bodyText, segments };
   } catch (_) {
     return { text: fullText, segments: identity };
@@ -884,6 +947,7 @@ async function loadPdf(url) {
   pageWrappers = [];
   pageObjects = [];
   pageSegments = [];
+  refActivationPromise = null;
   pageFigureAnchors = [];
   translationCols = [];
   translationSentences = [];

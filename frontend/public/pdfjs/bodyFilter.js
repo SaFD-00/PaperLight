@@ -8,7 +8,22 @@
 // 캡션 머리말(라벨 번호 포함). 영문 + 한국어(그림/표) 모두 매칭. .test(불리언)와
 // parseCaptionLabel(.exec)에서 공유한다.
 export const CAPTION_RE = /^(figure|fig\.?|table|algorithm|listing|그림|표)\s*(\d+)/i;
-const REF_HEADING_RE = /^(references|bibliography|acknowledg(e?ments)?)\b/i;
+// References/Bibliography/Acknowledgments 섹션 헤딩(단독 라인). 선택적 섹션 번호·로마숫자
+// 접두('7 References', 'VII. References')를 허용하되 $ 앵커로 단독 헤딩만 잡아 본문 중
+// 'references' 언급 오탐을 막는다. 이 라인 이후(같은 페이지)는 비본문으로 간주(refReached).
+const REF_HEADING_RE =
+  /^(?:(?:\d{1,2}|[ivxlc]{1,5})[.)\s]+)?(references|bibliography|acknowledg(?:e?ments)?)\s*$/i;
+// 학회 부록 보일러플레이트(문서 말미, Appendix 뒤). 양식 문구라 번역 가치가 없어 끝까지 제외.
+const CHECKLIST_HEADING_RE =
+  /^(?:neur\s*ips|neural information processing systems)?\s*paper\s+checklist\s*$/i;
+// References 뒤 본문(Appendix/Supplementary) 재개 헤딩 — 같은 페이지 안에서 refReached 해제용.
+// arXiv 관행(References 뒤 Appendix는 번역 유지)을 보존한다.
+const RESUME_HEADING_RE = /^(?:appendix|appendices|supplement(?:ary)?(?:\s+materials?)?)\b/i;
+// 서지(참고문헌) 라인 시그니처. 번호 항목([N])과 author-year(저자 이니셜) 양식을 모두 커버:
+// 번호 머리·"Luo, D." 류 저자 이니셜·arXiv·"et al"·"In Proceedings". 실측상 References 페이지는
+// 이 신호 비율 0.48~0.70, 본문/Appendix는 0.00~0.04로 분리돼 임계 0.3에 큰 마진이 있다.
+const BIB_LINE_RE =
+  /(?:^\[\d{1,3}\]|^[A-Z][A-Za-z'`-]+,\s+[A-Z]\.|\barxiv[:\s]|\bet al\b|\bin proceedings\b)/i;
 const NUMERIC_LINE_RE = /^[\d.,()[\]{}%±+\-–—\s/:;=*]+$/;
 // pdf.js styles 의 fontFamily 에 흔히 나타나는 수식 폰트군.
 const MATH_FONT_RE = /(cmmi|cmsy|cmex|msam|msbm|stixmath|mathjax|cmr|eufm|rsfs)/i;
@@ -92,13 +107,15 @@ function modalHeight(items) {
 
 /**
  * @param {import("./bodyFilter").BodyItem[]} items
- * @param {{ firstPage?: boolean }} [opts]
- * @returns {{ bodyText: string, segments: import("./bodyFilter").BodySegment[] }}
+ * @param {{ firstPage?: boolean, refActiveAtStart?: boolean }} [opts]
+ * @returns {{ bodyText: string, segments: import("./bodyFilter").BodySegment[], allDropped: boolean }}
  */
 export function extractBody(items, opts = {}) {
   const lines = groupLines(items);
   const modal = modalHeight(items);
-  let refReached = false;
+  // 문서 수준 스캔(scanReferenceActivation)이 이 페이지를 References/Checklist 구간으로
+  // 판정하면 첫 라인부터 비본문으로 시작한다(헤딩이 이전 페이지에 있는 연속 페이지 대응).
+  let refReached = !!opts.refActiveAtStart;
   // 작은 폰트 캡션 직후 같은 소형 폰트로 이어지는 멀티라인 캡션을 본문 재개 전까지 제거.
   let captionMode = false;
 
@@ -143,35 +160,46 @@ export function extractBody(items, opts = {}) {
 
     let drop = false;
     if (refReached) {
-      drop = true;
-    } else if (trimmed === "") {
-      drop = true;
-    } else if (EMAIL_RE.test(trimmed)) {
-      drop = true; // 저자 이메일 라인.
-    } else if (ARXIV_ID_RE.test(trimmed)) {
-      drop = true; // arXiv 세로 식별자/스탬프.
-    } else if (line.inFigure) {
-      drop = true; // Figure/Table 영역 내부 텍스트(다이어그램 라벨·표 셀).
-    } else if (CAPTION_RE.test(trimmed)) {
-      drop = true;
-      // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).
-      if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.9) {
-        captionMode = true;
+      // References/Checklist 구간 — 단, Appendix 등 본문 재개 헤딩(헤딩 폰트)에서 해제해
+      // arXiv 관행(References 뒤 Appendix 번역 유지)을 보존한다.
+      const resume =
+        RESUME_HEADING_RE.test(trimmed) &&
+        len < 24 &&
+        modal > 0 &&
+        line.medianHeight >= modal * 0.95;
+      if (resume) refReached = false; // 재개: 이 헤딩 라인부터 일반 규칙으로 평가.
+      else drop = true;
+    }
+    if (!drop && !refReached) {
+      if (trimmed === "") {
+        drop = true;
+      } else if (EMAIL_RE.test(trimmed)) {
+        drop = true; // 저자 이메일 라인.
+      } else if (ARXIV_ID_RE.test(trimmed)) {
+        drop = true; // arXiv 세로 식별자/스탬프.
+      } else if (line.inFigure) {
+        drop = true; // Figure/Table 영역 내부 텍스트(다이어그램 라벨·표 셀).
+      } else if (CAPTION_RE.test(trimmed)) {
+        drop = true;
+        // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).
+        if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.9) {
+          captionMode = true;
+        }
+      } else if (REF_HEADING_RE.test(trimmed) || CHECKLIST_HEADING_RE.test(trimmed)) {
+        // 단독 References/Bibliography/Checklist 헤딩 이후 본문 제거.
+        refReached = true;
+        drop = true;
+      } else if (NUMERIC_LINE_RE.test(trimmed)) {
+        drop = true; // 표 셀·수치 라인.
+      } else if (len < 3) {
+        drop = true; // 단독 짧은 토큰.
+      } else if (line.mathRatio > 0.6 && len < 40) {
+        drop = true; // 수식 라인(인라인 수식 보호 위해 짧은 라인만).
+      } else if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.78 && len < 40) {
+        drop = true; // 작은 폰트 + 짧은 라인(Figure 라벨·각주·위첨자).
+      } else if ((line.normTop < 0.06 || line.normTop > 0.94) && len < 24) {
+        drop = true; // 페이지 헤더/푸터/페이지 번호.
       }
-    } else if (REF_HEADING_RE.test(trimmed) && len < 24) {
-      // 단독 References/Bibliography 헤딩 이후 본문 제거.
-      refReached = true;
-      drop = true;
-    } else if (NUMERIC_LINE_RE.test(trimmed)) {
-      drop = true; // 표 셀·수치 라인.
-    } else if (len < 3) {
-      drop = true; // 단독 짧은 토큰.
-    } else if (line.mathRatio > 0.6 && len < 40) {
-      drop = true; // 수식 라인(인라인 수식 보호 위해 짧은 라인만).
-    } else if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.78 && len < 40) {
-      drop = true; // 작은 폰트 + 짧은 라인(Figure 라벨·각주·위첨자).
-    } else if ((line.normTop < 0.06 || line.normTop > 0.94) && len < 24) {
-      drop = true; // 페이지 헤더/푸터/페이지 번호.
     }
 
     if (drop) continue;
@@ -194,7 +222,78 @@ export function extractBody(items, opts = {}) {
     }
   }
 
-  return { bodyText, segments };
+  // 비공백 입력이 전부 drop되면(References/Checklist 전용·전면 Figure 페이지) 의도적 empty.
+  // viewer.js가 이 신호로 '추출 실패'(fullText 폴백)와 구분한다.
+  const allDropped = bodyText === "" && lines.some((l) => l.text.trim() !== "");
+  return { bodyText, segments, allDropped };
+}
+
+/**
+ * 페이지 라인 중 References/Bibliography/Acknowledgments 단독 헤딩(헤딩 폰트)이 있는가.
+ * @param {ReturnType<typeof groupLines>} lines
+ * @param {number} modal
+ * @param {RegExp} re
+ */
+function hasHeading(lines, modal, re) {
+  return lines.some((l) => {
+    const t = l.text.trim();
+    return re.test(t) && nonSpaceLen(t) < 28 && (modal === 0 || l.medianHeight >= modal * 0.95);
+  });
+}
+
+// 페이지 라인 중 서지 시그니처 비율이 임계 이상이면 참(연속 References 페이지 판정).
+// 본문(Appendix)은 0.04 이하라 0.3 임계로 안전 분리(보수적: 마진 큼 → 본문 오삭제 회피).
+const BIB_PAGE_RATIO = 0.3;
+function isBibliographyPage(lines) {
+  let total = 0;
+  let bib = 0;
+  for (const l of lines) {
+    const t = l.text.trim();
+    if (!t) continue;
+    total++;
+    if (BIB_LINE_RE.test(t)) bib++;
+  }
+  return total > 0 && bib / total >= BIB_PAGE_RATIO;
+}
+
+/**
+ * 문서 전체를 페이지 순서로 훑어 각 페이지의 refActiveAtStart(boolean)를 산출한다.
+ * extractBody가 페이지 단위 stateless라 References가 여러 페이지에 걸치면 헤딩 다음
+ * 페이지의 참고문헌 전체가 통과하던 문제를 문서 수준에서 해결한다(임의 순서 요청과 무관하게
+ * 결정적). References 헤딩 이후 '서지 시그니처가 과반인 연속 페이지'만 비본문으로 묶고,
+ * Appendix 등 본문이 재개되면(서지 시그니처 소멸) 자동 해제한다(보수적: 본문 오삭제 회피).
+ * Checklist 헤딩 이후는 문서 말미 보일러플레이트라 끝까지 비본문으로 본다.
+ * @param {import("./bodyFilter").BodyItem[][]} pagesItems 페이지별 BodyItem 배열(inFigure 불필요).
+ * @returns {boolean[]} 페이지별 refActiveAtStart.
+ */
+export function scanReferenceActivation(pagesItems) {
+  const out = [];
+  let mode = "body"; // "body" | "refs" | "tail"
+  for (const items of pagesItems) {
+    if (mode === "tail") {
+      out.push(true); // Checklist 이후: 전 페이지 비본문.
+      continue;
+    }
+    const lines = groupLines(items);
+    const modal = modalHeight(items);
+    if (mode === "body") {
+      out.push(false);
+      if (hasHeading(lines, modal, CHECKLIST_HEADING_RE)) mode = "tail";
+      else if (hasHeading(lines, modal, REF_HEADING_RE)) mode = "refs";
+    } else {
+      // refs: 헤딩 다음 페이지들. 서지 과반이면 비본문 유지, 아니면 본문 재개.
+      if (hasHeading(lines, modal, CHECKLIST_HEADING_RE)) {
+        out.push(false);
+        mode = "tail";
+      } else if (isBibliographyPage(lines)) {
+        out.push(true);
+      } else {
+        out.push(false);
+        mode = "body";
+      }
+    }
+  }
+  return out;
 }
 
 /**
