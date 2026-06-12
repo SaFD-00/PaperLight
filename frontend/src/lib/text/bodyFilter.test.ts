@@ -469,3 +469,80 @@ describe("groupLines normTop 라인 분리 (hasEOL 누락 join 교정)", () => {
     expect(bodyText).toContain("first part second part of the same line.");
   });
 });
+
+describe("비본문 라인(의사코드·소속·스탬프·수식번호)", () => {
+  it("Algorithm 캡션 이후 의사코드 블록(번호 스텝·Require/Ensure)을 제거하고 본문 재개", () => {
+    const items = [
+      item("Algorithm 1 Automated Data Synthesis with Visual Feedback Revision", { fontHeight: 10 }),
+      item("Require: Raw GUI dataset and a multimodal coder model here.", { fontHeight: 10 }),
+      item("Ensure: High-fidelity corpus of paired samples.", { fontHeight: 10 }),
+      item("1: Dsyn ← ∅", { fontHeight: 10 }),
+      item("2: for all items in the dataset do the synthesis loop", { fontHeight: 10 }),
+      item("21: return Dsyn", { fontHeight: 10 }),
+      item("We now describe the training procedure for the coder in detail.", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).not.toContain("Algorithm 1");
+    expect(bodyText).not.toContain("Require:");
+    expect(bodyText).not.toContain("return Dsyn");
+    expect(bodyText).toContain("We now describe the training procedure");
+  });
+
+  it("의사코드처럼 보이는 본문('While we ...')은 algorithmMode 밖에서 보존", () => {
+    const items = [
+      item("While we found this approach effective, several limitations remain here.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("While we found this approach effective");
+  });
+
+  it("저자 소속/연락처 블록을 drop", () => {
+    const items = [
+      item("This sentence is genuine body content that must be translated here.", {
+        fontHeight: 10,
+      }),
+      item("*Equal contribution 1University of Example. Correspondence to: a@b.c", {
+        fontHeight: 9,
+      }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("genuine body content");
+    expect(bodyText).not.toContain("Equal contribution");
+  });
+
+  it("Preprint 스탬프를 drop", () => {
+    const items = [
+      item("Preprint. Under review.", { fontHeight: 10, normTop: 0.72 }),
+      item("Real body sentence on the page that should be kept intact here.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).not.toContain("Preprint");
+    expect(bodyText).toContain("Real body sentence");
+  });
+
+  it("수식번호로 끝나는 display 수식 라인을 drop(수학 기호 동반)", () => {
+    const items = [
+      item("Body sentence introducing the objective function below right here.", {
+        fontHeight: 10,
+      }),
+      item("LGRPO(θ) = Ex min(ρiAi, clip(ρi)) − βDKL(πθ ∥ πsft) (5)", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("Body sentence introducing");
+    expect(bodyText).not.toContain("(5)");
+  });
+
+  it("수식번호 패턴이지만 수학 기호가 없는 본문 인용은 보존", () => {
+    const items = [
+      item("This behaviour is consistent with the trend reported by prior work (5)", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("consistent with the trend");
+  });
+});

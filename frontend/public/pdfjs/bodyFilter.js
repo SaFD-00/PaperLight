@@ -33,6 +33,19 @@ const EMAIL_RE = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i;
 const ARXIV_ID_RE = /arxiv:\s*\d{4}\.\d{4,5}/i;
 // 1페이지 front-matter 밴드 종료 지점(초록 헤딩). firstPage 일 때만 사용.
 const ABSTRACT_RE = /^abstract\b/i;
+// 저자 소속/연락처 블록(ICML 등은 초록 뒤 각주형으로 와 front-matter 밴드를 벗어난다).
+const AFFILIATION_RE = /\b(?:equal contribution|corresponding author|correspondence to)\b/i;
+// 프리프린트/투고 스탬프(짧은 라인).
+const STAMP_RE = /^(?:preprint|under review|to appear|accepted at|published as|in submission)\b/i;
+// 의사코드 스텝 라인. Algorithm/Listing 캡션 이후 algorithmMode에서만 적용(본문 오삭제 방지).
+// 의사코드는 모든 줄이 'N:' 번호 또는 Require/Ensure/Input/Output로 시작한다.
+const PSEUDOCODE_RE = /^(?:\d{1,2}:\s|require\s*:|ensure\s*:|input\s*:|output\s*:)/i;
+// 수식번호로 끝나는 display 수식 라인(본문 문장은 '(4)'로 끝나지 않는다).
+const EQUATION_NUM_RE = /\(\d{1,3}\)\s*$/;
+// 수식 라인 보강 판정용 수학 기호/그리스 문자(수식번호 종결과 AND로만 사용).
+const MATH_SYMBOL_RE = /[=≤≥<>∥∑∏∫√≈≠←→∈∉⊂⊆∇∂α-ωΑ-Ω]|−/;
+// 위와 동일 문자집합의 global 버전(의사코드 wrap 줄 판정 시 기호 개수 카운트용, 중괄호 포함).
+const MATH_SYMBOL_GLOBAL_RE = /[=≤≥<>∥∑∏∫√≈≠←→∈∉⊂⊆∇∂α-ωΑ-Ω{}−]/g;
 
 function nonSpaceLen(s) {
   return s.replace(/\s/g, "").length;
@@ -135,6 +148,8 @@ export function extractBody(items, opts = {}) {
   let refReached = !!opts.refActiveAtStart;
   // 작은 폰트 캡션 직후 같은 소형 폰트로 이어지는 멀티라인 캡션을 본문 재개 전까지 제거.
   let captionMode = false;
+  // Algorithm/Listing 캡션 직후 의사코드 블록(번호 스텝·Require/Ensure)을 본문 재개 전까지 제거.
+  let algorithmMode = false;
 
   // 1페이지 front-matter 밴드: 초록 헤딩 이전 구간에서 제목(최대 폰트)만 남기고
   // 저자·소속·이메일·Project/Dataset/Model 링크·*Equal contribution 등을 제거한다.
@@ -175,6 +190,27 @@ export function extractBody(items, opts = {}) {
       else continue;
     }
 
+    // 의사코드 블록(Algorithm/Listing 캡션 이후): 번호 스텝·Require/Ensure·빈줄·수치 라인,
+    // 그리고 스텝이 wrap된 줄(수학 기호 2개+)을 본문 산문 복귀 전까지 제거. 본문 폰트라
+    // 작은폰트 규칙엔 안 걸리고, 산문(수학 기호 거의 없음) 라인을 만나면 해제한다.
+    if (algorithmMode && !refReached) {
+      const symbolCount = (trimmed.match(MATH_SYMBOL_GLOBAL_RE) || []).length;
+      // 다음 라인이 다시 의사코드 스텝이면 현재 라인은 스텝의 wrap(둘째 줄)로 보고 유지한다
+      // (예: 'Require:' 라인이 'SigLIP(·), Threshold τ ...'로 wrap된 경우).
+      const next = lines[idx + 1];
+      const nextPseudo = next != null && PSEUDOCODE_RE.test(next.text.trim());
+      if (
+        trimmed === "" ||
+        PSEUDOCODE_RE.test(trimmed) ||
+        NUMERIC_LINE_RE.test(trimmed) ||
+        symbolCount >= 2 ||
+        nextPseudo
+      ) {
+        continue;
+      }
+      algorithmMode = false; // 수학 기호 없는 산문 라인(+다음도 산문) → 본문 재개.
+    }
+
     let drop = false;
     if (refReached) {
       // References/Checklist 구간 — 단, Appendix 등 본문 재개 헤딩(헤딩 폰트)에서 해제해
@@ -198,14 +234,22 @@ export function extractBody(items, opts = {}) {
         drop = true; // Figure/Table 영역 내부 텍스트(다이어그램 라벨·표 셀).
       } else if (CAPTION_RE.test(trimmed)) {
         drop = true;
-        // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).
-        if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.9) {
+        if (/^(?:algorithm|listing)\b/i.test(trimmed)) {
+          algorithmMode = true; // 의사코드 블록 시작.
+        } else if (modal > 0 && line.medianHeight > 0 && line.medianHeight < modal * 0.9) {
+          // 캡션이 본문보다 작은 폰트면 연속 줄도 제거(멀티라인 캡션).
           captionMode = true;
         }
       } else if (REF_HEADING_RE.test(trimmed) || CHECKLIST_HEADING_RE.test(trimmed)) {
         // 단독 References/Bibliography/Checklist 헤딩 이후 본문 제거.
         refReached = true;
         drop = true;
+      } else if (AFFILIATION_RE.test(trimmed)) {
+        drop = true; // 저자 소속·연락처 블록(front-matter 밴드 밖에 오는 경우).
+      } else if (STAMP_RE.test(trimmed) && len < 40) {
+        drop = true; // Preprint/Under review 등 투고 스탬프.
+      } else if (EQUATION_NUM_RE.test(trimmed) && MATH_SYMBOL_RE.test(trimmed)) {
+        drop = true; // 수식번호로 끝나는 display 수식 라인(본문 문장은 '(N)'으로 끝나지 않음).
       } else if (NUMERIC_LINE_RE.test(trimmed)) {
         drop = true; // 표 셀·수치 라인.
       } else if (len < 3) {
