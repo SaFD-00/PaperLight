@@ -593,6 +593,42 @@ describe("비본문 라인(의사코드·소속·스탬프·수식번호)", () =
     const { bodyText } = extractBody(items);
     expect(bodyText).toContain("consistent with the trend");
   });
+
+  it("멀티라인 display 수식((N)으로 끝나지 않는 분자/분모 줄 포함)을 전부 drop", () => {
+    const items = [
+      item("We define the transfer gap with the following expression below here.", {
+        fontHeight: 10,
+      }),
+      item("Δ(k)=[P_T(k)−P_S(k)]/P_T(k)", { fontHeight: 10 }),
+      item("= [∑_{p∈Pk}(I[T(p)=y*p]−I[S(p)=y*p])]", { fontHeight: 10 }),
+      item("/[∑_{p∈Pk} I[T(p)=y*p]]  (2)", { fontHeight: 10 }),
+      item("where P_T(k) and P_S(k) represent the score of the teacher and student.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText, segments } = extractBody(items);
+    expect(bodyText).toContain("We define the transfer gap");
+    expect(bodyText).toContain("where P_T(k) and P_S(k) represent"); // 산문 보존(기능어 다수).
+    expect(bodyText).not.toContain("Δ(k)");
+    expect(bodyText).not.toContain("∑_{p∈Pk}");
+    expect(bodyText).not.toContain("(2)");
+    // offset 불변식: bodyText 조각 == 원문 전역 offset 조각.
+    const full = fullText(items);
+    for (const seg of segments) {
+      expect(bodyText.slice(seg.bodyStart, seg.bodyEnd)).toBe(
+        full.slice(seg.globalStart, seg.globalEnd),
+      );
+    }
+  });
+
+  it("인라인 수식이 든 본문 문장은 display 수식으로 오인하지 않는다", () => {
+    const items = [
+      item("The threshold τ = 0.5 controls how aggressively we prune the tree here.", {
+        fontHeight: 10,
+      }),
+    ];
+    expect(extractBody(items).bodyText).toContain("The threshold τ = 0.5 controls");
+  });
 });
 
 describe("cross-page 문장 carry-over", () => {
@@ -782,5 +818,94 @@ describe("figureExclusionBand — 본문 보존형 도표 제외 밴드", () => 
     const band = figureExclusionBand(lines, { top: 0.3, bot: 0.32 }, col, "figure");
     expect(inBand(band, 0.205)).toBe(true); // 좌 컬럼 라벨 제외
     expect(band.h).toBeGreaterThan(0.05);
+  });
+});
+
+describe("extractBody — 파싱 강화 (저자/소속/다국어 캡션)", () => {
+  it("초록 헤딩이 없는 1페이지에서도 제목 뒤 저자/소속 블록을 제거(Zotero 폰트 폴백)", () => {
+    const items = [
+      item("Diffusion World Models for Robotic Manipulation", { fontHeight: 17 }), // 제목
+      item("Jane Doe, John Smith, Wei Zhang", { fontHeight: 11 }), // 저자 → drop
+      item("Stanford University, Google DeepMind", { fontHeight: 9 }), // 소속 → drop
+      item("We present a new approach to learning world models from raw pixels.", {
+        fontHeight: 10,
+      }), // 본문 시작 → keep
+      item("Our method outperforms prior work across all benchmarks evaluated.", { fontHeight: 10 }),
+    ];
+    const { bodyText, segments } = extractBody(items, { firstPage: true });
+    expect(bodyText).toContain("Diffusion World Models for Robotic Manipulation");
+    expect(bodyText).toContain("We present a new approach");
+    expect(bodyText).not.toContain("Jane Doe");
+    expect(bodyText).not.toContain("Stanford University");
+    const full = fullText(items);
+    for (const seg of segments) {
+      expect(bodyText.slice(seg.bodyStart, seg.bodyEnd)).toBe(
+        full.slice(seg.globalStart, seg.globalEnd),
+      );
+    }
+  });
+
+  it("초록 뒤 각주형 소속(ICML 양식)을 제거하되 University가 든 본문 문장은 보존", () => {
+    const items = [
+      item("Scaling Laws for World Models", { fontHeight: 16 }), // 제목
+      item("Abstract", { fontHeight: 11 }), // 초록 헤딩 → keep
+      item("We study how world models scale with data and compute in this paper.", {
+        fontHeight: 10,
+      }), // 초록 본문 → keep
+      item("1 Massachusetts Institute of Technology 2 Google DeepMind", { fontHeight: 9 }), // 각주 소속 → drop
+      item("Department of Computer Science, ETH Zurich", { fontHeight: 9 }), // 소속 → drop
+      item("We evaluate at the University of Toronto cluster throughout this study.", {
+        fontHeight: 10,
+      }), // 본문(기능어+마침표) → keep
+    ];
+    const { bodyText } = extractBody(items, { firstPage: true });
+    expect(bodyText).toContain("We study how world models scale");
+    expect(bodyText).toContain("We evaluate at the University of Toronto");
+    expect(bodyText).not.toContain("Massachusetts Institute of Technology");
+    expect(bodyText).not.toContain("Department of Computer Science");
+  });
+
+  it("소속 어휘가 든 본문 페이지 문장은 제거하지 않는다(firstPage 아님)", () => {
+    const items = [
+      item("Massachusetts Institute of Technology", { fontHeight: 10 }), // firstPage 아님 → 유지
+      item("We collaborate with the Department of Energy on this benchmark suite.", {
+        fontHeight: 10,
+      }),
+    ];
+    const { bodyText } = extractBody(items, { firstPage: false });
+    expect(bodyText).toContain("Massachusetts Institute of Technology");
+    expect(bodyText).toContain("We collaborate with the Department of Energy");
+  });
+
+  it("중국어/일본어/Scheme 캡션을 본문에서 제거", () => {
+    const items = [
+      item("这是足够长的中文正文句子用来确定本页的模态字体大小。", { fontHeight: 10 }),
+      item("图 1: 模型架构概览。", { fontHeight: 8 }), // 중국어 그림 캡션 → drop
+      item("表 2: 各模型准确率对比。", { fontHeight: 8 }), // 중국어 표 캡션 → drop
+      item("Scheme 1: synthesis route of the catalyst.", { fontHeight: 8 }), // Scheme 캡션 → drop
+      item("这是另一段必须保留的中文正文句子内容。", { fontHeight: 10 }),
+    ];
+    const { bodyText } = extractBody(items);
+    expect(bodyText).toContain("这是足够长的中文正文句子");
+    expect(bodyText).toContain("这是另一段必须保留");
+    expect(bodyText).not.toContain("图 1");
+    expect(bodyText).not.toContain("表 2");
+    expect(bodyText).not.toContain("Scheme 1");
+  });
+});
+
+describe("parseCaptionLabel — 다국어/추가 머리말", () => {
+  it("중국어·일본어 머리말을 원형 유지하며 kind를 정규화", () => {
+    expect(parseCaptionLabel("图 1: 概览")).toEqual({ kind: "figure", label: "图 1" });
+    expect(parseCaptionLabel("表 2: 对比")).toEqual({ kind: "table", label: "表 2" });
+    expect(parseCaptionLabel("図 3: 構成")).toEqual({ kind: "figure", label: "図 3" });
+  });
+
+  it("Scheme/Chart/Exhibit 머리말을 figure로 매핑", () => {
+    expect(parseCaptionLabel("Scheme 1: reaction")).toEqual({ kind: "figure", label: "Scheme 1" });
+    expect(parseCaptionLabel("Chart 4 compares revenue")).toEqual({
+      kind: "figure",
+      label: "Chart 4",
+    });
   });
 });
