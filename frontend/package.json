@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "vendor:katex": "node scripts/vendor-katex.mjs"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
@@ -18,12 +19,10 @@
     ]
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.53.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "next": "^15.0.0",
     "pdfjs-dist": "4.10.38",
-    "posthog-js": "^1.374.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
@@ -33,6 +32,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.3.0",
+    "katex": "0.16.11",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

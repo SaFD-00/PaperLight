@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import AsyncIterator
 from typing import Any
@@ -13,14 +14,14 @@ from pydantic import BaseModel, model_validator
 
 from paperlight.agents.context import SUMMARY_PROMPT_VERSION
 from paperlight.api._sse import format_sse
-from paperlight.observability.context import paper_id_var
-from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import read_cached, stream_with_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
-TRANSLATE_PROMPT_VERSION = "translate-v2"  # v2: 논문 요약을 용어 일관성 참고로 주입
-ALIGNED_PROMPT_VERSION = "translate-aligned-v2"
+TRANSLATE_PROMPT_VERSION = "translate-v3"  # v3: 인라인 수식 LaTeX $...$ 래핑(KaTeX 렌더)
+ALIGNED_PROMPT_VERSION = "translate-aligned-v3"
 
 _TERMS_CAP = 800
 _TERMS_GUARD = (
@@ -31,9 +32,10 @@ _TERMS_GUARD = (
 SYSTEM_PROMPT = (
     "당신은 학술 논문 번역가입니다. "
     "주어진 텍스트를 자연스러운 한국어로 번역합니다. "
-    "수식·고유 명사·약어는 원문 그대로 유지하고, "
-    "문장 구조는 한국어 어순에 맞게 재배열합니다. "
-    "마크다운 포맷은 그대로 보존합니다."
+    "고유 명사·약어는 원문 그대로 유지하고, "
+    "인라인 수식·수학 기호는 잘 구성된 LaTeX `$...$`로 감싸며(예: $k_i$, $\\tau_{high}$) "
+    "수식 내부는 절대 번역하지 않습니다. "
+    "문장 구조는 한국어 어순에 맞게 재배열하고, 마크다운 포맷은 그대로 보존합니다."
 )
 
 ALIGNED_SYSTEM_PROMPT = (
@@ -41,7 +43,9 @@ ALIGNED_SYSTEM_PROMPT = (
     "입력은 번호가 매겨진 영어 문장 목록입니다. "
     "각 문장을 자연스러운 한국어로 번역하되, 한 줄에 하나씩 "
     "`<번호>\\t<번역>` 형식으로만 출력하세요. "
-    "번호와 문장 개수를 그대로 유지하고, 수식·고유 명사·약어는 원문을 보존합니다. "
+    "번호와 문장 개수를 그대로 유지하고, 고유 명사·약어는 원문을 보존합니다. "
+    "인라인 수식·수학 기호는 잘 구성된 LaTeX `$...$`로 감싸고(예: $k_i$, $\\tau_{high}$), "
+    "수식 내부는 절대 번역하지 마세요. "
     "추가 설명이나 머리말은 절대 쓰지 마세요."
 )
 
@@ -80,8 +84,6 @@ class TranslateRequest(BaseModel):
 
 
 async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIterator[str]:
-    if paper_id:
-        paper_id_var.set(paper_id)
     system = SYSTEM_PROMPT
     terms = await _terminology(paper_id)
     if terms:
@@ -103,7 +105,7 @@ async def _stream(text: str, target_lang: str, paper_id: str | None) -> AsyncIte
         ):
             yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
-        capture_exception(err)
+        logger.exception("translation stream failed")
         yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
@@ -123,8 +125,6 @@ async def _stream_aligned(
     sentences: list[str], target_lang: str, paper_id: str | None
 ) -> AsyncIterator[str]:
     """문장별 번역을 `{"pair": {"i", "tgt"}}` SSE로 증분 전송(원문은 프론트가 인덱스로 보유)."""
-    if paper_id:
-        paper_id_var.set(paper_id)
     numbered = "\n".join(f"{i + 1}\t{s}" for i, s in enumerate(sentences))
     # 용어 참고는 system 에만 — 번호 매긴 user 입력은 손대지 않아 1:1 문장 대응이 유지된다.
     system = ALIGNED_SYSTEM_PROMPT
@@ -159,7 +159,7 @@ async def _stream_aligned(
         if ev:
             yield format_sse(ev)
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
-        capture_exception(err)
+        logger.exception("translation stream failed")
         yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 

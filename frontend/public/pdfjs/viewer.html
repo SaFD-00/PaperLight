@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PaperLight PDF Viewer</title>
     <link rel="stylesheet" href="/pdfjs/viewer.css" />
+    <link rel="stylesheet" href="/pdfjs/vendor/katex/katex.min.css" />
   </head>
   <body>
     <div id="pages" aria-label="PDF 페이지" role="document"></div>
     <div id="empty" hidden>PDF 로드 중…</div>
+    <!-- 클래식 스크립트 → 파싱 시점 동기 실행. 지연되는 module viewer.js 보다 먼저
+         평가되어 window.katex(UMD 전역)가 번역 컬럼 수식 렌더 시점에 준비된다. -->
+    <script src="/pdfjs/vendor/katex/katex.min.js"></script>
     <script type="module" src="/pdfjs/viewer.js"></script>
   </body>
 </html>

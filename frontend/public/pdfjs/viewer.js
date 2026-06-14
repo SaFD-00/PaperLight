@@ -429,8 +429,44 @@ function renderTranslation(pageNum, pairs, replace) {
       el.addEventListener("mouseleave", () => clearLinkedOverlays());
       insertSentenceSpan(col, el, p.i);
     }
-    entry.el.textContent = (p.tgt || "") + " ";
+    renderTranslatedText(entry.el, (p.tgt || "") + " ");
   }
+}
+
+// 인라인 수식 구분자 — `$...$` 와 `\(...\)`. 통화 오탐 방지: `$` 바로 안쪽(여는 뒤·닫는 앞)에
+// 공백을 금지해 "$5 and $10 million" 류는 매칭하지 않는다. 한 라인 안에서만(개행 미포함).
+const INLINE_MATH_RE = /\$(?!\s)([^$\n]+?)(?<!\s)\$|\\\(([^]*?)\\\)/g;
+
+// 번역 문자열을 인라인 수식과 일반 텍스트로 쪼개 KaTeX 로 렌더. KaTeX 미주입(window.katex
+// 없음)·렌더 실패 시 해당 조각은 원문 평문 텍스트 노드로 폴백(graceful). 항상 el 을 먼저 비운다.
+// hover 강조는 el(span)에 바인딩돼 있어 내부 노드 교체와 무관.
+function renderTranslatedText(el, text) {
+  el.textContent = "";
+  const katex = (typeof window !== "undefined" && window.katex) || null;
+  if (!katex) {
+    el.textContent = text; // KaTeX 미주입 → 전체 평문(기존 동작과 동일).
+    return;
+  }
+  let last = 0;
+  let m;
+  INLINE_MATH_RE.lastIndex = 0;
+  while ((m = INLINE_MATH_RE.exec(text)) !== null) {
+    const tex = (m[1] != null ? m[1] : m[2]).trim();
+    if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+    last = m.index + m[0].length;
+    if (!tex) {
+      el.appendChild(document.createTextNode(m[0])); // 빈 수식 → 원문 그대로.
+      continue;
+    }
+    const span = document.createElement("span");
+    try {
+      katex.render(tex, span, { throwOnError: false, displayMode: false });
+      el.appendChild(span);
+    } catch {
+      el.appendChild(document.createTextNode(m[0])); // 렌더 실패 → 원문 평문 폴백.
+    }
+  }
+  if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
 }
 
 function clearTranslation(pageNum) {
