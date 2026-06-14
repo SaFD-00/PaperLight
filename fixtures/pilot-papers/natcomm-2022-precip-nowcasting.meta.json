@@ -1,0 +1,16 @@
+{
+  "slug": "natcomm-2022-precip-nowcasting",
+  "title": "Deep learning for twelve hour precipitation forecasts",
+  "authors": ["Espeholt, L.", "Agrawal, S.", "Sønderby, C.", "Kumar, M.", "Heek, J.", "Bromberg, C.", "Gazen, C.", "Carver, R.", "Andrychowicz, M.", "Hickey, J.", "Bell, A.", "Kalchbrenner, N."],
+  "venue": "Nature Communications 2022",
+  "year": 2022,
+  "arxiv_id": null,
+  "doi": "10.1038/s41467-022-32483-x",
+  "pages": 10,
+  "size_bytes": 2859685,
+  "sha256": "680584f984b6e332e29519d7c8e591bac55b43f45fc2986fb293b9800e2d401c",
+  "added_at": "2026-06-14",
+  "license": "CC-BY 4.0 (Creative Commons Attribution 4.0 International)",
+  "source_url": "https://www.nature.com/articles/s41467-022-32483-x.pdf",
+  "notes": "양식 다양성 #13 — Nature 계열 출판본(Nature Communications native 2단). arXiv 외에 커밋 가능한 유일 케이스(CC-BY 4.0). 출판사 native 양식이라 Methods 섹션·컬럼 가로지르는 figure·Nature 인용 양식 등 학회 preprint 와 다른 출판본 레이아웃을 검증한다."
+}

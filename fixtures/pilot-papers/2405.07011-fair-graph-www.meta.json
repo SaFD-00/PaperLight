@@ -1,0 +1,16 @@
+{
+  "slug": "2405.07011-fair-graph-www",
+  "title": "Fair Graph Representation Learning via Sensitive Attribute Disentanglement",
+  "authors": ["Zhu, Y.", "Li, J.", "Zheng, Z.", "Chen, L."],
+  "venue": "WWW 2024 (The ACM Web Conference)",
+  "year": 2024,
+  "arxiv_id": "2405.07011",
+  "doi": "10.1145/3589334.3645532",
+  "pages": 11,
+  "size_bytes": 1025010,
+  "sha256": "32ae94b0353842a5b601d90652df12c27546d84a35d1e0669fd7950e90225607",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "source_url": "https://arxiv.org/pdf/2405.07011",
+  "notes": "양식 다양성 #12 — ACM acmart 양식(2단). 1페이지에 'CCS CONCEPTS', 'ACM Reference Format:', 'Permission to make digital or hard copies ...' 공지, DOI/ISBN 블록이 한꺼번에 들어가는 메타 블록 밀집 양식이라, 이 비본문 블록을 본문으로 오인하지 않고 제외하는지 검증한다."
+}

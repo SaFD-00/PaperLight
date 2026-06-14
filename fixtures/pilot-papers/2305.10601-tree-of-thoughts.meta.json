@@ -1,0 +1,16 @@
+{
+  "slug": "2305.10601-tree-of-thoughts",
+  "title": "Tree of Thoughts: Deliberate Problem Solving with Large Language Models",
+  "authors": ["Yao, S.", "Yu, D.", "Zhao, J.", "Shafran, I.", "Griffiths, T. L.", "Cao, Y.", "Narasimhan, K."],
+  "venue": "NeurIPS 2023",
+  "year": 2023,
+  "arxiv_id": "2305.10601",
+  "doi": null,
+  "pages": 14,
+  "size_bytes": 799685,
+  "sha256": "79c5237e3f63953a73f2b0d6894327702ee1f7e981450c251bb1b5cb4f8d7b8f",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "source_url": "https://arxiv.org/pdf/2305.10601",
+  "notes": "양식 다양성 #7 — NeurIPS 양식(single-column). 1페이지 푸터가 '37th Conference on Neural Information Processing Systems (NeurIPS 2023).' 라, single-column 본문 폭·러닝 푸터 처리(본문 오인 제외)를 검증한다. author-year References."
+}

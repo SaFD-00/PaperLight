@@ -1,0 +1,16 @@
+{
+  "slug": "2310.16834-icml-score-entropy",
+  "title": "Discrete Diffusion Modeling by Estimating the Ratios of the Data Distribution",
+  "authors": ["Lou, A.", "Meng, C.", "Ermon, S."],
+  "venue": "ICML 2024",
+  "year": 2024,
+  "arxiv_id": "2310.16834",
+  "doi": null,
+  "pages": 30,
+  "size_bytes": 1069705,
+  "sha256": "1f3a135a52346270ef4b0872d52f17954af7ea0fa53d0a0b31a9183599ec976e",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "source_url": "https://arxiv.org/pdf/2310.16834",
+  "notes": "양식 다양성 #8 — ICML 양식(icml2024.sty, 2단). 1페이지 푸터 'Proceedings of the 41st International Conference on Machine Learning ... PMLR 235, 2024. Copyright 2024 ...' 라 PMLR 러닝 푸터 처리를 검증한다. ICML 제목 블록(중앙 저자행 + 윗첨자 소속) + display 수식(score entropy) 다수."
+}

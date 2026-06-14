@@ -1,0 +1,16 @@
+{
+  "slug": "2501.02997-calm-aaai",
+  "title": "CALM: Curiosity-Driven Auditing for Large Language Models",
+  "authors": ["Zheng, X.", "Wang, L.", "Liu, Y.", "Ma, X.", "Shen, C.", "Wang, C."],
+  "venue": "AAAI 2025",
+  "year": 2025,
+  "arxiv_id": "2501.02997",
+  "doi": null,
+  "pages": 10,
+  "size_bytes": 1745000,
+  "sha256": "e7179be7fe5e3d9bb7480da75b3ca3780dc765c015a86aa4efb792857b1cf277",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "source_url": "https://arxiv.org/pdf/2501.02997",
+  "notes": "양식 다양성 #11 — AAAI 양식(aaai2x.sty, 2단). 1페이지 푸터 'Copyright © 2025, Association for the Advancement of Artificial Intelligence (www.aaai.org).' 라, AAAI 저작권 푸터(본문 오인 제외)와 natbib author-year 인용을 검증한다."
+}

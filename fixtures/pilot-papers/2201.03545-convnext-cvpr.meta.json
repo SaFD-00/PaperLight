@@ -1,0 +1,16 @@
+{
+  "slug": "2201.03545-convnext-cvpr",
+  "title": "A ConvNet for the 2020s",
+  "authors": ["Liu, Z.", "Mao, H.", "Wu, C.", "Feichtenhofer, C.", "Darrell, T.", "Xie, S."],
+  "venue": "CVPR 2022",
+  "year": 2022,
+  "arxiv_id": "2201.03545",
+  "doi": null,
+  "pages": 15,
+  "size_bytes": 751927,
+  "sha256": "1fde2340370d0eb8045bda97fc94da7adb2a7abe8e6ded1a473d22475b945e1a",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유)",
+  "source_url": "https://arxiv.org/pdf/2201.03545",
+  "notes": "양식 다양성 #9 — IEEE/CVF 양식(cvpr.sty, 2단). 숫자 대괄호 인용 [1]..[N] 와 'In CVPR, 2018.' 식 축약 References, 본문에 venue 러닝헤더/푸터가 전혀 없는 CVF 특성이라(헤더 부재) 헤더 의존 없이 2단 본문만 추출되는지 검증한다."
+}

@@ -31,9 +31,19 @@ logger = logging.getLogger(__name__)
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "pilot-papers"
 
 # (paperId expected by the front-end, fixtures slug)
+# sample-3..sample-10 = 학회 양식 다양성 픽스처(NeurIPS/ICML/CVPR/EMNLP/AAAI/ACM/Nature/IEEE).
+# 프론트의 SLUG_TO_FILE(route.ts)·PDF_URL_MAP(Center.tsx)와 paperId 매핑을 일치시킬 것.
 SAMPLES: list[tuple[str, str]] = [
     ("sample-1", "2602.09856-code2world"),
     ("sample-2", "2605.10347-mobile-world-model-gui-agents"),
+    ("sample-3", "2305.10601-tree-of-thoughts"),
+    ("sample-4", "2310.16834-icml-score-entropy"),
+    ("sample-5", "2201.03545-convnext-cvpr"),
+    ("sample-6", "2311.09210-chain-of-note-emnlp"),
+    ("sample-7", "2501.02997-calm-aaai"),
+    ("sample-8", "2405.07011-fair-graph-www"),
+    ("sample-9", "natcomm-2022-precip-nowcasting"),
+    ("sample-10", "2310.15641-coverage-tpami"),
 ]
 
 

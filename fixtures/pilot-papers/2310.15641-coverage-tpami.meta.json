@@ -1,0 +1,16 @@
+{
+  "slug": "2310.15641-coverage-tpami",
+  "title": "Guaranteed Coverage Prediction Intervals with Gaussian Process Regression",
+  "authors": ["Papadopoulos, H."],
+  "venue": "IEEE TPAMI 2024",
+  "year": 2024,
+  "arxiv_id": "2310.15641",
+  "doi": "10.1109/TPAMI.2024.3418214",
+  "pages": 12,
+  "size_bytes": 2589283,
+  "sha256": "05ca0ae22b8049c7d9ee195d3e4e7ca97298906b48669bf370fa5b2a5f17e3fc",
+  "added_at": "2026-06-14",
+  "license": "arXiv non-exclusive (저자 보유, IEEE TPAMI accepted author version)",
+  "source_url": "https://arxiv.org/pdf/2310.15641",
+  "notes": "양식 다양성 #14 — IEEEtran 저널 양식(2단). 러닝헤더 'IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE', 'Index Terms—' 라인, 문서 말미 저자 약력(biography) 블록이 특징이라, 러닝헤더 제외와 biography 블록(비논지 본문) 처리를 검증한다."
+}
