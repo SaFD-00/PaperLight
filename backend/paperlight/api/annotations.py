@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from paperlight.api._ownership import get_owned_highlight, get_owned_paper
-from paperlight.auth.dependencies import get_user_id
+from paperlight.local_user import get_user_id
 from paperlight.models.highlight import Highlight
 from paperlight.models.note import Note
 from paperlight.models.paper import Paper

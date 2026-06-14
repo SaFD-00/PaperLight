@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from paperlight.models.collection import Collection
 from paperlight.models.highlight import Highlight
 from paperlight.models.paper import Paper
 
@@ -20,16 +19,6 @@ async def get_owned_paper(
     if paper.user_id != user_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "paper belongs to another user")
     return paper
-
-
-async def get_owned_collection(session: AsyncSession, cid: str, user_id: str) -> Collection:
-    """소유한 컬렉션을 반환."""
-    col = await session.get(Collection, cid)
-    if col is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "collection not found")
-    if col.user_id != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "collection belongs to another user")
-    return col
 
 
 async def get_owned_highlight(session: AsyncSession, hid: str, user_id: str) -> Highlight:

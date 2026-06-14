@@ -15,7 +15,17 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -32,22 +42,17 @@ from paperlight.agents.pregen import (
 from paperlight.agents.references import get_references
 from paperlight.api._ownership import get_owned_paper
 from paperlight.api._sse import format_sse
-from paperlight.auth.dependencies import get_user_id
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, resolve_meta
 from paperlight.ingestion.pipeline import ingest_paper
 from paperlight.ingestion.render import render_region
+from paperlight.local_user import get_user_id
 from paperlight.models.cache import Cache
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.providers.cache import cache_key, load_figure_layout, read_cached
 from paperlight.providers.router import primary_model
 from paperlight.storage.db import get_session, get_session_factory
-from paperlight.storage.object_store import (
-    DEFAULT_TTL_SECONDS,
-    get_object_store,
-    pdf_key,
-    verify_pdf_token,
-)
+from paperlight.storage.object_store import get_object_store, pdf_key, pdf_url
 
 router = APIRouter(prefix="/api/papers", tags=["papers"])
 
@@ -152,6 +157,47 @@ async def import_paper(
     return _paper_dict(paper)
 
 
+def _title_from_filename(name: str | None) -> str:
+    stem = (name or "").rsplit("/", 1)[-1]
+    if stem.lower().endswith(".pdf"):
+        stem = stem[:-4]
+    return stem.strip() or "제목 없는 PDF"
+
+
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+async def upload_paper(
+    session: SessionDep,
+    user_id: UserDep,
+    background: BackgroundTasks,
+    file: Annotated[UploadFile, File()],
+    title: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    """로컬 PDF 파일 업로드 — 정식 입력 경로."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty file")
+    filename = file.filename or ""
+    is_pdf = file.content_type == "application/pdf" or filename.lower().endswith(".pdf")
+    if not is_pdf:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "PDF 파일만 업로드할 수 있습니다")
+
+    paper_id = str(uuid4())
+    paper = Paper(
+        id=paper_id,
+        user_id=user_id,
+        title=(title or "").strip() or _title_from_filename(file.filename),
+        pdf_r2_key=pdf_key(paper_id),
+        ingestion_status="pending",
+    )
+    session.add(paper)
+    await session.commit()
+
+    await asyncio.to_thread(get_object_store().put_pdf, pdf_key(paper_id), data)
+    background.add_task(ingest_paper, paper_id)
+    await session.refresh(paper)
+    return _paper_dict(paper)
+
+
 @router.get("/{paper_id}")
 async def get_paper(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
     return _paper_dict(await get_owned_paper(session, paper_id, user_id))
@@ -160,18 +206,12 @@ async def get_paper(paper_id: str, session: SessionDep, user_id: UserDep) -> dic
 @router.get("/{paper_id}/pdf-url")
 async def pdf_presigned_url(paper_id: str, session: SessionDep, user_id: UserDep) -> dict[str, Any]:
     await get_owned_paper(session, paper_id, user_id)
-    url = get_object_store().presigned_get(pdf_key(paper_id))
-    return {"url": url, "ttlSeconds": DEFAULT_TTL_SECONDS}
+    return {"url": pdf_url(paper_id)}
 
 
 @router.get("/{paper_id}/pdf")
-async def pdf_stream(
-    paper_id: str,
-    exp: Annotated[int, Query()],
-    sig: Annotated[str, Query()],
-) -> Response:
-    if not verify_pdf_token(paper_id, exp, sig):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid or expired token")
+async def pdf_stream(paper_id: str) -> Response:
+    # Single-user local app: the pdf.js iframe loads this directly (no auth/signing).
     try:
         data = await asyncio.to_thread(get_object_store().get_pdf, pdf_key(paper_id))
     except FileNotFoundError as err:

@@ -12,13 +12,13 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from paperlight.agents.chat import RetrievedChunk
+from paperlight.local_user import LOCAL_USER_ID
 from paperlight.models.paper import Paper
 from paperlight.storage.db import init_db, reset_engine, session_scope
 from paperlight.storage.object_store import reset_object_store
-from paperlight.storage.vector import reset_vector_store
 
-USER_A = {"X-User-Id": "user-a"}
-USER_B = {"X-User-Id": "user-b"}
+# 단일 사용자 모델: X-User-Id 헤더는 무시된다.
+USER_A: dict[str, str] = {}
 
 
 @pytest_asyncio.fixture
@@ -29,7 +29,6 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
     await reset_engine(f"sqlite+aiosqlite:///{path}")
     await init_db()
     reset_object_store()
-    reset_vector_store()
     from paperlight.main import app
 
     transport = ASGITransport(app=app)
@@ -37,14 +36,14 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
         yield ac
     await reset_engine()
     reset_object_store()
-    reset_vector_store()
     with contextlib.suppress(FileNotFoundError):
         os.unlink(path)
 
 
-async def _seed_paper(paper_id: str, user_id: str) -> None:
+async def _seed_paper(paper_id: str, user_id: str = LOCAL_USER_ID) -> None:
+    # 단일 사용자 모델: user_id 인자는 호환용이며 항상 로컬 사용자 소유로 만든다.
     async with session_scope() as session:
-        session.add(Paper(id=paper_id, user_id=user_id, title="T", authors=["A"]))
+        session.add(Paper(id=paper_id, user_id=LOCAL_USER_ID, title="T", authors=["A"]))
 
 
 def _fixed_retrieve(page: int = 3, text: str = "근거 본문") -> object:
@@ -66,12 +65,6 @@ async def _collect(client: AsyncClient, body: dict[str, str], headers: dict[str,
 async def test_chat_missing_paper_404(client: AsyncClient) -> None:
     resp = await client.post("/api/chat", json={"paperId": "nope", "question": "q"}, headers=USER_A)
     assert resp.status_code == 404
-
-
-async def test_chat_other_user_403(client: AsyncClient) -> None:
-    await _seed_paper("p1", "user-a")
-    resp = await client.post("/api/chat", json={"paperId": "p1", "question": "q"}, headers=USER_B)
-    assert resp.status_code == 403
 
 
 async def test_chat_streams_tokens_citations_followups(
@@ -118,9 +111,3 @@ async def test_chat_history_empty_before_chat(client: AsyncClient) -> None:
     resp = await client.get("/api/chat/p1", headers=USER_A)
     assert resp.status_code == 200
     assert resp.json() == {"sessionId": None, "messages": []}
-
-
-async def test_chat_history_other_user_403(client: AsyncClient) -> None:
-    await _seed_paper("p1", "user-a")
-    resp = await client.get("/api/chat/p1", headers=USER_B)
-    assert resp.status_code == 403

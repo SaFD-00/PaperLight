@@ -1,17 +1,15 @@
 "use client";
 
 import clsx from "clsx";
-import Link from "next/link";
-import { ListTree, LogOut, PanelRight, Play, Search, UserRound } from "lucide-react";
+import { ListTree, PanelRight, Search } from "lucide-react";
 import { SettingsMenu } from "@/components/shell/SettingsMenu";
 import { cycle, DENSITY_CYCLE, THEME_CYCLE } from "@/lib/cycle";
-import { useAuth } from "@/stores/auth";
 import { useCommand } from "@/stores/command";
 import { useReader } from "@/stores/reader";
 import { useSettings } from "@/stores/settings";
 import { IconButton } from "./IconButton";
 
-/** 우측 그룹 — 테마/밀도/명령 팔레트/AI 패널/설정/로그인/재생. */
+/** 우측 그룹 — 테마/밀도/명령 팔레트/AI 패널/설정. */
 export function ToolbarSettingsGroup() {
   const theme = useSettings((s) => s.theme);
   const density = useSettings((s) => s.density);
@@ -20,10 +18,6 @@ export function ToolbarSettingsGroup() {
 
   const aiPanelOpen = useReader((s) => s.aiPanelOpen);
   const toggleAiPanel = useReader((s) => s.toggleAiPanel);
-
-  const authUser = useAuth((s) => s.user);
-  const logout = useAuth((s) => s.logout);
-  const isLoggedIn = authUser !== null && !authUser.anonymous;
 
   return (
     <>
@@ -57,23 +51,6 @@ export function ToolbarSettingsGroup() {
         <PanelRight size={14} />
       </button>
       <SettingsMenu />
-      {isLoggedIn ? (
-        <IconButton label={`로그아웃 (${authUser?.email ?? ""})`} onClick={() => void logout()}>
-          <LogOut size={14} />
-        </IconButton>
-      ) : (
-        <Link
-          href="/login"
-          aria-label="로그인"
-          title="로그인"
-          className="grid h-8 w-8 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-muted hover:text-text-primary"
-        >
-          <UserRound size={14} />
-        </Link>
-      )}
-      <IconButton label="재생">
-        <Play size={14} />
-      </IconButton>
     </>
   );
 }

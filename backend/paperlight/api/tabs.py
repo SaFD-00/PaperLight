@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from paperlight.auth.dependencies import get_user_id
+from paperlight.local_user import get_user_id
 from paperlight.models import Tab
 from paperlight.storage.db import get_session
 from paperlight.utils.time import now_ms

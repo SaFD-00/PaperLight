@@ -1,7 +1,7 @@
 """AI Chat — S12 (F-03). RAG 질의응답 SSE + 대화 영속화 + 멀티턴 히스토리.
 
-`POST /api/chat` 는 질문을 임베딩→Qdrant 검색→grounded 프롬프트로 스트리밍하고, 인용(citations)과
-후속 질문(followups) 이벤트를 흘린 뒤 대화를 `ChatSession`/`ChatMessage`에 영구 저장한다. 스트리밍
+`POST /api/chat` 는 질문을 임베딩→SQLite 코사인 검색→grounded 프롬프트로 스트리밍하고,
+인용(citations)·후속 질문(followups)을 흘린 뒤 `ChatSession`/`ChatMessage`에 영구 저장한다. 스트리밍
 generator 는 요청 스코프 세션이 닫힌 뒤에도 동작하므로 DB 쓰기는 `session_scope()`로 격리한다.
 `GET /api/chat/{paper_id}` 는 저장된 히스토리를 돌려준다.
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import uuid4
@@ -31,14 +32,14 @@ from paperlight.agents.chat import (
 from paperlight.agents.context import SUMMARY_PROMPT_VERSION
 from paperlight.api._ownership import get_owned_paper
 from paperlight.api._sse import format_sse
-from paperlight.auth.dependencies import get_user_id
+from paperlight.local_user import get_user_id
 from paperlight.models.chat import ChatMessage, ChatSession
-from paperlight.observability.context import paper_id_var
-from paperlight.observability.sentry import capture_exception
 from paperlight.providers.base import reasoning_sink
 from paperlight.providers.cache import read_cached, stream_with_cache
 from paperlight.storage.db import get_session, session_scope
 from paperlight.utils.time import now_ms
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -72,7 +73,6 @@ async def _get_or_create_session(session: AsyncSession, paper_id: str, user_id: 
 
 
 async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[str]:
-    paper_id_var.set(paper_id)
     # Phase 1 — load prior history (before adding the current turn), persist user message.
     async with session_scope() as session:
         cs = await _get_or_create_session(session, paper_id, user_id)
@@ -121,7 +121,7 @@ async def _stream(paper_id: str, user_id: str, question: str) -> AsyncIterator[s
             ):
                 await queue.put(("token", token))
         except Exception as err:  # noqa: BLE001 — relay upstream failure to UI
-            capture_exception(err)
+            logger.exception("chat stream failed")
             await queue.put(("error", str(err)))
         finally:
             await queue.put(None)

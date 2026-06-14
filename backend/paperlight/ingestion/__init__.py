@@ -1,1 +1,1 @@
-"""Ingestion pipeline — S8/S9: arxiv resolve → parse → chunk → embed → Qdrant index."""
+"""Ingestion pipeline: PDF/arXiv resolve → parse → chunk → embed → SQLite (chunks + embeddings)."""

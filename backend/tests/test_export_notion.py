@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from httpx import AsyncClient
 
-from tests.conftest import USER_A, USER_B, MakePaper
+from tests.conftest import USER_A, MakePaper
 
 
 async def _seed(client: AsyncClient, pid: str) -> None:
@@ -28,12 +28,6 @@ async def test_notion_stub_returns_markdown(
     assert body["url"] is None
     assert "# Diffusion Models" in body["markdown"]
     assert "내 메모" in body["markdown"]
-
-
-async def test_notion_export_ownership_403(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    resp = await client.post(f"/api/annotations/papers/{pid}/export/notion", headers=USER_B)
-    assert resp.status_code == 403
 
 
 async def test_export_notion_format_get_is_markdown(

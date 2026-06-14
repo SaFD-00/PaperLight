@@ -3,7 +3,6 @@
 import { ImageIcon, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/common/Markdown";
-import { capture } from "@/lib/analytics";
 import { streamSse } from "@/lib/sse";
 import { useReader } from "@/stores/reader";
 
@@ -84,7 +83,6 @@ export function FigureExplainPopover({ paperId }: { paperId: string }) {
   function send(q: string) {
     const question = q.trim();
     if (!question || streaming) return;
-    capture("figure_followup_sent", { paperId, kind: fig?.kind });
     setInput("");
     streamTurn(question, messages);
   }

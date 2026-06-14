@@ -12,6 +12,7 @@ interface PapersState {
   refreshList: () => Promise<void>;
   fetchMeta: (input: string) => Promise<ArxivMeta | null>;
   importPaper: (input: string) => Promise<Paper | null>;
+  uploadPaper: (file: File) => Promise<Paper | null>;
   reset: () => void;
 }
 
@@ -68,6 +69,24 @@ export const usePapers = create<PapersState>((set) => ({
       return paper;
     } catch {
       set({ importing: false, error: "가져오기 중 오류가 발생했습니다." });
+      return null;
+    }
+  },
+  uploadPaper: async (file: File) => {
+    set({ importing: true, error: null });
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await apiFetch("/api/papers/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        set({ importing: false, error: "업로드에 실패했습니다." });
+        return null;
+      }
+      const paper = (await res.json()) as Paper;
+      set({ importing: false });
+      return paper;
+    } catch {
+      set({ importing: false, error: "업로드 중 오류가 발생했습니다." });
       return null;
     }
   },

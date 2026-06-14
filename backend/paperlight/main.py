@@ -14,24 +14,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from paperlight.api import (
     annotations,
-    auth,
     chat,
-    deep_search,
     explain,
-    library,
     papers,
-    podcast,
     tabs,
     translate,
 )
-from paperlight.observability.langfuse_client import shutdown_langfuse
-from paperlight.observability.middleware import RequestContextMiddleware
-from paperlight.observability.sentry import init_sentry
 from paperlight.storage.db import init_db
 
 # uvicorn/uv 는 .env 를 자동 로드하지 않으므로 서버 기동 시 직접 로드한다. lifespan 안에서
 # 호출해 실서버(uvicorn)에서만 동작하게 하고, lifespan 을 띄우지 않는 ASGI 테스트는 .env 의
-# 인프라 설정(S3/Qdrant/DB)에 오염되지 않게 한다. override=False 라 호스트(Render/CI)가 주입한
+# 인프라 설정(DB/데이터 디렉터리)에 오염되지 않게 한다. override=False 라 호스트가 주입한
 # 실제 env 가 항상 우선하고, .env 가 없으면 no-op 이다.
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
@@ -47,7 +40,6 @@ def _seed_samples_enabled() -> bool:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     load_dotenv(_ENV_FILE)
-    init_sentry()
     await init_db()
     if _seed_samples_enabled():
         # Background so the heavy first-time ingest/pre-gen never blocks startup.
@@ -55,7 +47,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
         asyncio.create_task(seed_samples())
     yield
-    shutdown_langfuse()
 
 
 def _cors_origins() -> list[str]:
@@ -78,7 +69,6 @@ def _cors_origin_regex() -> str | None:
 
 app = FastAPI(title="PaperLight API", version="0.0.1", lifespan=lifespan)
 
-app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -91,13 +81,9 @@ app.add_middleware(
 app.include_router(papers.router)
 app.include_router(annotations.router)
 app.include_router(chat.router)
-app.include_router(podcast.router)
-app.include_router(library.router)
-app.include_router(auth.router)
 app.include_router(tabs.router)
 app.include_router(explain.router)
 app.include_router(translate.router)
-app.include_router(deep_search.router)
 
 
 @app.get("/health")

@@ -19,6 +19,16 @@ def embed(texts: list[str]) -> list[list[float]]:
     return [_stub_vector(t) for t in texts]
 
 
+def pack_embedding(vec: list[float]) -> bytes:
+    """Serialize an embedding to compact float32 bytes for SQLite storage."""
+    return np.asarray(vec, dtype=np.float32).tobytes()
+
+
+def unpack_embedding(blob: bytes) -> np.ndarray:
+    """Inverse of pack_embedding."""
+    return np.frombuffer(blob, dtype=np.float32)
+
+
 def _stub_vector(text: str) -> list[float]:
     seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
     rng = np.random.default_rng(seed)

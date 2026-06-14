@@ -6,7 +6,7 @@ import { inter, jbMono, pretendard } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "PaperLight",
-  description: "AI paper reader — read, listen, summarize, discover.",
+  description: "AI 논문 리더 — 읽고, 번역하고, 요약하고, 대화하세요.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

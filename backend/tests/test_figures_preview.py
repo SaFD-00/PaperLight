@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 from paperlight.providers.cache import save_figure_layout
 from paperlight.storage.object_store import get_object_store, pdf_key
-from tests.conftest import USER_A, USER_B, MakePaper
+from tests.conftest import USER_A, MakePaper
 
 
 def _one_page_pdf() -> bytes:
@@ -55,10 +55,3 @@ async def test_figure_image_no_layout_404(client: AsyncClient, make_paper: MakeP
     pid = await make_paper("user-a")
     resp = await client.get(f"/api/papers/{pid}/figures/0/image", headers=USER_A)
     assert resp.status_code == 404
-
-
-async def test_figure_image_ownership_403(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    await _seed_layout(pid)
-    resp = await client.get(f"/api/papers/{pid}/figures/0/image", headers=USER_B)
-    assert resp.status_code == 403

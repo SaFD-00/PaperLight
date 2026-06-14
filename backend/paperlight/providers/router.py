@@ -10,8 +10,6 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
-from paperlight.observability.context import current_trace_metadata
-from paperlight.observability.langfuse_client import get_langfuse
 from paperlight.providers.base import LLMProvider
 from paperlight.providers.gemini_provider import GeminiProvider
 from paperlight.providers.openai_provider import OpenAIProvider
@@ -169,34 +167,13 @@ async def stream_task(
     task: str,
     messages: list[dict[str, Any]],
 ) -> AsyncIterator[str]:
-    """Stream a task through its provider chain, traced via Langfuse when enabled.
+    """Stream a task through its provider chain.
 
     LLM_PROVIDER=stub forces the offline deterministic provider. Otherwise each
     candidate is tried in order; an unavailable provider (missing key) or a
     failure *before the first token* falls through to the next. A failure after
     tokens were already emitted is re-raised (cannot un-send a partial stream).
-    With no Langfuse keys the call delegates with zero tracing overhead.
     """
     holder: dict[str, str] = {"model": primary_model(task)}
-    langfuse = get_langfuse()
-    if langfuse is None:
-        async for token in _stream_candidates(task, messages, holder):
-            yield token
-        return
-
-    with langfuse.start_as_current_observation(
-        name=f"llm.{task}",
-        as_type="generation",
-        input=messages,
-        model=holder["model"],
-        metadata=current_trace_metadata(),
-    ) as generation:
-        buffer: list[str] = []
-        try:
-            async for token in _stream_candidates(task, messages, holder):
-                buffer.append(token)
-                yield token
-        except Exception as err:
-            generation.update(level="ERROR", status_message=str(err), model=holder["model"])
-            raise
-        generation.update(output="".join(buffer), model=holder["model"])
+    async for token in _stream_candidates(task, messages, holder):
+        yield token

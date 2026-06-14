@@ -11,12 +11,13 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from paperlight.local_user import LOCAL_USER_ID
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.storage.db import init_db, reset_engine, session_scope
 
-USER_A = {"X-User-Id": "user-a"}
-USER_B = {"X-User-Id": "user-b"}
+# 단일 사용자 모델: X-User-Id 헤더는 무시된다.
+USER_A: dict[str, str] = {}
 
 
 @pytest_asyncio.fixture
@@ -37,8 +38,9 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
 
 
 async def _seed(paper_id: str, user_id: str, body: str) -> None:
+    # 단일 사용자 모델: user_id 인자는 호환용이며 항상 로컬 사용자 소유로 만든다.
     async with session_scope() as session:
-        session.add(Paper(id=paper_id, user_id=user_id, title="T", authors=["A"]))
+        session.add(Paper(id=paper_id, user_id=LOCAL_USER_ID, title="T", authors=["A"]))
         session.add(
             Chunk(
                 id=f"{paper_id}-c0",
@@ -71,12 +73,6 @@ async def test_references_empty_for_paper_without_refs(client: AsyncClient) -> N
     resp = await client.get("/api/papers/p1/references", headers=USER_A)
     assert resp.status_code == 200
     assert resp.json() == []
-
-
-async def test_references_other_user_403(client: AsyncClient) -> None:
-    await _seed("p1", "user-a", _BODY)
-    resp = await client.get("/api/papers/p1/references", headers=USER_B)
-    assert resp.status_code == 403
 
 
 async def test_references_missing_paper_404(client: AsyncClient) -> None:

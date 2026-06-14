@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
 import tempfile
 import uuid
 from collections.abc import AsyncIterator
@@ -12,6 +13,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 
+from paperlight.agents.chat import retrieve
 from paperlight.ingestion.arxiv import fetch_pdf_bytes, normalize_arxiv_id, resolve_meta
 from paperlight.ingestion.chunker import chunk_pages
 from paperlight.ingestion.embedder import EMBED_DIM, embed
@@ -21,7 +23,6 @@ from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.storage.db import get_session_factory, init_db, reset_engine
 from paperlight.storage.object_store import get_object_store, pdf_key, reset_object_store
-from paperlight.storage.vector import get_vector_store, reset_vector_store
 
 PILOT_ID = "2602.09856"
 
@@ -64,16 +65,17 @@ async def test_parse_pdf_fixture_has_pages() -> None:
 @pytest_asyncio.fixture
 async def db_and_stores(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[None]:
     monkeypatch.setenv("LLM_PROVIDER", "stub")  # S11 pre-gen runs after ingest — keep offline
+    data_dir = tempfile.mkdtemp(prefix="paperlight-data-")
+    monkeypatch.setenv("PAPERLIGHT_DATA_DIR", data_dir)
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     await reset_engine(f"sqlite+aiosqlite:///{path}")
     await init_db()
     reset_object_store()
-    reset_vector_store()
     yield
     await reset_engine()
     reset_object_store()
-    reset_vector_store()
+    shutil.rmtree(data_dir, ignore_errors=True)
     with contextlib.suppress(FileNotFoundError):
         os.unlink(path)
 
@@ -99,19 +101,23 @@ async def test_ingest_paper_end_to_end(db_and_stores: None) -> None:
             select(func.count()).select_from(Chunk).where(Chunk.paper_id == paper_id)
         )
         assert count and count > 0
-        first = (
+        rows = (
             (
                 await session.execute(
                     select(Chunk).where(Chunk.paper_id == paper_id).order_by(Chunk.idx)
                 )
             )
             .scalars()
-            .first()
+            .all()
         )
+        first = rows[0] if rows else None
     assert first is not None
+    # 모든 청크가 임베딩과 함께 SQLite에 기록되어야 한다(packed float32).
+    assert all(c.embedding is not None for c in rows)
 
-    hits = get_vector_store().search(embed([first.text])[0], top_k=1, paper_id=paper_id)
-    assert hits and hits[0]["id"] == first.id
+    # 첫 청크 본문으로 질의하면 SQLite cosine 검색이 같은 청크를 최상위로 돌려줘야 한다.
+    hits = await retrieve(paper_id, first.text, top_k=1)
+    assert hits and hits[0].chunk_id == first.id
 
 
 async def test_ingest_pregen_failure_keeps_ready(

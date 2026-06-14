@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
@@ -14,9 +15,9 @@ from pydantic import BaseModel, Field
 from paperlight.agents.chat import generate_followups
 from paperlight.agents.context import GROUND_GUARD, apply_context, build_paper_context
 from paperlight.api._sse import format_sse
-from paperlight.observability.context import paper_id_var
-from paperlight.observability.sentry import capture_exception
 from paperlight.providers.cache import stream_with_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/explain", tags=["explain"])
 
@@ -66,8 +67,6 @@ class FigureExplainRequest(BaseModel):
 
 
 async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
-    if paper_id:
-        paper_id_var.set(paper_id)
     context = await build_paper_context(paper_id, text)
     messages = apply_context(
         SYSTEM_PROMPT, f"다음 단락을 설명해주세요:\n\n```\n{text}\n```", context
@@ -82,7 +81,7 @@ async def _stream(text: str, paper_id: str | None) -> AsyncIterator[str]:
         ):
             yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
-        capture_exception(err)
+        logger.exception("explanation stream failed")
         yield format_sse({"error": str(err)})
     yield "data: [DONE]\n\n"
 
@@ -106,8 +105,6 @@ def _parse_data_url(value: str) -> tuple[str, str]:
 
 
 async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
-    if req.paperId:
-        paper_id_var.set(req.paperId)
     mime, b64 = _parse_data_url(req.image)
     is_table = req.kind == "table"
     system = TABLE_SYSTEM_PROMPT if is_table else FIGURE_SYSTEM_PROMPT
@@ -160,7 +157,7 @@ async def _stream_figure(req: FigureExplainRequest) -> AsyncIterator[str]:
             answer.append(token)
             yield format_sse({"token": token})
     except Exception as err:  # noqa: BLE001 — relay any upstream failure to UI
-        capture_exception(err)
+        logger.exception("explanation stream failed")
         yield format_sse({"error": str(err)})
         yield "data: [DONE]\n\n"
         return

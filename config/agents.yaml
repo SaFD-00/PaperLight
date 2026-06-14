@@ -9,7 +9,7 @@
 # `/reset-default --preset <qwen|gpt|gemini>` 가 각 agent의 provider+model(+fallback의
 # provider+model)을 아래 표대로 되돌린다. plain 실행 = qwen = committed canonical.
 # reasoning_effort/temperature/top_p/max_tokens 는 preset 무관(agent 의미값) — 미변경.
-# embedding/reranker/tts 도 preset 무관 — 미변경.
+# embedding/reranker 도 preset 무관 — 미변경.
 #
 # Tier → (provider, model) per preset:
 #   tier   qwen (openrouter)       gpt (openai)    gemini (gemini)
@@ -18,13 +18,13 @@
 #   low    qwen/qwen3.6-35b-a3b    gpt-5.4-nano    gemini-2.5-flash-lite
 #
 # Agent → tier:
-#   high : figure_description, table_description, podcast_outline, podcast_script
-#   mid  : default, summary, chat, explanation, podcast_critique, critique
+#   high : figure_description, table_description
+#   mid  : default, summary, chat, explanation, critique
 #   low  : translation, paragraph_description, paragraph_importance,
 #          classifier, highlight, domain_classifier
 # Agent → fallback-tier (그 외 agent는 fallback 없음):
 #   summary→high, chat→high, explanation→low, translation→mid,
-#   figure_description→mid, table_description→mid, podcast_outline→mid, podcast_script→mid
+#   figure_description→mid, table_description→mid
 version: "2026.06.03"
 
 default:
@@ -104,31 +104,6 @@ agents:
     temperature: 0.1          # Qwen 권장: non-thinking에서도 greedy(0.0) 회피
     max_tokens: 100
 
-  podcast_outline:
-    provider: openrouter
-    model: qwen/qwen3.6-plus
-    reasoning_effort: high
-    temperature: 0.6
-    max_tokens: 2000
-    fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-flash }
-
-  podcast_script:
-    provider: openrouter
-    model: qwen/qwen3.6-plus
-    reasoning_effort: high
-    temperature: 0.7
-    max_tokens: 8000
-    fallback:
-      - { provider: openrouter, model: qwen/qwen3.6-flash }
-
-  podcast_critique:
-    provider: openrouter
-    model: qwen/qwen3.6-flash
-    reasoning_effort: medium
-    temperature: 0.3
-    max_tokens: 1500
-
   critique:
     provider: openrouter
     model: qwen/qwen3.6-flash
@@ -169,15 +144,3 @@ reranker:
   model: bge-reranker-v2-m3
   fallback:
     - { provider: cohere, model: rerank-multilingual-v3.0 }
-
-tts:
-  default_provider: openai
-  providers:
-    openai:
-      model: tts-1-hd
-      voice_a: alloy
-      voice_b: echo
-    elevenlabs:                # 한국어 품질 부족 시 fallback
-      voice_a_id_env: ELEVENLABS_VOICE_A_ID
-      voice_b_id_env: ELEVENLABS_VOICE_B_ID
-      model: eleven_multilingual_v2

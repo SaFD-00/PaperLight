@@ -29,7 +29,7 @@ def test_primary_model() -> None:
 
 
 def test_reasoning_effort_per_agent_and_default() -> None:
-    assert router.reasoning_effort("podcast_script") == "high"
+    assert router.reasoning_effort("highlight") == "low"
     assert router.reasoning_effort("translation") == "none"
     assert router.reasoning_effort("summary") == "medium"
     # unknown agent inherits the default effort.

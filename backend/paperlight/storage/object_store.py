@@ -1,24 +1,18 @@
-"""Object store for original PDFs — S3/MinIO/R2 or in-process local backend.
+"""Local filesystem object store for original PDFs and markdown note backups.
 
-PRD §7.3: 원본 PDF는 presigned URL(TTL 10분)로만 클라이언트에 전달. 직접 키/URL 노출 금지.
-env `S3_ENDPOINT_URL` 가 있으면 S3 호환(MinIO/R2), 없으면 in-process Local 백엔드
-(dev/test 오프라인 — presigned = HMAC 서명된 가드 라우트 URL).
+PaperLight is a single-user self-hosted app, so blobs live on disk under
+`PAPERLIGHT_DATA_DIR` (default `./data`). The PDF is served directly by the
+`/api/papers/{id}/pdf` route — no presigning, no auth.
 """
 
 from __future__ import annotations
 
-import contextlib
-import hashlib
-import hmac
 import os
-import time
+from pathlib import Path
 from typing import Protocol
-from urllib.parse import urlencode
 
 PDF_KEY_TEMPLATE = "papers/{paper_id}/original.pdf"
 NOTE_KEY_TEMPLATE = "notes/{note_id}.md"
-AUDIO_KEY_TEMPLATE = "podcasts/{podcast_id}.mp3"
-DEFAULT_TTL_SECONDS = 10 * 60
 
 
 def pdf_key(paper_id: str) -> str:
@@ -29,148 +23,56 @@ def note_key(note_id: str) -> str:
     return NOTE_KEY_TEMPLATE.format(note_id=note_id)
 
 
-def audio_key(podcast_id: str) -> str:
-    return AUDIO_KEY_TEMPLATE.format(podcast_id=podcast_id)
-
-
-def _token_secret() -> str:
-    secret = os.environ.get("JWT_SECRET")
-    if secret and secret != "change-me-in-production":
-        return secret
-    if os.environ.get("APP_ENV", "development") == "development":
-        return "dev-secret-do-not-use-in-production"
-    raise RuntimeError("JWT_SECRET must be set in non-development environments")
+def _data_dir() -> Path:
+    return Path(os.environ.get("PAPERLIGHT_DATA_DIR", "./data")).resolve()
 
 
 def _public_base_url() -> str:
     return os.environ.get("PAPERLIGHT_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 
 
-def sign_pdf_token(paper_id: str, expires_at: int) -> str:
-    msg = f"{paper_id}:{expires_at}".encode()
-    return hmac.new(_token_secret().encode(), msg, hashlib.sha256).hexdigest()
-
-
-def verify_pdf_token(paper_id: str, expires_at: int, signature: str) -> bool:
-    if expires_at < int(time.time()):
-        return False
-    return hmac.compare_digest(sign_pdf_token(paper_id, expires_at), signature)
-
-
-def sign_audio_token(podcast_id: str, expires_at: int) -> str:
-    msg = f"podcast:{podcast_id}:{expires_at}".encode()
-    return hmac.new(_token_secret().encode(), msg, hashlib.sha256).hexdigest()
-
-
-def verify_audio_token(podcast_id: str, expires_at: int, signature: str) -> bool:
-    if expires_at < int(time.time()):
-        return False
-    return hmac.compare_digest(sign_audio_token(podcast_id, expires_at), signature)
-
-
-def audio_url(podcast_id: str, ttl: int = DEFAULT_TTL_SECONDS) -> str:
-    """Podcast 오디오 가드 라우트 URL(HMAC 서명, 쿠키 불필요)."""
-    exp = int(time.time()) + ttl
-    qs = urlencode({"exp": exp, "sig": sign_audio_token(podcast_id, exp)})
-    return f"{_public_base_url()}/api/podcast/{podcast_id}/audio?{qs}"
+def pdf_url(paper_id: str) -> str:
+    """Absolute URL the pdf.js iframe loads (served by the /pdf route)."""
+    return f"{_public_base_url()}/api/papers/{paper_id}/pdf"
 
 
 class ObjectStore(Protocol):
     def put_pdf(self, key: str, data: bytes) -> None: ...
     def get_pdf(self, key: str) -> bytes: ...
-    def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str: ...
     def put_text(self, key: str, text: str) -> None: ...
     def get_text(self, key: str) -> str: ...
-    def put_audio(self, key: str, data: bytes) -> None: ...
-    def get_audio(self, key: str) -> bytes: ...
 
 
 class LocalObjectStore:
-    """In-process store for dev/test without docker. Presigned = HMAC 가드 라우트 URL."""
+    """Disk-backed store under PAPERLIGHT_DATA_DIR."""
 
     def __init__(self) -> None:
-        self._blobs: dict[str, bytes] = {}
+        self._root = _data_dir()
+
+    def _path(self, key: str) -> Path:
+        return self._root / key
 
     def put_pdf(self, key: str, data: bytes) -> None:
-        self._blobs[key] = data
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
 
     def get_pdf(self, key: str) -> bytes:
         try:
-            return self._blobs[key]
-        except KeyError as err:
+            return self._path(key).read_bytes()
+        except FileNotFoundError as err:
             raise FileNotFoundError(key) from err
 
-    def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str:
-        paper_id = key.split("/")[1]
-        exp = int(time.time()) + ttl
-        qs = urlencode({"exp": exp, "sig": sign_pdf_token(paper_id, exp)})
-        return f"{_public_base_url()}/api/papers/{paper_id}/pdf?{qs}"
-
     def put_text(self, key: str, text: str) -> None:
-        self._blobs[key] = text.encode()
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
     def get_text(self, key: str) -> str:
         try:
-            return self._blobs[key].decode()
-        except KeyError as err:
+            return self._path(key).read_text(encoding="utf-8")
+        except FileNotFoundError as err:
             raise FileNotFoundError(key) from err
-
-    def put_audio(self, key: str, data: bytes) -> None:
-        self._blobs[key] = data
-
-    def get_audio(self, key: str) -> bytes:
-        try:
-            return self._blobs[key]
-        except KeyError as err:
-            raise FileNotFoundError(key) from err
-
-
-class S3ObjectStore:
-    def __init__(self) -> None:
-        import boto3  # type: ignore[import-untyped]
-
-        self._bucket = os.environ.get("S3_BUCKET", "paperlight-pdf")
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=os.environ.get("S3_ENDPOINT"),
-            aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
-            aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
-            region_name=os.environ.get("S3_REGION", "auto"),
-        )
-        with contextlib.suppress(Exception):
-            if self._bucket not in {b["Name"] for b in self._client.list_buckets()["Buckets"]}:
-                self._client.create_bucket(Bucket=self._bucket)
-
-    def put_pdf(self, key: str, data: bytes) -> None:
-        self._client.put_object(
-            Bucket=self._bucket, Key=key, Body=data, ContentType="application/pdf"
-        )
-
-    def get_pdf(self, key: str) -> bytes:
-        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
-        return data
-
-    def presigned_get(self, key: str, ttl: int = DEFAULT_TTL_SECONDS) -> str:
-        url: str = self._client.generate_presigned_url(
-            "get_object", Params={"Bucket": self._bucket, "Key": key}, ExpiresIn=ttl
-        )
-        return url
-
-    def put_text(self, key: str, text: str) -> None:
-        self._client.put_object(
-            Bucket=self._bucket, Key=key, Body=text.encode(), ContentType="text/markdown"
-        )
-
-    def get_text(self, key: str) -> str:
-        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
-        return data.decode()
-
-    def put_audio(self, key: str, data: bytes) -> None:
-        self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType="audio/mpeg")
-
-    def get_audio(self, key: str) -> bytes:
-        data: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
-        return data
 
 
 _store: ObjectStore | None = None
@@ -179,7 +81,7 @@ _store: ObjectStore | None = None
 def get_object_store() -> ObjectStore:
     global _store
     if _store is None:
-        _store = S3ObjectStore() if os.environ.get("S3_ENDPOINT") else LocalObjectStore()
+        _store = LocalObjectStore()
     return _store
 
 

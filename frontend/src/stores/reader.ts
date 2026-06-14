@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { capture } from "@/lib/analytics";
 import type { OutlineItem } from "@/lib/pdf/messages";
 import type { NormRect } from "@/lib/types";
 
@@ -157,22 +156,13 @@ export const useReader = create<ReaderState>((set) => ({
   findRequest: null,
   findStepRequest: null,
   setSelection: (s) => set({ selection: s }),
-  triggerExplain: (sel) => {
-    capture("explain_requested", { length: sel.text.length });
-    set({ explainSelection: sel, selection: null });
-  },
+  triggerExplain: (sel) => set({ explainSelection: sel, selection: null }),
   clearExplain: () => set({ explainSelection: null }),
-  triggerFigureExplain: (fig) => {
-    capture("figure_explain_requested", { kind: fig.kind });
-    set({ figureExplain: fig, selection: null });
-  },
+  triggerFigureExplain: (fig) => set({ figureExplain: fig, selection: null }),
   clearFigureExplain: () => set({ figureExplain: null }),
   triggerAsk: (text) => set({ askText: text, selection: null }),
   clearAsk: () => set({ askText: null }),
-  triggerTranslateSelection: (sel) => {
-    capture("translate_requested", { length: sel.text.length });
-    set({ translateSelection: sel, selection: null });
-  },
+  triggerTranslateSelection: (sel) => set({ translateSelection: sel, selection: null }),
   clearTranslateSelection: () => set({ translateSelection: null }),
   toggleTranslation: () => set((state) => ({ translationEnabled: !state.translationEnabled })),
   setTranslation: (enabled) => set({ translationEnabled: enabled }),

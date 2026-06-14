@@ -1,7 +1,6 @@
-"""Async SQLAlchemy setup.
+"""Async SQLAlchemy setup — SQLite only (single-user local app).
 
-Phase 1 S7a: `DATABASE_URL` (Postgres) 우선, `PAPERLIGHT_DB_URL`은 backward-compat.
-default는 SQLite로 유지 — Phase 0 회귀 호환.
+`DATABASE_URL` 로 경로 재정의 가능, 기본은 로컬 `./paperlight.db`.
 """
 
 from __future__ import annotations
@@ -38,18 +37,7 @@ def get_database_url() -> str:
     )
 
 
-def _normalize_async_url(url: str) -> str:
-    """Map a bare Postgres URL (Supabase/Render/.env hand out `postgresql://`) to the
-    async driver. SQLAlchemy defaults `postgresql://` to psycopg2 (sync, not installed);
-    this app is async, so route it through asyncpg."""
-    for prefix in ("postgresql://", "postgres://"):
-        if url.startswith(prefix):
-            return "postgresql+asyncpg://" + url[len(prefix) :]
-    return url
-
-
 def _build_engine(url: str) -> AsyncEngine:
-    url = _normalize_async_url(url)
     connect_args: dict[str, Any] = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
@@ -58,7 +46,7 @@ def _build_engine(url: str) -> AsyncEngine:
         # SQLite is single-writer: concurrent cache writes (translate/explain SSE +
         # pregen) otherwise fail instantly with "database is locked". busy_timeout
         # makes writers wait; WAL lets readers proceed during a write. :memory:
-        # ignores WAL (no error). Postgres skips this branch entirely.
+        # ignores WAL (no error).
         @event.listens_for(engine.sync_engine, "connect")
         def _sqlite_pragmas(dbapi_conn: Any, _record: Any) -> None:
             cur = dbapi_conn.cursor()
@@ -83,35 +71,26 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
-DEFAULT_USER_ID = "anonymous"
-
-
 async def init_db() -> None:
     import paperlight.models  # noqa: F401 — register all ORM tables before create_all
 
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Phase 1 S7a: ensure default user row exists for unauthenticated tab/library flows.
-    # 실제 OAuth(S7b) 합류 시 anonymous는 게스트 모드로 격하.
+    # Single-user app: ensure the one local user row exists for all data scoping.
     await _ensure_default_user()
 
 
 async def _ensure_default_user() -> None:
     # Avoid import cycle: User imports Base from this module.
+    from paperlight.local_user import LOCAL_USER_ID
     from paperlight.models.user import User
 
     factory = get_session_factory()
     async with factory() as session:
-        existing = await session.get(User, DEFAULT_USER_ID)
+        existing = await session.get(User, LOCAL_USER_ID)
         if existing is None:
-            session.add(
-                User(
-                    id=DEFAULT_USER_ID,
-                    email="anonymous@local",
-                    google_sub=None,
-                )
-            )
+            session.add(User(id=LOCAL_USER_ID, email="local@paperlight"))
             await session.commit()
 
 

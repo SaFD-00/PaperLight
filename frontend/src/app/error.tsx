@@ -1,19 +1,6 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
-
-export default function Error({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
+export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
       <h2 className="text-lg font-semibold text-text-primary">문제가 발생했습니다</h2>

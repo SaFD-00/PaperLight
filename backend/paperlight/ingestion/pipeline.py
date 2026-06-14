@@ -1,6 +1,6 @@
 """Ingestion orchestrator — S9.
 
-PDF 로드 → parse → chunk → Chunk rows → embed → Qdrant upsert.
+PDF 로드 → parse → chunk → embed → Chunk rows(텍스트+임베딩) in SQLite.
 status 전이: pending → parsing → embedding → ready (실패 시 failed). 각 전이 commit →
 SSE 폴링이 진행률 관측. BackgroundTask에서 호출되므로 CPU/sync IO는 to_thread로 위임.
 """
@@ -14,14 +14,13 @@ from uuid import uuid4
 
 from paperlight.agents.pregen import pregen_paper
 from paperlight.ingestion.chunker import chunk_pages
-from paperlight.ingestion.embedder import embed
+from paperlight.ingestion.embedder import embed, pack_embedding
 from paperlight.ingestion.parser import parse_pdf
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.providers.cache import save_figure_layout
 from paperlight.storage.db import get_session_factory
 from paperlight.storage.object_store import get_object_store, pdf_key
-from paperlight.storage.vector import get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +56,17 @@ async def ingest_paper(paper_id: str) -> None:
         if figures:
             await save_figure_layout(paper_id, figures)
 
+        await _set_status(paper_id, "embedding")
+
+        vectors = (
+            await asyncio.to_thread(embed, [cd.text for cd in chunk_datas]) if chunk_datas else []
+        )
         factory = get_session_factory()
-        points_meta: list[tuple[str, str, int]] = []
         async with factory() as session:
-            for cd in chunk_datas:
-                cid = str(uuid4())
+            for cd, vec in zip(chunk_datas, vectors, strict=True):
                 session.add(
                     Chunk(
-                        id=cid,
+                        id=str(uuid4()),
                         paper_id=paper_id,
                         idx=cd.idx,
                         text=cd.text,
@@ -72,20 +74,10 @@ async def ingest_paper(paper_id: str) -> None:
                         char_start=cd.char_start,
                         char_end=cd.char_end,
                         token_estimate=cd.token_estimate,
+                        embedding=pack_embedding(vec),
                     )
                 )
-                points_meta.append((cid, cd.text, cd.page_num))
             await session.commit()
-
-        await _set_status(paper_id, "embedding")
-
-        if points_meta:
-            vectors = await asyncio.to_thread(embed, [text for _, text, _ in points_meta])
-            points = [
-                (cid, vec, {"paper_id": paper_id, "page": page, "text": text})
-                for (cid, text, page), vec in zip(points_meta, vectors, strict=True)
-            ]
-            await asyncio.to_thread(get_vector_store().upsert, points)
 
         await _set_status(paper_id, "ready")
     except Exception:

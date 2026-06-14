@@ -1,7 +1,7 @@
 """RAG chat pipeline — S12 (F-03).
 
-질문 임베딩 → Qdrant top-k chunk 검색(S9) → grounded 프롬프트 구성 → task별 라우터/캐시(S10)
-스트리밍. 답변 후 후속 질문 3개를 best-effort로 생성한다.
+질문 임베딩 → SQLite에 저장된 청크 임베딩과 코사인 top-k 검색 → grounded 프롬프트 구성 →
+task별 라우터/캐시(S10) 스트리밍. 답변 후 후속 질문 3개를 best-effort로 생성한다.
 """
 
 from __future__ import annotations
@@ -10,9 +10,13 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
-from paperlight.ingestion.embedder import embed
+import numpy as np
+from sqlalchemy import select
+
+from paperlight.ingestion.embedder import embed, unpack_embedding
+from paperlight.models.chunk import Chunk
 from paperlight.providers.router import stream_task
-from paperlight.storage.vector import get_vector_store
+from paperlight.storage.db import get_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -44,24 +48,34 @@ class RetrievedChunk:
     score: float
 
 
-async def retrieve(paper_id: str, question: str, *, top_k: int = _TOP_K) -> list[RetrievedChunk]:
-    """Embed the question and fetch top-k similar chunks for this paper from Qdrant."""
-    vectors = await asyncio.to_thread(embed, [question])
-    results = await asyncio.to_thread(
-        get_vector_store().search, vectors[0], top_k=top_k, paper_id=paper_id
-    )
-    out: list[RetrievedChunk] = []
-    for r in results:
-        payload = r.get("payload") or {}
-        out.append(
-            RetrievedChunk(
-                chunk_id=str(r.get("id")),
-                page=int(payload.get("page", 0)),
-                text=str(payload.get("text", "")),
-                score=float(r.get("score", 0.0)),
+async def _load_chunks(paper_id: str) -> list[tuple[str, int, str, bytes | None]]:
+    factory = get_session_factory()
+    async with factory() as session:
+        rows = await session.execute(
+            select(Chunk.id, Chunk.page_num, Chunk.text, Chunk.embedding).where(
+                Chunk.paper_id == paper_id
             )
         )
-    return out
+        return list(rows.all())
+
+
+async def retrieve(paper_id: str, question: str, *, top_k: int = _TOP_K) -> list[RetrievedChunk]:
+    """Embed the question and rank this paper's chunks by cosine similarity (SQLite)."""
+    vectors = await asyncio.to_thread(embed, [question])
+    q = np.asarray(vectors[0], dtype=np.float32)
+    q_norm = float(np.linalg.norm(q)) or 1.0
+
+    scored: list[RetrievedChunk] = []
+    for chunk_id, page, text, emb in await _load_chunks(paper_id):
+        if emb is None:
+            continue
+        v = unpack_embedding(emb)
+        denom = q_norm * (float(np.linalg.norm(v)) or 1.0)
+        score = float(np.dot(q, v) / denom)
+        scored.append(RetrievedChunk(chunk_id=chunk_id, page=int(page), text=text, score=score))
+
+    scored.sort(key=lambda c: c.score, reverse=True)
+    return scored[:top_k]
 
 
 def build_messages(

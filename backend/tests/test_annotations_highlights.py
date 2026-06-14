@@ -6,7 +6,7 @@ from typing import Any
 
 from httpx import AsyncClient
 
-from tests.conftest import USER_A, USER_B, MakePaper
+from tests.conftest import USER_A, MakePaper
 
 BBOX = {"rects": [{"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.04}]}
 
@@ -52,27 +52,3 @@ async def test_delete_removes_highlight(client: AsyncClient, make_paper: MakePap
 async def test_delete_unknown_404(client: AsyncClient) -> None:
     resp = await client.delete("/api/annotations/highlights/nope", headers=USER_A)
     assert resp.status_code == 404
-
-
-async def test_list_other_user_forbidden(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    await _create(client, pid, USER_A)
-    resp = await client.get(f"/api/annotations/papers/{pid}/highlights", headers=USER_B)
-    assert resp.status_code == 403
-
-
-async def test_delete_other_user_forbidden(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    created = await _create(client, pid, USER_A)
-    resp = await client.delete(f"/api/annotations/highlights/{created['id']}", headers=USER_B)
-    assert resp.status_code == 403
-
-
-async def test_create_on_others_paper_forbidden(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    resp = await client.post(
-        f"/api/annotations/papers/{pid}/highlights",
-        json={"page": 1, "bbox": BBOX},
-        headers=USER_B,
-    )
-    assert resp.status_code == 403

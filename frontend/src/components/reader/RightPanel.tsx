@@ -1,34 +1,16 @@
 "use client";
 
-import {
-  Bookmark,
-  BookOpen,
-  FileText,
-  Headphones,
-  MessageSquare,
-  Quote,
-  Sparkles,
-  Star,
-} from "lucide-react";
+import { BookOpen, FileText, MessageSquare, Quote, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/panels/ChatPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { NotesPanel } from "@/components/panels/NotesPanel";
-import { PodcastPanel } from "@/components/panels/PodcastPanel";
 import { ReferencesPanel } from "@/components/panels/ReferencesPanel";
 import { SummaryPanel } from "@/components/panels/SummaryPanel";
 import { useReader } from "@/stores/reader";
 import { ResizeHandle } from "./ResizeHandle";
 
-type PanelId =
-  | "summary"
-  | "insights"
-  | "chat"
-  | "references"
-  | "notes"
-  | "podcast"
-  | "bookmarks"
-  | "starred";
+type PanelId = "summary" | "insights" | "chat" | "references" | "notes";
 
 const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookOpen }[] = [
   { id: "summary", label: "Summary", hint: "논문 전체를 요약해 보여줍니다", icon: BookOpen },
@@ -36,9 +18,6 @@ const PANEL_TABS: { id: PanelId; label: string; hint: string; icon: typeof BookO
   { id: "chat", label: "Chat", hint: "논문 내용에 대해 질문하고 대화합니다", icon: MessageSquare },
   { id: "references", label: "References", hint: "참고문헌 목록을 보여줍니다", icon: Quote },
   { id: "notes", label: "Notes", hint: "하이라이트와 메모를 모아 봅니다", icon: FileText },
-  { id: "podcast", label: "Podcast", hint: "논문을 오디오 팟캐스트로 만듭니다", icon: Headphones },
-  { id: "bookmarks", label: "Bookmarks", hint: "북마크한 위치를 모아 봅니다", icon: Bookmark },
-  { id: "starred", label: "Starred", hint: "즐겨찾기한 항목을 모아 봅니다", icon: Star },
 ];
 
 export function RightPanel({ paperId }: { paperId: string }) {
@@ -91,19 +70,6 @@ export function RightPanel({ paperId }: { paperId: string }) {
         {active === "chat" && <ChatPanel paperId={paperId} />}
         {active === "references" && <ReferencesPanel paperId={paperId} />}
         {active === "notes" && <NotesPanel paperId={paperId} />}
-        {active === "podcast" && <PodcastPanel paperId={paperId} />}
-        {active !== "summary" &&
-          active !== "insights" &&
-          active !== "chat" &&
-          active !== "references" &&
-          active !== "notes" &&
-          active !== "podcast" && (
-            <div className="space-y-4 p-4 text-sm text-text-muted">
-              <p className="text-xs">
-                {PANEL_TABS.find((p) => p.id === active)?.label} placeholder · Phase 1
-              </p>
-            </div>
-          )}
       </div>
     </aside>
   );

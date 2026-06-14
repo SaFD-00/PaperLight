@@ -12,14 +12,14 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from paperlight.agents.pregen import pregen_paper
+from paperlight.local_user import LOCAL_USER_ID
 from paperlight.models.chunk import Chunk
 from paperlight.models.paper import Paper
 from paperlight.storage.db import init_db, reset_engine, session_scope
 from paperlight.storage.object_store import reset_object_store
-from paperlight.storage.vector import reset_vector_store
 
-USER_A = {"X-User-Id": "user-a"}
-USER_B = {"X-User-Id": "user-b"}
+# 단일 사용자 모델: X-User-Id 헤더는 무시된다.
+USER_A: dict[str, str] = {}
 
 
 @pytest_asyncio.fixture
@@ -30,7 +30,6 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
     await reset_engine(f"sqlite+aiosqlite:///{path}")
     await init_db()
     reset_object_store()
-    reset_vector_store()
     from paperlight.main import app
 
     transport = ASGITransport(app=app)
@@ -38,14 +37,14 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
         yield ac
     await reset_engine()
     reset_object_store()
-    reset_vector_store()
     with contextlib.suppress(FileNotFoundError):
         os.unlink(path)
 
 
 async def _seed(paper_id: str, user_id: str, chunks: list[tuple[str, str]]) -> None:
+    # 단일 사용자 모델: user_id 인자는 호환용이며 항상 로컬 사용자 소유로 만든다.
     async with session_scope() as session:
-        session.add(Paper(id=paper_id, user_id=user_id, title="T", authors=["A"]))
+        session.add(Paper(id=paper_id, user_id=LOCAL_USER_ID, title="T", authors=["A"]))
         for i, (cid, text) in enumerate(chunks):
             session.add(
                 Chunk(
@@ -103,13 +102,6 @@ async def test_insights_before_pregen_graceful(client: AsyncClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body == {"paragraphs": [], "figures": [], "highlights": None}
-
-
-async def test_summary_other_user_403(client: AsyncClient) -> None:
-    await _seed("p1", "user-a", [("c1", "Body.")])
-    await pregen_paper("p1")
-    resp = await client.get("/api/papers/p1/summary", headers=USER_B)
-    assert resp.status_code == 403
 
 
 async def test_insights_missing_paper_404(client: AsyncClient) -> None:

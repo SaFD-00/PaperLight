@@ -11,11 +11,15 @@ pnpm dev
 
 Open <http://localhost:3000>.
 
-## Roadmap (PRD §10 Phase 0)
+## 검증
 
-- F-01 PDF Viewer (`react-pdf` or `pdf.js`)
-- F-02 Translation (parallel display, scroll sync)
-- F-03 AI Chat (SSE streaming, right panel)
-- F-04 Explanation (formula / definition popover)
+```bash
+pnpm typecheck   # tsc --noEmit
+pnpm test        # vitest (bodyFilter 합성 + 실제 PDF 픽스처 회귀)
+pnpm build
+```
 
-See [docs/PRD.md](../docs/PRD.md) for full feature set.
+## 구조 · 패턴
+
+라우트: `/`(랜딩) · `/import`(PDF 업로드) · `/library`(내 논문) · `/r/[paperId]`(리더).
+아키텍처·pdf.js Shadow DOM·본문 추출(bodyFilter)은 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 참고.

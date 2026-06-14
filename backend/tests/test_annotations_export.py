@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from httpx import AsyncClient
 
-from tests.conftest import USER_A, USER_B, MakePaper
+from tests.conftest import USER_A, MakePaper
 
 BBOX = {"rects": [{"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.04}]}
 
@@ -57,9 +57,3 @@ async def test_export_unknown_format_422(client: AsyncClient, make_paper: MakePa
     pid = await make_paper("user-a")
     resp = await client.get(f"/api/annotations/papers/{pid}/export?format=pdf", headers=USER_A)
     assert resp.status_code == 422
-
-
-async def test_export_ownership(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    resp = await client.get(f"/api/annotations/papers/{pid}/export?format=markdown", headers=USER_B)
-    assert resp.status_code == 403

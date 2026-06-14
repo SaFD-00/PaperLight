@@ -12,16 +12,8 @@ export function isBrowser(): boolean {
 }
 
 /**
- * BE 호출 wrapper — credentials include (httpOnly cookie 자동 첨부) + 401 시 refresh 1회 재시도.
- * Phase 1 S7b.
+ * BE 호출 wrapper. 단일 사용자 로컬 앱이라 인증/쿠키가 없다 — 평범한 fetch.
  */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(apiUrl(path), { ...init, credentials: "include" });
-  if (res.status !== 401 || path.startsWith("/api/auth/")) return res;
-  const refreshed = await fetch(apiUrl("/api/auth/refresh"), {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!refreshed.ok) return res;
-  return fetch(apiUrl(path), { ...init, credentials: "include" });
+  return fetch(apiUrl(path), init);
 }

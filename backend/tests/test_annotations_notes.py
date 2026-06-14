@@ -5,7 +5,7 @@ from __future__ import annotations
 from httpx import AsyncClient
 
 from paperlight.storage.object_store import get_object_store
-from tests.conftest import USER_A, USER_B, MakePaper
+from tests.conftest import USER_A, MakePaper
 
 
 async def test_get_creates_empty_note(client: AsyncClient, make_paper: MakePaper) -> None:
@@ -52,15 +52,3 @@ async def test_put_updates_same_note(client: AsyncClient, make_paper: MakePaper)
     ).json()
     assert second["id"] == first["id"]
     assert second["markdownText"] == "v2"
-
-
-async def test_note_ownership(client: AsyncClient, make_paper: MakePaper) -> None:
-    pid = await make_paper("user-a")
-    assert (
-        await client.get(f"/api/annotations/papers/{pid}/note", headers=USER_B)
-    ).status_code == 403
-    assert (
-        await client.put(
-            f"/api/annotations/papers/{pid}/note", json={"markdownText": "x"}, headers=USER_B
-        )
-    ).status_code == 403
