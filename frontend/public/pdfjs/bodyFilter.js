@@ -538,7 +538,12 @@ export function trailingIncomplete(text) {
   const re = /[.!?]["')\]]?(?=\s|$)/g;
   let last = -1;
   let m;
-  while ((m = re.exec(text))) last = m.index + m[0].length;
+  while ((m = re.exec(text))) {
+    // 약어 마침표(Fig./e.g./et al./이니셜)는 문장 끝이 아니므로 종결로 보지 않는다.
+    // 페이지가 약어로 끝나도 미완 꼬리로 carry돼 다음 페이지에서 한 문장으로 이어진다.
+    if (m[0][0] === "." && isAbbreviationEnder(text, m.index)) continue;
+    last = m.index + m[0].length;
+  }
   if (last < 0) return { headLen: 0, tail: text.trim() };
   return { headLen: last, tail: text.slice(last).trim() };
 }

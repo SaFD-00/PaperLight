@@ -644,6 +644,24 @@ describe("cross-page 문장 carry-over", () => {
     });
   });
 
+  it("trailingIncomplete: 약어 마침표(et al.)를 페이지 끝 종결로 오인하지 않는다", () => {
+    // 'al.'을 종결로 보면 미완 꼬리가 잘려 다음 페이지로 carry되지 못한다.
+    expect(trailingIncomplete("Done. We cite Smith et al.")).toEqual({
+      headLen: 5,
+      tail: "We cite Smith et al.",
+    });
+  });
+
+  it("약어(e.g.)로 끝나는 페이지의 꼬리도 다음 페이지로 이어 붙인다", () => {
+    const prevText = "Body sentence here. Citing prior work, e.g.";
+    const raw = {
+      text: "this approach scales well. Next sentence here.",
+      segments: [{ bodyStart: 0, bodyEnd: 46, globalStart: 0, globalEnd: 46 }],
+    };
+    const { text } = carryAcrossPages(prevText, raw, false);
+    expect(text.startsWith("Citing prior work, e.g. this approach scales well.")).toBe(true);
+  });
+
   it("페이지 끝 미완 문장을 제외하고 다음 페이지 앞에 붙여 완성", () => {
     const prevText = "Complete sentence here. The model predicts the next";
     const raw = {
