@@ -64,6 +64,44 @@ const DISPLAY_MATH_DENSITY = 0.3;
 // 않는다. CAPTION_RE(Figure/Table 등)와는 별개로 '본문 라인 경계'만 식별한다.
 const FIG_HEADING_RE = /^(?:\d{1,2}(?:\.\d{1,2}){0,3}|[A-Z](?:\.\d{1,2}){0,2}|[ivxlc]{1,5})[.)]?\s+[A-Za-z]/;
 
+// 문장 종결(.) 오인 방지용 약어 사전. 학술 영문 논문 빈출 약어만 보수적으로 담는다
+// (정상 문장 경계 유지 > 약어 병합). 키는 소문자, 내부 점 포함 형태(e.g/u.s)와 점 제거
+// 형태(eg/us)를 isAbbreviationEnder에서 둘 다 대조한다. splitSentences(문장 분리)와
+// trailingIncomplete(cross-page carry 판정)가 공유한다 — '.' 종결만, '!'/'?'·말줄임('...')은 제외.
+export const ABBREVIATIONS = new Set([
+  // 라틴 약어
+  "e.g", "i.e", "cf", "vs", "etc", "et", "al", "viz", "ibid", "n.b",
+  "w.r.t", "a.k.a", "approx", "resp", "incl", "esp",
+  // 참조/구조 (Fig. 1 / Eq. (3) / Sec. 4 / Tab. 2 / Ref.)
+  "fig", "figs", "eq", "eqs", "tab", "tabs", "sec", "secs", "ref", "refs",
+  "no", "nos", "vol", "vols", "pp", "ch", "chap", "ed", "eds", "app", "alg",
+  // 경칭/이름
+  "dr", "prof", "mr", "mrs", "ms", "st", "jr", "sr",
+  // 지명/기관 (U.S. government 등)
+  "u.s", "u.k", "e.u",
+]);
+
+// text[i](종결 '.')가 문장 끝이 아니라 약어/이니셜의 마침표인지 판정. true면 분리/종결하지 않는다.
+// 보수적: 사전·이니셜에 확실히 걸릴 때만 true, 애매하면 false(정상 분리 유지).
+export function isAbbreviationEnder(text, i) {
+  if (text[i] !== ".") return false; // '!'/'?'는 약어 아님(호출부 가드와 이중 안전).
+  if (i > 0 && text[i - 1] === ".") return false; // 말줄임('...')·연속 마침표는 약어 아님.
+  // 직전 토큰을 역방향 추출(영문자 + 내부 점). 예: "e.g" / "U.S" / "Fig" / "al".
+  let j = i - 1;
+  while (j >= 0 && /[A-Za-z.]/.test(text[j])) j--;
+  const rawTok = text.slice(j + 1, i); // 종결 '.' 제외.
+  if (!rawTok) return false; // 숫자·기호 뒤 마침표("$5.")는 정상 종결.
+  const tok = rawTok.replace(/^\.+/, "").toLowerCase();
+  if (!tok) return false;
+  if (ABBREVIATIONS.has(tok) || ABBREVIATIONS.has(tok.replace(/\./g, ""))) return true;
+  // 단일 대문자 이니셜("J. Smith"/"A. B."): 종결 뒤 첫 비공백이 대문자/'('면 이니셜로 본다.
+  if (/^[A-Za-z]$/.test(rawTok) && rawTok === rawTok.toUpperCase()) {
+    const after = text.slice(i + 1).match(/\S/);
+    if (after && /[A-Z(]/.test(after[0])) return true;
+  }
+  return false;
+}
+
 function nonSpaceLen(s) {
   return s.replace(/\s/g, "").length;
 }

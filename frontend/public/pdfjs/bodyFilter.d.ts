@@ -62,6 +62,12 @@ export function mapBodyRange(
   bodyEnd: number,
 ): { startOffset: number; endOffset: number } | null;
 
+/** 문장 종결(.) 오인 방지용 약어 사전(소문자). splitSentences/trailingIncomplete 공유. */
+export const ABBREVIATIONS: Set<string>;
+
+/** text[i](종결 '.')가 약어/이니셜의 마침표인지 판정. true면 문장 분리/종결하지 않는다. */
+export function isAbbreviationEnder(text: string, i: number): boolean;
+
 /** 캡션 머리말 정규식(영문 + 그림/표). 캡션 판별과 라벨 파싱에서 공유. */
 export const CAPTION_RE: RegExp;
 
