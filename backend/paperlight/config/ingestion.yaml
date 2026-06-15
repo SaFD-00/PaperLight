@@ -4,3 +4,9 @@
 #   marker  — marker-pdf로 정밀 figure/table bbox 추출(torch+모델 수 GB, 무거움).
 # 우선순위: env INGEST_PARSER > 이 파일 > "pymupdf".
 parser: pymupdf
+
+# bodyfilter: 청크 본문 정제. figure/table 캡션 라인(Figure/Table/Algorithm N …)을 제거해
+#   RAG 검색 노이즈를 줄인다. references 섹션은 보존(agents/references.py가 청크에서 추출).
+#   pymupdf 텍스트는 좌표가 없어 캡션 패턴만 걷어내며 표 셀/도표 내부 텍스트는 남는다.
+#   우선순위: env INGEST_BODYFILTER > 이 파일 > true.
+bodyfilter: true

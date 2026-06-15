@@ -13,6 +13,7 @@ import logging
 from uuid import uuid4
 
 from paperlight.agents.pregen import pregen_paper
+from paperlight.ingestion.bodyfilter import filter_body_pages
 from paperlight.ingestion.chunker import chunk_pages
 from paperlight.ingestion.embedder import embed, pack_embedding
 from paperlight.ingestion.parser import parse_pdf
@@ -40,7 +41,9 @@ async def ingest_paper(paper_id: str) -> None:
 
         data = await asyncio.to_thread(get_object_store().get_pdf, pdf_key(paper_id))
         pages = await asyncio.to_thread(parse_pdf, data)
-        chunk_datas = chunk_pages(pages)
+        # 청크 전에 figure/table 캡션 등 비본문을 제거(references 보존). figure bbox는 raw
+        # pages에서 별도 수집하므로 정제 전/후 무관 — .figures를 보존해 순서 영향 없음.
+        chunk_datas = chunk_pages(filter_body_pages(pages))
 
         figures = [
             {

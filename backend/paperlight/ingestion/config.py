@@ -30,3 +30,16 @@ def get_parser() -> str:
     if env:
         return env
     return str(_load().get("parser") or "pymupdf")
+
+
+def _truthy(val: str) -> bool:
+    return val.strip().lower() not in ("0", "false", "no", "off", "")
+
+
+def bodyfilter_enabled() -> bool:
+    """청크 본문 정제(figure/table 캡션 제거) on/off — env INGEST_BODYFILTER > yaml > True."""
+    env = os.environ.get("INGEST_BODYFILTER")
+    if env is not None:
+        return _truthy(env)
+    val = _load().get("bodyfilter")
+    return True if val is None else bool(val)
