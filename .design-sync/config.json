@@ -1,0 +1,47 @@
+{
+  "projectId": "fef2055e-adce-4cc0-ba05-12ac13e44f8b",
+  "shape": "package",
+  "pkg": "paperlight-frontend",
+  "globalName": "PaperLight",
+  "srcDir": "src/components",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".ds-css/ds-compiled.css",
+  "tokensGlob": "src/styles/tokens.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "ShaderBackground": null
+  },
+  "extraEntries": [
+    "./src/stores/reader.ts",
+    "./src/stores/markup.ts",
+    "./src/stores/figures.ts"
+  ],
+  "overrides": {
+    "FloatingSelectionMenu": { "cardMode": "single", "viewport": "760x160" },
+    "SelectionTranslatePopover": { "cardMode": "single", "viewport": "480x240" },
+    "SelectionExplainPopover": { "cardMode": "single", "viewport": "480x420" },
+    "FigureExplainPopover": { "cardMode": "single", "viewport": "520x600" },
+    "ChatComposer": { "cardMode": "column" },
+    "ChatEmptyState": { "cardMode": "column" },
+    "ChatMessage": { "cardMode": "column" },
+    "CommandList": { "cardMode": "column" },
+    "Markdown": { "cardMode": "column" },
+    "InsightsPanel": { "cardMode": "column" },
+    "ReferencesPanel": { "cardMode": "column" },
+    "SummaryPanel": { "cardMode": "column" },
+    "Center": { "cardMode": "column" },
+    "CrossRefText": { "cardMode": "column" },
+    "PdfViewer": { "cardMode": "column" },
+    "ReaderShell": { "cardMode": "column" },
+    "RightPanel": { "cardMode": "column" },
+    "SearchBar": { "cardMode": "column" },
+    "AppShell": { "cardMode": "column" },
+    "CommandPalette": { "cardMode": "column" },
+    "Tab": { "cardMode": "column" },
+    "TabBar": { "cardMode": "column" },
+    "TopToolbar": { "cardMode": "column" }
+  },
+  "libOverrides": {
+    "bundle.mjs": "Next.js app: (1) process-shim banner for bundled remark/vfile + lib/api.ts process.env; (2) next/navigation no-op stub so useRouter() doesn't throw outside a Next app (TabBar/AppShell + every design)"
+  }
+}
